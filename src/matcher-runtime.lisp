@@ -104,7 +104,12 @@
 (defmacro defcomparison-matcher (name operator)
   `(defmatcher ,name (actual expected)
      (let ((target (real-expected expected ,name "comparison target")))
-       (values (and (realp actual) (,operator actual target))
+       ;; NaN is realp but an ordered comparison against it signals a
+       ;; floating-point trap under SBCL; treat it as a clean non-match.
+       (values (and (realp actual)
+                    (not (nan-value-p actual))
+                    (not (nan-value-p target))
+                    (,operator actual target))
                (comparison-report actual target ,name ',operator)
                (comparison-expected-report target ,name ',operator)))))
 
