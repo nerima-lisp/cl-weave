@@ -37,7 +37,7 @@ Pick the path that matches how you want to use the framework.
     nix run . -- --help                          # run the packaged CLI
     nix profile install .                         # install from the checkout
     timeout 600s nix flake check                  # every CI entrypoint
-    timeout 360s nix run . -- run cl-weave/tests --reporter spec
+    timeout 360s nix run . -- run cl-weave/test --reporter spec
     ```
 
     `timeout` is an optional outer guard for CI and automation; it is not

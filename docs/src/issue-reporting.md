@@ -21,7 +21,7 @@ Please include:
 For CLI or metadata issues, capture the command output directly when possible:
 
 ```sh
-timeout 120s nix run . -- metadata cl-weave/tests --output cl-weave-metadata.json
+timeout 120s nix run . -- metadata cl-weave/test --output cl-weave-metadata.json
 ```
 
 ## Report Template

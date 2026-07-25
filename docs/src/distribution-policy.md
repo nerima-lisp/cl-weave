@@ -10,7 +10,7 @@ The machine-readable source of truth is `distributionChannels` in
 `cl-weave metadata`. Human-facing documentation should describe the same three
 channels:
 
-- `source-self-test`: run `nix run . -- run cl-weave/tests` from a source
+- `source-self-test`: run `nix run . -- run cl-weave/test` from a source
   checkout to validate the bundled ASDF test suite.
 - `nix-local-cli`: install with `nix profile install .` from the current
   checkout root, then run `nix run . -- --help` to validate the packaged CLI.
