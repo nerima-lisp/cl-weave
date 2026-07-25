@@ -7,23 +7,23 @@ entrypoints for bugs, feature proposals, and pull requests.
 ## Intake Surfaces
 
 - Bug reports use
-  [.github/ISSUE_TEMPLATE/bug_report.md](../../.github/ISSUE_TEMPLATE/bug_report.md)
+  [.github/ISSUE_TEMPLATE/bug_report.md](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/bug_report.md)
   and must include `Summary`, `Reproduction`, `Expected Behavior`,
   `Actual Behavior`, `Validation`, and `Additional Context`.
 - Feature requests use
-  [.github/ISSUE_TEMPLATE/feature_request.md](../../.github/ISSUE_TEMPLATE/feature_request.md)
+  [.github/ISSUE_TEMPLATE/feature_request.md](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/feature_request.md)
   and must include `Problem`, `Proposed Change`, `Validation Plan`,
   `Scope Check`, and `Public Surface Notes`.
 - Pull requests use
-  [.github/pull_request_template.md](../../.github/pull_request_template.md) and
+  [.github/pull_request_template.md](https://github.com/takeokunn/cl-weave/blob/main/.github/pull_request_template.md) and
   must include `Summary`, `Validation`, `Public Surface Impact`, and
   `Follow-up Risk`.
 - Issue chooser routing lives in
-  [.github/ISSUE_TEMPLATE/config.yml](../../.github/ISSUE_TEMPLATE/config.yml) and
+  [.github/ISSUE_TEMPLATE/config.yml](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/config.yml) and
   should keep support, security, and reproduction guidance pointed at canonical
   policy documents.
 - Review ownership lives in
-  [.github/CODEOWNERS](../../.github/CODEOWNERS) and is the default routing source
+  [.github/CODEOWNERS](https://github.com/takeokunn/cl-weave/blob/main/.github/CODEOWNERS) and is the default routing source
   for repository-wide review responsibility.
 
 ## Canonical References

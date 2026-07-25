@@ -26,6 +26,15 @@ and saves readable coverage state with `sb-cover:save-coverage-in-file` when
 meaningless coverage artifacts. Pass `:coverage-reset nil` to merge the run
 into existing counters.
 
+For custom scripts, the same machinery is available directly:
+`coverage-support-available-p` reports whether `sb-cover` is usable (always
+`nil` off SBCL), `reset-coverage` and `save-coverage` clear and persist counters,
+and `coverage-statistics` returns a plist of `:expression-covered`,
+`:expression-total`, `:branch-covered`, and `:branch-total` (optionally scoped
+with `:include-pathnames` / `:exclude-pathnames`). When coverage is requested but
+unusable, cl-weave signals the `coverage-unavailable` condition (reader
+`coverage-unavailable-reason`).
+
 Use `--coverage` to enable `sb-cover:store-coverage-data` before loading the
 requested system. `--coverage-output` saves the coverage state for a subsequent
 reporting step, and `--coverage-report-directory` emits the HTML report. Limit
@@ -49,12 +58,17 @@ and lifecycle contracts through `supportChannels`, `securityContacts`,
 
 The packaged CLI accepts `--reporter` (`spec`, `sexp`, `json`, `jsonl`, `tap`,
 `github`, or `junit`), `--filter`, `--shard`, `--sequence`, `--seed`, `--bail`,
-`--retry`, `--test-timeout-ms`, `--max-workers`, `--coverage`, snapshot flags,
-and `--output`. Use the `list` command for discovery without execution. Use
-`--fail-with-no-tests` when a zero-test filtered CI run must fail. `tap` is for
-line-oriented logs, `github` emits GitHub Actions annotations, and `junit`
-produces XML for CI ingestion. List mode supports `spec`, `sexp`, `json`, and
-`jsonl`.
+`--retry`, `--test-timeout-ms`, `--max-workers`, `--coverage`, `--journal`,
+`--random-seed`, snapshot flags, and `--output`. Use the `list` command for
+discovery without execution. Use `--fail-with-no-tests` when a zero-test
+filtered CI run must fail. `tap` is for line-oriented logs, `github` emits
+GitHub Actions annotations, and `junit` produces XML for CI ingestion. List mode
+supports `spec`, `sexp`, `json`, and `jsonl`.
+
+`--journal` records an execution-journal timeline for each test attempt, and
+`--random-seed INTEGER` seeds `cl:random` deterministically for reproducible
+runs. Both apply to `run` and `watch`. See
+[Time-Travel Debugging](time-travel-debugging.md) for the full workflow.
 
 The CLI uses kebab-case flags consistently, including `--watch-interval`,
 `--coverage-output`, `--coverage-report-directory`, `--test-timeout-ms`,
@@ -65,10 +79,12 @@ filtering and output redirection use the single-word flags `--filter` and
 
 ## CI
 
-GitHub Actions runs the same Nix entrypoints used locally:
+GitHub Actions runs `nix flake check`, whose check derivations execute the same
+CLI entrypoints you can run locally (shown below), and then materializes their
+artifacts with `nix build .#checks.x86_64-linux.<name>-artifact`:
 
 ```sh
-timeout 600s nix flake check --print-build-logs
+timeout 600s nix flake check --print-build-logs --max-jobs 1
 timeout 360s nix run . -- run cl-weave/tests --coverage --coverage-output cl-weave.coverage --coverage-report-directory cl-weave-coverage-report/
 timeout 360s nix run . -- run cl-weave/tests --reporter json --output cl-weave-results.json
 timeout 360s nix run . -- run cl-weave/tests --reporter jsonl --output cl-weave-events.jsonl
@@ -102,7 +118,10 @@ schema v6 is intended for AI agents and external automation: the root object
 identifies itself with `kind: "test-results"`, and every event includes both a
 machine `path` and a stable Vitest-style `pathString`, while assertion payloads
 stay structurally typed for agent consumption. Ordered cleanup and hook failures
-are retained as `secondaryConditions`. JSONL event schema v3 is intended
+are retained as `secondaryConditions`. Each event also carries a `timeline`
+array (the execution-journal frames when `--journal` is enabled, otherwise
+empty) and a `replaySeed` (the per-test deterministic seed, or `null`), so
+agents can inspect the recorded lead-up to a failure and reproduce it. JSONL event schema v3 is intended
 for streaming automation, coverage is intended for SBCL-side inspection,
 metadata is intended for agent discovery, one-shot watch output is intended for
 automation that needs watch resolution without entering a polling loop, TAP is

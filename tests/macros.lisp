@@ -593,3 +593,86 @@
             :to-be (cl-weave::suite-around-each *coverage-fuzz-suite*))
     (expect (eval '(cl-weave::suite-hook *coverage-fuzz-suite* after-each))
             :to-be (cl-weave::suite-after-each *coverage-fuzz-suite*))))
+
+(describe "test plan entry positional constructor"
+  (it "constructs test plan entries with the same values and identities"
+    (let* ((path (list :path))
+           (status (list :status))
+           (reason (list :reason))
+           (focused (list :focused))
+           (retry (list :retry))
+           (timeout-ms (list :timeout-ms))
+           (concurrent (list :concurrent))
+           (location (list :location))
+           (tags (list :tags))
+           (values (list path status reason focused retry timeout-ms
+                         concurrent location tags))
+           (record
+             (cl-weave::make-test-plan-entry-record
+              path status reason focused retry timeout-ms concurrent location tags))
+           (ordinary
+             (cl-weave::make-test-plan-entry
+              :path path
+              :status status
+              :reason reason
+              :focused focused
+              :retry retry
+              :timeout-ms timeout-ms
+              :concurrent concurrent
+              :location location
+              :tags tags))
+           (accessors
+             (list (function cl-weave::test-plan-entry-path)
+                   (function cl-weave::test-plan-entry-status)
+                   (function cl-weave::test-plan-entry-reason)
+                   (function cl-weave::test-plan-entry-focused)
+                   (function cl-weave::test-plan-entry-retry)
+                   (function cl-weave::test-plan-entry-timeout-ms)
+                   (function cl-weave::test-plan-entry-concurrent)
+                   (function cl-weave::test-plan-entry-location)
+                   (function cl-weave::test-plan-entry-tags))))
+      (expect (eq (class-of record) (class-of ordinary)) :to-be t)
+      (loop for accessor in accessors
+            for value in values
+            do (expect (eq (funcall accessor record) value) :to-be t)
+               (expect (eq (funcall accessor record)
+                           (funcall accessor ordinary))
+                       :to-be t))))
+
+  (it "runs initialize-instance once while collecting a plan"
+    (let* ((generic-function (fdefinition (quote initialize-instance)))
+           (specializers
+             (list (find-class (quote cl-weave::test-plan-entry))))
+           (previous-method
+             (find-method generic-function (list :after) specializers nil))
+           (probe-symbol
+             (gensym "TEST-PLAN-ENTRY-INITIALIZE-PROBE-"))
+           (count-indicator (gensym "CALL-COUNT-"))
+           (method nil))
+      (unwind-protect
+           (progn
+             (remprop probe-symbol count-indicator)
+             (setf method
+                   (eval
+                    `(defmethod initialize-instance :after
+                         ((instance cl-weave::test-plan-entry)
+                          &rest initargs
+                          &key &allow-other-keys)
+                       (declare (ignore instance initargs))
+                       (incf
+                        (get (quote ,probe-symbol)
+                             (quote ,count-indicator)
+                             0)))))
+             (let ((root (cl-weave::make-suite :name "root")))
+               (cl-weave::add-child
+                root
+                (cl-weave::make-test-case
+                 :name "case"
+                 :function (lambda () t)))
+               (expect (length (cl-weave:collect-test-plan root)) :to-be 1)
+               (expect (get probe-symbol count-indicator 0) :to-be 1)))
+        (when method
+          (remove-method generic-function method))
+        (when previous-method
+          (add-method generic-function previous-method))
+        (remprop probe-symbol count-indicator)))))

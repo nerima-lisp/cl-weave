@@ -1,0 +1,156 @@
+# cl-weave documentation — MkDocs + Material configuration.
+#
+# Build:   mkdocs build -f docs/mkdocs.yml --strict
+# Serve:   mkdocs serve  -f docs/mkdocs.yml
+# The Nix flake (`nix build .#docs`) drives the same config offline.
+
+site_name: cl-weave
+site_description: >-
+  A modern Common Lisp testing framework inspired by Vitest — macros,
+  conditions, dynamic bindings, and reproducible Nix workflows.
+site_author: cl-weave contributors
+site_url: https://takeokunn.github.io/cl-weave/
+
+repo_name: takeokunn/cl-weave
+repo_url: https://github.com/takeokunn/cl-weave
+edit_uri: edit/main/docs/src/
+
+# Content lives in docs/src (kept from the previous mdBook layout).
+docs_dir: src
+site_dir: ../site
+use_directory_urls: true
+
+copyright: Copyright &copy; cl-weave contributors — MIT License
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/vector-triangle
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/takeokunn/cl-weave
+      name: cl-weave on GitHub
+  generator: false
+
+plugins:
+  - search
+
+markdown_extensions:
+  # Callouts / admonitions.
+  - admonition
+  - pymdownx.details
+  # Code blocks: syntax highlighting, line numbers, inline highlighting.
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  # Content tabs (e.g. the Nix run / profile / local-checkout install paths).
+  - pymdownx.tabbed:
+      alternate_style: true
+  # Task lists, key bindings, smart symbols, emoji.
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.keys
+  - pymdownx.smartsymbols
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+
+nav:
+  - Home: README.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quick Start: quick-start.md
+      - Adoption Guide: adoption.md
+  - Guide:
+      - DSL Guide: dsl-guide.md
+      - Assertions and Matchers: assertions.md
+      - Property Testing: property-testing.md
+      - Mutation Testing: mutation-testing.md
+      - Mocking: mocking.md
+      - Benchmarking: benchmarking.md
+      - Test Execution: test-execution.md
+      - Logic Programming: logic-programming.md
+      - Time-Travel Debugging: time-travel-debugging.md
+      - Reporters and CI: reporters-and-ci.md
+      - AI Discovery: ai-discovery.md
+  - Reference:
+      - AI Contract: ai-contract.md
+      - Runtime Support: runtime-support.md
+      - Doctor Report: doctor-report.md
+  - Governance:
+      - Project Scope: project-scope.md
+      - Governance: governance.md
+      - Triage Policy: triage-policy.md
+      - Support Policy: support-policy.md
+      - Versioning Policy: versioning-policy.md
+      - Maintenance Policy: maintenance-policy.md
+      - Distribution Policy: distribution-policy.md
+      - Release Process: release-process.md
+  - Contributing:
+      - Community Health: community-health.md
+      - Issue Reporting Guide: issue-reporting.md
+      - Pull Request Template: pull-request-template.md

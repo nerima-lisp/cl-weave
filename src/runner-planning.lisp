@@ -43,17 +43,17 @@
 (defun make-plan-entry
     (suite test status reason filter ancestor-focused execution-mode)
   (declare (ignore suite))
-  (make-test-plan-entry
-   :path (gethash test (selection-filter-test-paths filter))
-   :status status
-   :reason reason
-   :focused (and (selection-filter-focus-enabled filter)
-                 (or ancestor-focused (test-case-focus test)))
-   :retry (retry-count test)
-   :timeout-ms (effective-timeout-ms test)
-   :concurrent (effective-concurrent-test-case-p test execution-mode)
-   :location (test-case-location test)
-   :tags (test-case-tags test)))
+  (make-test-plan-entry-record
+   (gethash test (selection-filter-test-paths filter))
+   status
+   reason
+   (and (selection-filter-focus-enabled filter)
+        (or ancestor-focused (test-case-focus test)))
+   (retry-count test)
+   (effective-timeout-ms test)
+   (effective-concurrent-test-case-p test execution-mode)
+   (test-case-location test)
+   (test-case-tags test)))
 
 (defun concurrent-batching-enabled-p (control suppressed-status)
   (and (null suppressed-status)

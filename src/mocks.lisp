@@ -99,6 +99,9 @@
                     (mock-state-implementation state))))))
     (when disposed-p
       (error 'mock-disposed-error :mock mock))
+    ;; Interleave mock invocations onto the time-travel timeline (opt-in).
+    (when *execution-journal*
+      (record-journal-frame :mock-call :actual arguments :pass t))
     (values call-token implementation)))
 
 (defun register-mock-result (state call-token result)

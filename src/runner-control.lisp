@@ -62,7 +62,9 @@
     *update-snapshots*
     *property-test-count*
     *property-seed*
-    *recursive-generator-depth*))
+    *recursive-generator-depth*
+    *journal-enabled*
+    *test-random-seed*))
 
 (defconstant +stable-hash-modulus+ 4294967296)
 (defconstant +stable-hash-offset+ 2166136261)

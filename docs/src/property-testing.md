@@ -88,3 +88,72 @@ Use `*property-test-count*` and `*property-seed*` for dynamic REPL control, or
 `CL_WEAVE_PROPERTY_TESTS` must be a positive integer. Both CI environment
 variables are parsed strictly, so invalid values fail fast with a `cl-weave:`
 diagnostic instead of silently running zero generated cases.
+
+## Fuzzing with `it-fuzz`
+
+`it-fuzz` reuses `it-property`'s generator and shrinking machinery, but the body
+is *not* a boolean predicate. A trial passes simply by running without signaling
+an `error`; a trial that signals an `error` is a failure, and its generated
+inputs are minimized exactly as a failing `it-property`'s are. This makes
+`it-fuzz` the right tool for "must never crash" invariants over generated
+inputs — parsers, decoders, and state machines.
+
+```lisp
+(it-fuzz "parser never crashes on generated forms"
+    ((form (gen-form :operators '(progn list cons) :max-depth 3)))
+    (:trials 200 :timeout-per-trial 2)
+  (my-parser form))
+```
+
+`bindings` is the same literal `((name generator) ...)` list as `it-property`.
+`options` is a literal plist accepting:
+
+- `:trials` — number of generated trials (default `100`); it binds
+  `*property-test-count*` for the run.
+- `:timeout-per-trial` — per-trial budget in seconds (default `5`, or `nil` to
+  disable). A trial that merely *times out* is not evidence of a bug, so it
+  counts as neither a pass nor a failure and is skipped rather than shrunk.
+
+## Controlling Shrinking
+
+Shrinking is bounded and recoverable through the condition system, so a
+misbehaving shrinker never hangs a run:
+
+- `*property-shrink-max-steps*` (default `1000`) caps the number of shrink
+  steps. Exceeding it signals `property-shrink-limit` (readers
+  `property-shrink-limit-values`, `property-shrink-limit-steps`,
+  `property-shrink-limit-max-steps`), which offers the `accept-current` restart
+  to stop and keep the smallest value found so far.
+- If a generator's own shrink function errors, cl-weave signals
+  `property-shrinker-error` (readers `property-shrinker-error-generator`,
+  `property-shrinker-error-value`, `property-shrinker-error-cause`) with three
+  restarts: `retry-shrinker` (run the shrinker again), `use-value` (supply
+  replacement shrink candidates), and `skip-shrinking` (keep the current value
+  and stop shrinking it).
+- `same-property-failure-p` is a generic function that decides whether a shrink
+  candidate reproduces the *same* failure. The default method compares the
+  signaled condition's class; specialize it when two distinct failures share a
+  class and should not be conflated during minimization.
+
+## Watching a Shrink Run
+
+Every candidate the shrinker tries becomes a `:shrink-step` frame on the
+[execution journal](time-travel-debugging.md) when `*journal-enabled*` is
+bound, interleaved chronologically with the assertion frames from the
+property function itself. The frame's form is the full candidate argument
+tuple; `pass` records whether that candidate reproduced the failure and became
+the new shrink frontier:
+
+```lisp
+(let ((cl-weave:*journal-enabled* t))
+  (cl-weave:with-execution-journal
+    (cl-weave::shrink-property-values ...)))
+;; => (#<journal-frame #0 shrink-step arg 0 -> (5) rejected>
+;;     #<journal-frame #1 shrink-step arg 0 -> (1) accepted> ...)
+```
+
+In practice this surfaces automatically wherever the journal already does: the
+`spec` reporter prints the walk from the first failing case down to the
+minimal one underneath a failed `it-property` test, and `explain-journal` or
+the JSON `timeline` field carry the same frames for offline inspection or
+`replay-test`.

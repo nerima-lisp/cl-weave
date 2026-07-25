@@ -28,27 +28,38 @@
 (defun expand-smart-predicate-assertion (actual form)
   (let* ((operator (first actual))
          (operands (rest actual))
-         (values (loop for operand in operands collect (gensym "OPERAND-"))))
+         (values (loop for operand in operands collect (gensym "OPERAND-")))
+         (report-forms (loop for operand in operands
+                             for value in values
+                             collect `(operand-report-form ',operand ,value))))
     `(progn
        (record-assertion)
        (let ,(loop for value in values
                    for operand in operands
                    collect `(,value ,operand))
-         (unless (,operator ,@values)
-           (signal-smart-assertion-failure
-            ',form
-            ',operator
-            (list ,@(loop for operand in operands
-                          for value in values
-                          collect `(operand-report-form ',operand ,value)))
-            ',actual))
-         t))))
+         (if (,operator ,@values)
+             (progn
+               ;; Only the reporting list is skipped on the passing path when
+               ;; journaling is off, keeping the common case allocation-free.
+               (when (journaling-active-p)
+                 (record-smart-assertion-frame
+                  ',form ',operator (list ,@report-forms) ',actual t))
+               t)
+             (let ((reports (list ,@report-forms)))
+               (when (journaling-active-p)
+                 (record-smart-assertion-frame
+                  ',form ',operator reports ',actual nil))
+               (signal-smart-assertion-failure
+                ',form ',operator reports ',actual)))))))
 
 (defun expand-smart-truthy-assertion (actual form)
   (let ((value (gensym "ACTUAL-")))
     `(progn
        (record-assertion)
        (let ((,value ,actual))
+         (when (journaling-active-p)
+           (record-smart-assertion-frame
+            ',form :truthy ,value t (and ,value t)))
          (unless ,value
            (signal-smart-assertion-failure
             ',form

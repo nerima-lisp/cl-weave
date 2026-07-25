@@ -288,11 +288,16 @@
   (mop-required matcher))
 
 (defun matcher-result-values (matcher actual expected)
-  (let ((values (multiple-value-list
-                 (funcall (matcher-function matcher) actual expected))))
-    (values (first values)
-            (if (>= (length values) 2) (second values) actual)
-            (if (>= (length values) 3) (third values) expected))))
+  (multiple-value-call
+      (lambda (default-actual default-expected
+               &optional pass-p
+                         (actual-report default-actual)
+                         (expected-report default-expected)
+               &rest ignored)
+        (declare (dynamic-extent ignored) (ignore ignored))
+        (values pass-p actual-report expected-report))
+    (values actual expected)
+    (funcall (matcher-function matcher) actual expected)))
 
 (defun call-with-matcher-result/k (matcher actual expected continue)
   (multiple-value-call continue

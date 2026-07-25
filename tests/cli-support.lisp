@@ -90,3 +90,40 @@
     (when job
       (let ((steps-position (search "    steps:" job)))
         (subseq job 0 (or steps-position (length job)))))))
+
+(defparameter +setup-nix-cachix-action-path+
+  #P".github/actions/setup-nix-cachix/action.yml"
+  "Composite action that both CI and docs workflows delegate Nix/Cachix setup to.
+The Cachix pull-vs-push gating lives here so the two workflows share one source.")
+
+(defun action-step-blocks (action)
+  "Split a composite-action body into per-step blocks. Composite-action steps are
+indented two columns less than workflow-job steps (`    - name:` vs `      - name:`)."
+  (loop with marker = "    - name:"
+        with length = (length action)
+        for start = (search marker action)
+          then (and end (search marker action :start2 end))
+        while start
+        for end = (or (search marker action :start2 (+ start (length marker)))
+                      length)
+        collect (subseq action start end)))
+
+(defun action-step-for-name (action name)
+  (let ((marker (format nil "- name: ~A" name)))
+    (find-if (lambda (step)
+               (search marker step))
+             (action-step-blocks action))))
+
+(defun ci-templated-artifact-bundle (ci)
+  "The metadata artifact-bundle name with its concrete system replaced by the
+workflow matrix template, so the contract accepts the matrix-ready workflow while
+staying derived from the metadata (bundle name + declared system)."
+  (let* ((bundle (getf ci :artifact-bundle))
+         (system (first (getf ci :systems)))
+         (position (and system (search system bundle))))
+    (if position
+        (concatenate 'string
+                     (subseq bundle 0 position)
+                     "${{ matrix.system }}"
+                     (subseq bundle (+ position (length system))))
+        bundle)))

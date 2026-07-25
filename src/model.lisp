@@ -38,6 +38,9 @@
       (note-test-registry-change-unlocked)
       registration))))
 (defvar *test-context* nil)
+(defvar *soft-assertion-sink* nil
+  "When bound to an adjustable vector (inside WITH-SOFT-ASSERTIONS), a failing
+assertion is collected there and execution continues instead of unwinding.")
 (defvar *assertion-count* nil)
 (defvar *expected-assertion-count* nil)
 (defvar *expected-assertion-count-form* nil)
@@ -110,10 +113,25 @@
 
 (define-record-class test-event
   (status path condition secondary-conditions assertion reason location
-   elapsed-internal-time))
+   elapsed-internal-time journal replay-seed))
 
-(define-record-class test-plan-entry
-  (path status reason focused retry timeout-ms concurrent location tags))
+(progn
+  (define-record-class test-plan-entry
+    (path status reason focused retry timeout-ms concurrent location tags))
+
+  (defun make-test-plan-entry-record
+      (path status reason focused retry timeout-ms concurrent location tags)
+    (make-instance
+     (load-time-value (find-class (quote test-plan-entry)))
+     :path path
+     :status status
+     :reason reason
+     :focused focused
+     :retry retry
+     :timeout-ms timeout-ms
+     :concurrent concurrent
+     :location location
+     :tags tags)))
 
 (define-record-class benchmark-result
   (samples iterations warmup))
@@ -352,45 +370,49 @@
 returns for each element, and return the unique values in original order.
 Calls OVERFLOW-ERROR-FN (expected to signal an error) instead of returning
 if LIST is circular, improper, or longer than MAXIMUM elements."
-  (loop with seen-cells = (make-hash-table :test #'eq)
-        with seen-keys = (make-hash-table :test #'equal)
-        with normalized = '()
-        with count = 0
-        with cursor = list
-        do (cond
-             ((null cursor)
-              (return (nreverse normalized)))
-             ((or (atom cursor)
-                  (gethash cursor seen-cells)
-                  (>= count maximum))
-              (funcall overflow-error-fn))
-             (t
-              (setf (gethash cursor seen-cells) t)
-              (incf count)
-              (multiple-value-bind (key value) (funcall canonicalize-fn (car cursor))
-                (unless (gethash key seen-keys)
-                  (setf (gethash key seen-keys) t)
-                  (push value normalized)))
-              (setf cursor (cdr cursor))))))
+  (if (null list)
+      nil
+      (loop with seen-cells = (make-hash-table :test #'eq)
+            with seen-keys = (make-hash-table :test #'equal)
+            with normalized = '()
+            with count = 0
+            with cursor = list
+            do (cond
+                 ((null cursor)
+                  (return (nreverse normalized)))
+                 ((or (atom cursor)
+                      (gethash cursor seen-cells)
+                      (>= count maximum))
+                  (funcall overflow-error-fn))
+                 (t
+                  (setf (gethash cursor seen-cells) t)
+                  (incf count)
+                  (multiple-value-bind (key value) (funcall canonicalize-fn (car cursor))
+                    (unless (gethash key seen-keys)
+                      (setf (gethash key seen-keys) t)
+                      (push value normalized)))
+                  (setf cursor (cdr cursor)))))))
 
 (defconstant +maximum-tag-count+ 100000)
 
 (defun normalize-tags (tags &optional (description "tags"))
   "Canonicalize tags to unique uppercase strings, comparing names case-insensitively."
-  (collect-bounded-unique
-   tags +maximum-tag-count+
-   (lambda ()
-     (error
-      "cl-weave: ~A must be a finite proper list with at most ~D entries."
-      description
-      +maximum-tag-count+))
-   (lambda (tag)
-     (let* ((name
-              (etypecase tag
-                (symbol (symbol-name tag))
-                (string tag)))
-            (canonical (string-upcase name)))
-       (values canonical canonical)))))
+  (if (null tags)
+      nil
+      (collect-bounded-unique
+       tags +maximum-tag-count+
+       (lambda ()
+         (error
+          "cl-weave: ~A must be a finite proper list with at most ~D entries."
+          description
+          +maximum-tag-count+))
+       (lambda (tag)
+         (let* ((name
+                  (etypecase tag
+                    (symbol (symbol-name tag))
+                    (string tag)))
+                (canonical (string-upcase name)))
+           (values canonical canonical))))))
 
 
 (defun collapse-parent-directory-components (pathname)
@@ -412,33 +434,35 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
 (defconstant +maximum-watch-dependency-count+ 100000)
 
 (defun normalize-watch-dependencies (dependencies location)
-  (let* ((source (getf location :file))
-         (base (and source
-                    (uiop:pathname-directory-pathname
-                     (uiop:ensure-absolute-pathname source)))))
-    (collect-bounded-unique
-     dependencies +maximum-watch-dependency-count+
-     (lambda ()
-       (error
-        "cl-weave: watch dependencies must be a finite proper list with at most ~D entries."
-        +maximum-watch-dependency-count+))
-     (lambda (dependency)
-       (let* ((pathname
-                (etypecase dependency
-                  (pathname dependency)
-                  (string (pathname dependency))))
-              (absolute
-                (if (uiop:absolute-pathname-p pathname)
-                    pathname
-                    (if base
-                        (merge-pathnames pathname base)
-                        (error
-                         "cl-weave: relative watch dependency ~S requires a test source location."
-                         dependency))))
-              (canonical
-                (collapse-parent-directory-components
-                 (uiop:ensure-absolute-pathname absolute))))
-         (values canonical canonical))))))
+  (if (null dependencies)
+      nil
+      (let* ((source (getf location :file))
+             (base (and source
+                        (uiop:pathname-directory-pathname
+                         (uiop:ensure-absolute-pathname source)))))
+        (collect-bounded-unique
+         dependencies +maximum-watch-dependency-count+
+         (lambda ()
+           (error
+            "cl-weave: watch dependencies must be a finite proper list with at most ~D entries."
+            +maximum-watch-dependency-count+))
+         (lambda (dependency)
+           (let* ((pathname
+                    (etypecase dependency
+                      (pathname dependency)
+                      (string (pathname dependency))))
+                  (absolute
+                    (if (uiop:absolute-pathname-p pathname)
+                        pathname
+                        (if base
+                            (merge-pathnames pathname base)
+                            (error
+                             "cl-weave: relative watch dependency ~S requires a test source location."
+                             dependency))))
+                  (canonical
+                    (collapse-parent-directory-components
+                     (uiop:ensure-absolute-pathname absolute))))
+             (values canonical canonical)))))))
 
 
 (defun test-registration-initargs
@@ -453,11 +477,14 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
         :todo-reason todo-reason
         :retry retry
         :timeout-ms timeout-ms
-        :execution-mode (normalize-execution-mode execution-mode)
+        :execution-mode (and execution-mode
+                             (normalize-execution-mode execution-mode))
         :expected-failure-reason expected-failure-reason
         :location location
-        :tags (normalize-tags tags)
-        :watch-dependencies (normalize-watch-dependencies watch-dependencies location)))
+        :tags (and tags (normalize-tags tags))
+        :watch-dependencies
+        (and watch-dependencies
+             (normalize-watch-dependencies watch-dependencies location))))
 
 (defun register-suite
     (name thunk &key focus execution-mode skip-reason todo-reason location)
@@ -505,7 +532,15 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
 (define-tail-registration register-after-each suite-after-each suite-after-each-tail)
 
 (defun signal-assertion-failure (detail)
-  (error 'assertion-failure :detail detail))
+  "Signal an assertion failure. Inside WITH-SOFT-ASSERTIONS the DETAIL is
+collected and returned so the surrounding form keeps running; otherwise the
+failure unwinds the test as usual."
+  (let ((sink *soft-assertion-sink*))
+    (if sink
+        (progn
+          (vector-push-extend detail sink)
+          detail)
+        (error 'assertion-failure :detail detail))))
 
 (defun assertion-counting-active-p ()
   (integerp *assertion-count*))

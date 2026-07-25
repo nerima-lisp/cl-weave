@@ -9,6 +9,20 @@
       (format stream "~&    expected: ~S" (assertion-detail-expected detail))
       (format stream "~&    negated: ~S" (assertion-detail-negated detail)))))
 
+(defun report-journal-frame (frame stream)
+  (format stream "~&      ~A" (journal-frame-line frame)))
+
+(defun report-journal-timeline (frames stream)
+  (when frames
+    (format stream "~&    timeline (~D frame~:P):" (length frames))
+    (dolist (frame frames)
+      (report-journal-frame frame stream))))
+
+(defun report-replay-seed (seed stream)
+  (when seed
+    (format stream "~&    replay seed: ~D (bind *test-random-seed* to reproduce)"
+            seed)))
+
 (defun report-spec (events stream)
   (let ((summary (result-summary events)))
     (dolist (event events)
@@ -22,7 +36,9 @@
         (format stream "~&    condition: ~A" (test-event-condition event))
         (dolist (condition (test-event-secondary-conditions event))
           (format stream "~&    secondary condition: ~A" condition))
-        (report-assertion-detail (test-event-assertion event) stream)))
+        (report-assertion-detail (test-event-assertion event) stream)
+        (report-journal-timeline (test-event-journal event) stream)
+        (report-replay-seed (test-event-replay-seed event) stream)))
     (format stream "~&~%~D passed, ~D skipped, ~D todo, ~D failed, ~D errored, ~D total~%"
             (getf summary :passed)
             (getf summary :skipped)
@@ -31,6 +47,19 @@
             (getf summary :errored)
             (getf summary :total))
     (values)))
+
+;; The inverse, JOURNAL-FRAME-FROM-PLIST (journal.lisp), rebuilds a frame from
+;; this plist; a round-trip test guards the two against key drift. Keep the keys
+;; here in sync with that reader.
+(defun serializable-journal-frame (frame)
+  (list :index (journal-frame-index frame)
+        :kind (journal-frame-kind frame)
+        :form (journal-frame-form frame)
+        :matcher (journal-frame-matcher frame)
+        :actual (journal-frame-actual frame)
+        :expected (journal-frame-expected frame)
+        :pass (journal-frame-pass frame)
+        :elapsed-internal-time (journal-frame-elapsed-internal-time frame)))
 
 (defun serializable-event (event)
   (list :status (test-event-status event)
@@ -51,7 +80,9 @@
                               :actual (assertion-detail-actual detail)
                               :expected (assertion-detail-expected detail)
                               :negated (assertion-detail-negated detail)
-                              :pass (assertion-detail-pass detail))))))
+                              :pass (assertion-detail-pass detail))))
+        :timeline (mapcar #'serializable-journal-frame (test-event-journal event))
+        :replay-seed (test-event-replay-seed event)))
 
 (define-sexp-reporter report-sexp (events stream)
   :tag :cl-weave/results

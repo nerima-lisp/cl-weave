@@ -43,7 +43,7 @@ verification and scope policy for those channels lives in
 {
   "schemaVersion": 23,
   "kind": "cl-weave-metadata",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "homepage": "https://github.com/takeokunn/cl-weave",
   "bugTracker": "https://github.com/takeokunn/cl-weave/issues",
   "license": "MIT",
@@ -343,12 +343,13 @@ verification and scope policy for those channels lives in
           "required": true,
           "description": "Ordered test events."
         },
-        {
-          "name": "summary",
-          "kind": "object",
-          "required": true,
-          "description": "Aggregated run counts and failure paths."
-        }
+        { "name": "passed", "kind": "integer", "required": true },
+        { "name": "skipped", "kind": "integer", "required": true },
+        { "name": "todos", "kind": "integer", "required": true },
+        { "name": "failed", "kind": "integer", "required": true },
+        { "name": "errored", "kind": "integer", "required": true },
+        { "name": "failedPaths", "kind": "array", "required": true },
+        { "name": "erroredPaths", "kind": "array", "required": true }
       ]
     },
     {
@@ -429,7 +430,7 @@ verification and scope policy for those channels lives in
       "name": "vitest-dsl",
       "status": "implemented",
       "summary": "Hierarchical and table-driven test registration.",
-      "publicApis": ["describe", "it", "describe-each", "it-concurrent", "it-isolated"],
+      "publicApis": ["describe", "it", "describe-each", "it-each", "it-concurrent", "it-property", "it-isolated"],
       "qualityGates": ["flake-check", "filtered-smoke", "plan-artifact"],
       "documentation": ["README.md", "docs/src/ai-contract.md"]
     }
@@ -718,11 +719,22 @@ The reporter prints one JSON object:
       "condition": null,
       "secondaryConditions": [],
       "reason": null,
-      "assertion": null
+      "assertion": null,
+      "timeline": [],
+      "replaySeed": null
     }
   ]
 }
 ```
+
+Every event also carries a `timeline` array and a `replaySeed`. `timeline` holds
+the execution-journal frames recorded when `--journal` (or `*journal-enabled*`)
+is active — one object per frame with `index`, `kind` (`assertion`,
+`mock-call`, `hook`, or `note`), `form`, `matcher`, `actual`, `expected`,
+`pass`, and `elapsedInternalTime` — and is `[]` otherwise. `replaySeed` is the
+per-test deterministic seed used when `--random-seed` (or `*test-random-seed*`)
+is set, or `null`. Both are nested inside each event, so schema v6 is unchanged.
+See [Time-Travel Debugging](time-travel-debugging.md).
 
 `location` is source metadata captured by the `it` family of macros. Portable
 Common Lisp does not expose reliable source line numbers across implementations,
@@ -739,7 +751,7 @@ It prints one JSON object per line:
 
 ```jsonl
 {"schemaVersion":1,"kind":"test-results-start","total":1}
-{"schemaVersion":3,"kind":"test-event","event":{"status":"pass","path":["suite","case"],"pathString":"suite > case","location":{"file":"tests/example.lisp"},"seconds":0.0,"durationMs":0.0,"condition":null,"secondaryConditions":[],"reason":null,"assertion":null}}
+{"schemaVersion":3,"kind":"test-event","event":{"status":"pass","path":["suite","case"],"pathString":"suite > case","location":{"file":"tests/example.lisp"},"seconds":0.0,"durationMs":0.0,"condition":null,"secondaryConditions":[],"reason":null,"assertion":null,"timeline":[],"replaySeed":null}}
 {"schemaVersion":1,"kind":"test-results-summary","passed":1,"skipped":0,"todos":0,"failed":0,"errored":0,"failedPaths":[],"erroredPaths":[]}
 ```
 
@@ -1245,7 +1257,8 @@ CLI flags use canonical kebab-case names only. Agent-generated commands must
 emit the canonical option names directly, for example `--filter`,
 `--output`, `--watch-interval`, `--coverage-output`, `--test-timeout-ms`,
 `--pass-with-no-tests`, `--fail-with-no-tests`, `--snapshot-dir`,
-`--snapshot-file`, `--max-workers`, and `--update-snapshots`.
+`--snapshot-file`, `--max-workers`, `--update-snapshots`, `--journal`, and
+`--random-seed`.
 
 Filtering changes which events are emitted; it does not change the event shape
 or reporter schema versions. If no test matches, reporters emit zero events and

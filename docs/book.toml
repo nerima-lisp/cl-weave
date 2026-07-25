@@ -1,9 +1,0 @@
-[book]
-authors = ["cl-weave contributors"]
-language = "en"
-src = "src"
-title = "cl-weave"
-
-[output.html]
-git-repository-url = "https://github.com/takeokunn/cl-weave"
-edit-url-template = "https://github.com/takeokunn/cl-weave/edit/main/{path}"

@@ -10,6 +10,18 @@
                cl-weave:*snapshot-file-name*)))
      ,@body))
 
+(defmacro with-cli-journal-settings ((options) &body body)
+  "Bind the time-travel toggles from OPTIONS: --journal enables the execution
+journal and --random-seed drives deterministic replay. Both ride in the runner's
+dynamic environment, so worker threads inherit them."
+  `(let ((cl-weave:*journal-enabled*
+           (or (cli-options-journal ,options)
+               cl-weave:*journal-enabled*))
+         (cl-weave:*test-random-seed*
+           (or (cli-options-random-seed ,options)
+               cl-weave:*test-random-seed*)))
+     ,@body))
+
 (defun command-dispatch-kind (options)
   (cond
     ((eq (cli-options-command options) :doctor) :doctor)
@@ -258,7 +270,8 @@
     (prepare-coverage-compilation options)
     (load-requested-inputs options))
   (with-cli-snapshot-settings (options)
-    (execute-command-plan (command-execution-plan options) options)))
+    (with-cli-journal-settings (options)
+      (execute-command-plan (command-execution-plan options) options))))
 
 #+sbcl
 (defun process-arguments ()

@@ -220,6 +220,13 @@ and editor integrations:
 ;;     :description "Checks that a response plist has the expected HTTP status.")
 ```
 
+`list-matchers` returns **every** registered matcher sorted by name; the two
+entries above are representative rather than the literal first elements —
+built-in matchers often have a `nil` description, while custom matchers carry
+the description you gave `defmatcher`. A resolved `matcher` object also answers
+`matcher-name` and `matcher-description` directly, which is what
+`matcher-metadata` serializes.
+
 ## Performance And Allocation
 
 Performance assertions accept thunks so the measured form is executed exactly
@@ -338,3 +345,28 @@ without ad-hoc reflection helpers:
 
 These matchers report normalized slot and method-specializer lists through the
 structured reporters, which keeps architecture tests AI-readable.
+
+## Soft Assertions
+
+A normal `expect` aborts the test at the first failure. Wrap several
+expectations in `with-soft-assertions` to run them all and report every failure
+together:
+
+```lisp
+(it "validates the whole response"
+  (with-soft-assertions
+    (expect (status response) :to-be 200)
+    (expect (content-type response) :to-equal "application/json")
+    (expect (body response) :to-contain "ok")))
+```
+
+If the status is wrong *and* the body is missing `"ok"`, both failures are
+reported in one run instead of only the first. The block reports them as a
+single aggregated failure whose payload carries `:failures` (the count) and
+`:details` (one entry per failed expectation).
+
+Only assertion failures are softened — a genuine error (a raised condition,
+not an `expect` failure) still aborts the block immediately. This is built on
+Common Lisp's condition system: inside the block a failing assertion is
+collected and execution simply continues, so no per-expression rewriting is
+needed.

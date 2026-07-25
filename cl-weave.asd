@@ -6,7 +6,7 @@
   :license "MIT"
   :homepage "https://github.com/takeokunn/cl-weave"
   :bug-tracker "https://github.com/takeokunn/cl-weave/issues"
-  :version "0.10.0"
+  :version "0.11.0"
   :serial t
   :components
   ((:module "src"
@@ -17,6 +17,9 @@
      (:file "platform-portable")
      (:file "platform-sbcl")
      (:file "model")
+     (:file "journal")
+     (:file "replay")
+     (:file "soft")
      (:file "benchmark")
      (:file "logic")
      (:file "isolation")
@@ -152,6 +155,9 @@
      (:file "reporter-ci")
      (:file "reporter-status")
      (:file "reporter-runtime")
+     (:file "journal")
+     (:file "replay")
+     (:file "soft")
      (:file "runner-public-api"))))
   :perform (test-op (op c)
              (declare (ignore op c))

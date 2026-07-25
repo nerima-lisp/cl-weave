@@ -161,7 +161,31 @@
   (values))
 
 (defun results-status (results)
-  (every #'passed-event-p (normalize-run-results results)))
+  (let ((passedp t)
+        (leave-marker (list nil))
+        (active-conses (make-hash-table :test (function eq)))
+        (work (list results)))
+    (loop while work
+          for item = (pop work)
+          do (if (and (consp item)
+                      (eq (car item) leave-marker))
+                 (remhash (cdr item) active-conses)
+                 (cond
+                   ((null item))
+                   ((test-event-p item)
+                    (unless (passed-event-p item)
+                      (setf passedp nil)))
+                   ((consp item)
+                    (when (gethash item active-conses)
+                      (error "cl-weave: circular nested event lists are not supported."))
+                    (setf (gethash item active-conses) t)
+                    (push (cons leave-marker item) work)
+                    (push (cdr item) work)
+                    (push (car item) work))
+                   (t
+                    (error "cl-weave: expected test events or nested event lists, got ~S."
+                           item)))))
+    passedp))
 
 (defun run-all (&key (reporter :spec)
                   (stream *standard-output*)
@@ -219,6 +243,71 @@
      :exclude-pathnames coverage-exclude-pathnames
      :minimum-expression coverage-minimum-expression
      :minimum-branch coverage-minimum-branch)))
+
+(defun split-path-string (string)
+  "Split a ' > '-joined Vitest-style path into its component strings."
+  (let ((separator " > ")
+        (parts '())
+        (start 0))
+    (loop
+      (let ((position (search separator string :start2 start)))
+        (if position
+            (progn
+              (push (subseq string start position) parts)
+              (setf start (+ position (length separator))))
+            (progn
+              (push (subseq string start) parts)
+              (return)))))
+    (nreverse parts)))
+
+(defun normalize-replay-path (path)
+  (cond
+    ((stringp path) (split-path-string path))
+    ((and (listp path) (every #'stringp path)) path)
+    (t (error "cl-weave: replay path must be a string or list of strings, got ~S."
+              path))))
+
+(defun find-test-by-path (target-path)
+  "Return (values suite test) for the registered test whose path equals
+TARGET-PATH, or (values NIL NIL) when none matches."
+  (labels ((walk (suite)
+             (dolist (child (suite-children suite))
+               (cond
+                 ((test-case-p child)
+                  (when (equal (test-path suite child) target-path)
+                    (return-from find-test-by-path (values suite child))))
+                 ((suite-p child)
+                  (walk child))))))
+    (walk (root-suite))
+    (values nil nil)))
+
+(defun replay-test (path &key (seed nil seed-supplied-p) breakpoint)
+  "Re-run the single registered test identified by PATH with journaling enabled
+and return (values event frames). PATH is a list of suite/test name strings or a
+' > '-joined string, matching the Vitest-style path reporters print. When SEED (a
+base seed) is supplied the run uses deterministic replay so CL:RANDOM reproduces;
+otherwise the current *TEST-RANDOM-SEED* applies. Signals an error when PATH
+matches no registered test.
+
+BREAKPOINT, when supplied, is an integer JOURNAL-FRAME index or a function of
+one frame; the run signals JOURNAL-BREAKPOINT-HIT (and, left unhandled, drops
+into a live debugger) the instant a matching frame is recorded, with the
+test's dynamic environment still on the stack. Pair it with JOURNAL-DIFF: diff
+two timelines to find the diverging frame index, then pass that index here to
+land exactly where the two runs disagreed.
+
+This is the programmatic heart of time-travel debugging: capture a failing
+event's replaySeed from a run, then replay that one test in isolation and inspect
+its recorded timeline."
+  (let ((target (normalize-replay-path path)))
+    (multiple-value-bind (suite test) (find-test-by-path target)
+      (unless test
+        (error "cl-weave: no registered test found for replay path ~S." path))
+      (let ((*journal-enabled* t)
+            (*test-random-seed* (if seed-supplied-p seed *test-random-seed*))
+            (*journal-breakpoint* (normalize-journal-breakpoint breakpoint)))
+        (let ((event (run-test-case suite test)))
+          (values event (test-event-journal event)))))))
 
 (defun list-tests (&key (reporter :spec)
                      (stream *standard-output*)

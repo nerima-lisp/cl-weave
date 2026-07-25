@@ -28,13 +28,15 @@
 
 (defun run-concurrent-test-cases (suite tests)
   #+sb-thread
-  (let* ((test-vector (coerce tests (quote vector)))
-         (test-count (length test-vector))
+  (let* ((test-count (length tests))
          (worker-count (worker-batch-size tests test-count)))
     (if (<= worker-count 1)
-        (loop for test across test-vector
-              collect (run-test-case/internal suite test))
-        (let* ((captured-environment
+        (map (quote list)
+             (lambda (test)
+               (run-test-case/internal suite test))
+             tests)
+        (let* ((test-vector (coerce tests (quote vector)))
+               (captured-environment
                  (capture-runner-dynamic-environment))
                (results (make-array test-count))
                (cancel-mask (ash 1 (integer-length most-positive-fixnum)))

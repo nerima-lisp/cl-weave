@@ -10,34 +10,33 @@
 
 (progn
   (defun build-focus-index (suite)
-    (let ((index (make-hash-table :test #'eq))
-          (stack (list (list :enter suite nil t))))
+    (let ((index (make-hash-table :test (function eq)))
+          (stack (list (list* suite nil (suite-children suite)))))
       (loop while stack
-            do (destructuring-bind (phase node ancestor-focused root-p)
-                   (pop stack)
-                 (ecase phase
-                   (:enter
-                    (cond
-                      ((suite-p node)
-                       (let ((focused
-                               (or ancestor-focused
-                                   (and (not root-p)
-                                        (suite-focus node)))))
-                         (push (list :exit node focused root-p) stack)
-                         (dolist (child
-                                  (reverse
-                                   (copy-list (suite-children node))))
-                           (push (list :enter child focused nil) stack))))
-                      ((test-case-p node)
-                       (when (or ancestor-focused
-                                 (test-case-focus node))
-                         (setf (gethash node index) t)))))
-                   (:exit
-                    (when (or ancestor-focused
-                              (some (lambda (child)
-                                      (gethash child index))
-                                    (suite-children node)))
-                      (setf (gethash node index) t))))))
+            for frame = (car stack)
+            for node = (car frame)
+            for ancestor-focused = (cadr frame)
+            for remaining = (cddr frame)
+            do (if remaining
+                   (let ((child (car remaining)))
+                     (setf (cddr frame) (cdr remaining))
+                     (cond
+                       ((suite-p child)
+                        (let ((focused (or ancestor-focused
+                                           (suite-focus child))))
+                          (push (list* child focused (suite-children child))
+                                stack)))
+                       ((test-case-p child)
+                        (when (or ancestor-focused
+                                  (test-case-focus child))
+                          (setf (gethash child index) t)))))
+                   (progn
+                     (pop stack)
+                     (when (or ancestor-focused
+                               (some (lambda (child)
+                                       (gethash child index))
+                                     (suite-children node)))
+                       (setf (gethash node index) t)))))
       (values (not (null (gethash suite index))) index)))
 
   (defun focused-suite-p (suite)
@@ -209,36 +208,35 @@
         (selected-suites (make-hash-table :test (function eq)))
         (test-paths (make-hash-table :test (function eq)))
         (ordinal 0)
-        (stack (list (list :enter suite nil))))
+        (stack (list (cons suite (suite-children suite)))))
     (loop while stack
-          do (destructuring-bind (phase node parent-suite)
-                 (pop stack)
-               (ecase phase
-                 (:enter
-                  (cond
-                    ((suite-p node)
-                     (push (list :exit node nil) stack)
-                     (dolist (child
-                              (reverse
-                               (copy-list (suite-children node))))
-                       (push (list :enter child node) stack)))
-                    ((test-case-p node)
-                     (let ((path (test-path parent-suite node)))
-                       (setf (gethash node test-paths) path)
-                       (when (base-selected-test-case-p
-                              node path filter nil)
-                         (incf ordinal)
-                         (when (or (null shard)
-                                   (shard-includes-ordinal-p ordinal shard))
-                           (setf (gethash node selected-tests) t)))))))
-                 (:exit
-                  (when (some (lambda (child)
-                                (if (suite-p child)
-                                    (gethash child selected-suites)
-                                    (and (test-case-p child)
-                                         (gethash child selected-tests))))
-                              (suite-children node))
-                    (setf (gethash node selected-suites) t))))))
+          for frame = (car stack)
+          for node = (car frame)
+          for remaining = (cdr frame)
+          do (if remaining
+                 (let ((child (car remaining)))
+                   (setf (cdr frame) (cdr remaining))
+                   (cond
+                     ((suite-p child)
+                      (push (cons child (suite-children child)) stack))
+                     ((test-case-p child)
+                      (let ((path (test-path node child)))
+                        (setf (gethash child test-paths) path)
+                        (when (base-selected-test-case-p
+                               child path filter nil)
+                          (incf ordinal)
+                          (when (or (null shard)
+                                    (shard-includes-ordinal-p ordinal shard))
+                            (setf (gethash child selected-tests) t)))))))
+                 (progn
+                   (pop stack)
+                   (when (some (lambda (child)
+                                 (if (suite-p child)
+                                     (gethash child selected-suites)
+                                     (and (test-case-p child)
+                                          (gethash child selected-tests))))
+                               (suite-children node))
+                     (setf (gethash node selected-suites) t)))))
     (values selected-tests selected-suites test-paths)))
 
 (defun normalize-sequence-order (order)
@@ -306,17 +304,17 @@
     (if (eq *test-sequence-order* :random)
         (let* ((prefix (sequence-suite-prefix suite))
                (prefix-hash
-                 (stable-string-hash prefix *test-sequence-seed*))
+                (stable-string-hash prefix *test-sequence-seed*))
                (decorated
-                 (stable-sort
-                  (mapcar
-                   (lambda (child)
-                     (cons (sequence-child-hash
-                            suite child prefix prefix-hash)
-                           child))
-                   children)
-                  (function <)
-                  :key (function car))))
+                (stable-sort
+                 (mapcar
+                  (lambda (child)
+                    (cons (sequence-child-hash
+                           suite child prefix prefix-hash)
+                          child))
+                  children)
+                 (function <)
+                 :key (function car))))
           (loop for cell on decorated
                 do (setf (car cell) (cdar cell)))
           decorated)

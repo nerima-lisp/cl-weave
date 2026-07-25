@@ -1,6 +1,7 @@
 (in-package #:cl-weave/tests)
 
-(describe "tag filter normalization"
+(progn
+  (describe "tag filter normalization"
   (it "accepts maximum include and exclude tags in canonical first order"
     (let* ((limit cl-weave::+maximum-tag-count+)
            (include-tags (make-list limit :initial-element :fast))
@@ -48,3 +49,64 @@
               :to-equal '("FAST" "SLOW" "OTHER"))
       (expect (cl-weave::collection-options-exclude-tags captured-options)
               :to-equal '("DATABASE" "CACHE")))))
+  (describe "normalization NIL fast paths"
+  (it "preserves empty registration and collection defaults"
+    (let* ((initargs
+             (cl-weave::test-registration-initargs
+              "empty" #'identity nil nil nil nil nil nil nil nil nil nil))
+           (options (cl-weave::normalize-collection-options)))
+      (expect (cl-weave::normalize-tags nil) :to-be nil)
+      (expect (getf initargs :execution-mode) :to-be nil)
+      (expect (getf initargs :tags) :to-be nil)
+      (expect (getf initargs :watch-dependencies) :to-be nil)
+      (expect (cl-weave::collection-options-name-filter options) :to-be nil)
+      (expect (cl-weave::collection-options-location-filter options) :to-be nil)
+      (expect (cl-weave::collection-options-test-path-filter options) :to-be nil)
+      (expect (cl-weave::collection-options-include-tags options) :to-be nil)
+      (expect (cl-weave::collection-options-exclude-tags options) :to-be nil)
+      (expect (cl-weave::collection-options-bail options) :to-be nil)
+      (expect (cl-weave::collection-options-shard options) :to-be nil)
+      (expect (cl-weave::collection-options-order options) :to-be :defined)
+      (expect (cl-weave::collection-options-seed options) :to-be 0)
+      (expect (cl-weave::collection-options-retry options) :to-be 0)
+      (expect (cl-weave::collection-options-timeout-ms options) :to-be nil)
+      (expect (cl-weave::collection-options-max-workers options) :to-be nil)))
+
+  (it "preserves non-empty tag canonicalization and option normalization"
+    (let ((options
+            (cl-weave::normalize-collection-options
+             :include-tags '(:fast "FAST" :slow)
+             :exclude-tags '(:database "DATABASE" :cache)
+             :bail t
+             :order :random
+             :seed 17
+             :retry 2
+             :timeout-ms 50
+             :max-workers 3)))
+      (expect (cl-weave::normalize-tags '(:fast "FAST" :slow))
+              :to-equal '("FAST" "SLOW"))
+      (expect (cl-weave::collection-options-include-tags options)
+              :to-equal '("FAST" "SLOW"))
+      (expect (cl-weave::collection-options-exclude-tags options)
+              :to-equal '("DATABASE" "CACHE"))
+      (expect (cl-weave::collection-options-bail options) :to-be-truthy)
+      (expect (cl-weave::collection-options-order options) :to-be :random)
+      (expect (cl-weave::collection-options-seed options) :to-be 17)
+      (expect (cl-weave::collection-options-retry options) :to-be 2)
+      (expect (cl-weave::collection-options-timeout-ms options) :to-be 50)
+      (expect (cl-weave::collection-options-max-workers options) :to-be 3)))
+
+  (it "keeps improper and circular tag validation on non-NIL input"
+    (let ((circular (list :fast))
+          (dotted (cons :fast :slow)))
+      (setf (cdr circular) circular)
+      (flet ((check-malformed-inputs ()
+               (expect (lambda () (cl-weave::normalize-tags dotted))
+                       :to-throw "finite proper list")
+               (expect (lambda () (cl-weave::normalize-tags circular))
+                       :to-throw "finite proper list")))
+        #+sbcl
+        (sb-ext:with-timeout 10
+          (check-malformed-inputs))
+        #-sbcl
+        (check-malformed-inputs))))))

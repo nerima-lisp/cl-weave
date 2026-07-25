@@ -27,18 +27,29 @@ Mutation operators are data-backed and macro-extensible:
 
 The first string form in `defmutation-operator` becomes stable operator
 metadata. `list-mutation-operators` returns deterministic plist metadata for
-CI tools and agents:
+CI tools and agents — **every** registered operator, sorted by name. After the
+`:keyword-toggle` definition above, the four built-ins and the new operator are
+all present (descriptions elided here for brevity):
 
 ```lisp
 (cl-weave:list-mutation-operators)
 ;; => ((:name :arithmetic-operator :description "...")
+;;     (:name :boolean-literal :description "...")
+;;     (:name :comparison-operator :description "...")
+;;     (:name :conditional-branch :description "...")
 ;;     (:name :keyword-toggle :description "..."))
 ```
 
 The built-in operators cover arithmetic calls, comparison calls, boolean
 literals, and `if` branch swaps. `report-mutations-sexp` and
 `report-mutations-json` emit stable, AI-readable mutation reports with killed,
-survived, errored, and score fields.
+survived, errored, and score fields. `mutation-summary` returns the same
+aggregate as a plist (`:total`, `:killed`, `:survived`, `:errored`, `:score`)
+for programmatic use, and each entry in the `run-mutations` result is a
+`mutation-result` (readers `mutation-result-status`, `mutation-result-mutation`,
+`mutation-result-condition`) wrapping a `mutation` (readers `mutation-id`,
+`mutation-operator`, `mutation-path`, `mutation-original`, `mutation-replacement`,
+`mutation-form`).
 
 Use `mutation-score-passes-p` or `assert-mutation-score` to turn mutation
 results into CI gates. A gate passes only when there are no errored mutants and

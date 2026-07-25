@@ -97,6 +97,32 @@
    #:isolated-result-stdout
    #:isolated-result-stdout-path
    #:isolated-result-timed-out-p
+   #:*journal-enabled*
+   #:journal-note
+   #:journal-diff
+   #:explain-journal-diff
+   #:journal-frame-line
+   #:journal-frame-line-for-kind
+   #:record-journal-frame
+   #:journal-frame-from-plist
+   #:journal-frames-from-plists
+   #:explain-journal
+   #:with-execution-journal
+   #:journal-frame
+   #:journal-frame-p
+   #:journal-frame-index
+   #:journal-frame-kind
+   #:journal-frame-form
+   #:journal-frame-matcher
+   #:journal-frame-actual
+   #:journal-frame-expected
+   #:journal-frame-pass
+   #:journal-frame-elapsed-internal-time
+   #:*journal-breakpoint*
+   #:journal-breakpoint-hit
+   #:journal-breakpoint-hit-frame
+   #:*test-random-seed*
+   #:replay-test
    #:it
    #:it-concurrent
    #:it-concurrent-each
@@ -129,6 +155,9 @@
    #:logic-run
    #:logic-variable-p
    #:logic-where
+   #:journal-facts
+   #:journal-where
+   #:query-journal
    #:list-matchers
    #:list-mutation-operators
    #:matcher
@@ -182,6 +211,7 @@
    #:with-snapshot-updates
    #:with-continuation-result
    #:with-continuation-values
+   #:with-soft-assertions
    #:with-cleared-hash-table
    #:clear-all-mocks
    #:clear-mock

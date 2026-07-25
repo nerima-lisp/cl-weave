@@ -41,7 +41,10 @@ the default no-op function.
 `dispose-mock` clears retained history references and unregisters a mock when
 it is no longer needed. A disposed mock cannot be inspected or called. Active
 spies must be restored with `mock-restore` before they can be disposed; this
-also applies to pending frames in nested spy stacks.
+also applies to pending frames in nested spy stacks. Calling a disposed mock
+signals `mock-disposed-error` (reader `mock-disposed-error-mock`); disposing an
+active spy signals `active-spy-disposal-error` (readers
+`active-spy-disposal-error-mock` and `active-spy-disposal-error-symbol`).
 `mock-implementation` replaces an existing mock's active implementation.
 `mock-return-value` pins a single return value, while `mock-return-values` pin
 Common Lisp multiple values.
@@ -61,3 +64,9 @@ indices. Nth returned matchers count only successful returns, while
 
 `with-mocked-functions` temporarily rewrites global function cells. The
 original function cells are restored with `unwind-protect`.
+
+When the execution journal is enabled, every mock invocation — whether from
+`make-mock-function`, `spy-on`, or `with-mocked-functions` — is recorded as a
+`:mock-call` frame carrying its arguments, so mock calls appear interleaved with
+assertions on the time-travel timeline. See
+[Time-Travel Debugging](time-travel-debugging.md).

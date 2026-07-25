@@ -1,6 +1,7 @@
 (in-package #:cl-weave/tests)
 
-(describe "watch scope"
+(progn
+  (describe "watch scope"
   (it "rejects invalid watch intervals before enumerating watched files"
     (let ((enumeration-count 0))
       (with-mocked-functions
@@ -732,3 +733,10 @@
           (expect next-state :to-be nil)
           (expect continuep :to-be-truthy)
           (expect calls :to-equal nil))))))
+  (describe "watch dependency NIL fast path"
+  (it "returns NIL for an empty dependency list"
+    (expect
+     (cl-weave::normalize-watch-dependencies
+      nil
+      '(:file "/tmp/cl-weave/tests/watch-empty.lisp"))
+     :to-be nil))))

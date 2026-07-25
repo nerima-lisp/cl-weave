@@ -68,6 +68,35 @@ For command-line and CI usage:
 timeout 360s nix run . -- run cl-weave/tests --sequence random --seed 12345
 ```
 
+`--seed` controls the sequence *ordering*; it is independent of `--random-seed`,
+which seeds `cl:random` inside test bodies for deterministic replay (below).
+
+## Deterministic Replay
+
+```lisp
+(let ((cl-weave:*test-random-seed* 20260724))
+  (cl-weave:run-all :reporter :json))
+
+(cl-weave:replay-test "math > adds numbers" :seed 20260724)
+```
+
+Binding `*test-random-seed*` (or passing `--random-seed INTEGER`) seeds
+`cl:*random-state*` per test from that base seed and the test's path, so
+`cl:random` is reproducible and independent of execution order. The effective
+per-test seed is recorded on each event and reported as `replaySeed`.
+`replay-test` re-runs a single test by its Vitest-style path with journaling on,
+returning the event and its recorded timeline — the fastest way to reproduce and
+inspect one failure in isolation.
+
+```sh
+timeout 360s nix run . -- run cl-weave/tests --journal --random-seed 20260724
+```
+
+`--journal` records an execution-journal timeline (assertions, mock calls,
+fixture hooks, and notes) for each attempt. See
+[Time-Travel Debugging](time-travel-debugging.md) for the complete workflow,
+including `with-execution-journal` and `journal-note`.
+
 ## Test Listing
 
 ```lisp
@@ -78,11 +107,10 @@ timeout 360s nix run . -- run cl-weave/tests --sequence random --seed 12345
 List mode discovers selected tests without executing suite hooks or test
 bodies. It composes with focus, filtering, skipped suites, and todo suites, and
 emits `:run`, `:skip`, or `:todo` plan entries with `path`, `pathString`,
-`location`, `reason`, `focused`, `retry`, `timeout-ms`, `concurrent`, `tags`,
-and `dependsOn` metadata. `location` records the macro source file when
+`location`, `reason`, `focused`, `retry`, `timeout-ms`, `concurrent`, and
+`tags` metadata. `location` records the macro source file when
 available; JSON emits `null` for manually constructed tests without source
-metadata. cl-weave does not infer dependency ordering from `dependsOn`. Native
-test tags participate in
+metadata. Native test tags participate in
 selection through `:include-tags` and `:exclude-tags` on `run`, `run-all`, and
 `list-tests`. Inclusion accepts a test matching any requested tag; exclusion
 rejects a test matching any excluded tag. Tag selection is resolved before
@@ -110,11 +138,20 @@ AI agents can also query plans as plain Lisp facts:
 ```
 
 `test-plan-facts` emits data such as `(:test path)`, `(:status path status)`,
-`:focused`, `:reason`, `:retry`, `:timeout-ms`, and `:location`.
+`:focused`, `:reason`, `:retry`, `:timeout-ms`, and `:location`. Each entry
+returned by `collect-test-plan` is a `test-plan-entry` struct with matching
+readers — `test-plan-entry-path`, `test-plan-entry-status`,
+`test-plan-entry-focused`, `test-plan-entry-reason`, `test-plan-entry-retry`,
+`test-plan-entry-timeout-ms`, `test-plan-entry-concurrent`,
+`test-plan-entry-tags`, and `test-plan-entry-location` — so you can inspect a
+plan directly without going through the fact relations.
 `logic-where`, `logic-program`, `logic-run`, and `test-plan-where` keep data and
 logic separate: relations stay plain lists, while query and rule syntax stays in
 macros. Variables are symbols whose names start with `?`, clauses are matched
-left-to-right, and `(:limit n)` caps backtracking results.
+left-to-right, and `(:limit n)` caps backtracking results. See
+[Logic Programming](logic-programming.md) for the full engine — the
+`logic-query` function, `:max-steps` bounding, and the `logic-search-exhausted`
+recovery restarts.
 
 Rules use a Prolog-style `(:- head goal...)` form:
 
@@ -206,7 +243,11 @@ selected and executed before the runner stopped.
 exits or timeouts as normal structured assertion failures. Use it around FFI,
 native parser, and crash-boundary tests where the parent REPL or CI process
 must stay alive. `run-isolated` returns captured stdout/stderr strings in all
-cases. `:keep-files` accepts `nil`, `t`, or `:on-failure`; the last option keeps
+cases. Alongside `isolated-result-status`, `isolated-result-stdout`, and
+`isolated-result-stderr`, the result reports `isolated-result-exit-code`,
+`isolated-result-elapsed-ms`, and `isolated-result-timed-out-p` for the child's
+exit status, wall-clock duration, and whether it hit the isolation timeout.
+`:keep-files` accepts `nil`, `t`, or `:on-failure`; the last option keeps
 artifacts only for non-passing child processes. When files are retained, the
 generated script, stdout, stderr, and temporary HOME directory paths are exposed
 via
