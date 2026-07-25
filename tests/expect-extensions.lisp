@@ -124,8 +124,35 @@
     (expect-public-custom-matcher-failure)))
 
 (describe "expect-extend custom matchers"
-  (it "supports Vitest-style expect-extend custom matchers"
-    (expect-extended-custom-matcher-failure)))
+    (it "supports Vitest-style expect-extend custom matchers"
+      (expect-extended-custom-matcher-failure)))
+
+  (describe "matcher result values"
+    (it "preserves defaults and reports across matcher value arities"
+      (flet ((normalized-values (producer)
+               (multiple-value-list
+                (cl-weave::matcher-result-values
+                 (cl-weave::make-matcher
+                  :function
+                  (lambda (actual expected)
+                    (declare (ignore actual expected))
+                    (funcall producer)))
+                 :original-actual
+                 :original-expected))))
+        (expect (normalized-values (lambda () (values)))
+                :to-equal
+                (list nil :original-actual :original-expected))
+        (expect (normalized-values (lambda () (values nil)))
+                :to-equal
+                (list nil :original-actual :original-expected))
+        (expect (normalized-values (lambda () (values :pass nil)))
+                :to-equal
+                (list :pass nil :original-expected))
+        (expect (normalized-values
+                 (lambda ()
+                   (values :pass :reported-actual :reported-expected :ignored)))
+                :to-equal
+                (list :pass :reported-actual :reported-expected)))))
 
 (describe "data-driven custom matchers"
   (it "supports data-driven extend-expect custom matchers"

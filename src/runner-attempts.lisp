@@ -70,10 +70,10 @@
             +maximum-worker-count+ max-workers))))
 
 (defun retry-count (test)
-  (normalize-retry-count
-   (if (null (test-case-retry test))
-       *default-retry*
-       (test-case-retry test))))
+  (let ((retry (test-case-retry test)))
+    (normalize-retry-count
+      (if (null retry) *default-retry*
+        retry))))
 
 (defun effective-timeout-ms (test)
   (normalize-timeout-ms
@@ -138,34 +138,39 @@
                   :format-control "The configured retry budget is exhausted."))
 
 (defun test-case-hookless-p (suite)
-  (and (null (effective-before-hooks suite))
-       (null (effective-after-hooks suite))
-       (null (effective-around-hooks suite))))
+  (loop for current = suite then (suite-parent current)
+        while current
+        never (or
+      (suite-before-each current)
+      (suite-after-each current)
+      (suite-around-each current))))
 
-  (defun call-test-attempt/restarts (suite test start retry)
-    (restart-case
-        (call-test-case-with-timeout/k
-         suite
-         test
-         (timeout-seconds test)
-         (lambda ()
-           (make-event :pass suite test start)))
-      (continue-test ()
-        :report "Continue the current failed test attempt and record it as passed."
-        (make-event :pass suite test start))
-      (skip-test (&optional reason)
-        :report "Skip the current failed test attempt and record it as skipped."
-        (make-event :skip
-                    suite
-                    test
-                    start
-                    :reason (normalize-restart-skip-reason reason)))
-      (retry-test ()
-        :report "Retry the current test attempt using the configured retry budget."
-        (if (plusp *retry-budget-remaining*)
-            (funcall retry)
-            (make-event :error suite test start
-                        :condition (retry-budget-exhausted-error))))))
+(defun call-test-attempt/restarts (suite test start timeout retry)
+  (restart-case (call-test-case-with-timeout/k
+      suite
+      test
+      timeout
+      (lambda ()
+        (make-event :pass suite test start)))
+    (continue-test ()
+      :report
+      "Continue the current failed test attempt and record it as passed."
+      (make-event :pass suite test start))
+    (skip-test (&optional reason)
+      :report
+      "Skip the current failed test attempt and record it as skipped."
+      (make-event
+        :skip
+        suite
+        test
+        start
+        :reason
+        (normalize-restart-skip-reason reason)))
+    (retry-test ()
+      :report
+      "Retry the current test attempt using the configured retry budget."
+      (if (plusp *retry-budget-remaining*) (funcall retry)
+        (make-event :error suite test start :condition (retry-budget-exhausted-error))))))
 
 (defun offer-condition-to-outer-handlers (condition)
   (let ((*runner-default-condition-handler-disabled* t))
@@ -198,53 +203,62 @@ handlers, so runner propagation cannot abort an enclosing runner."
                       (make-event :error suite test start
                                   :condition condition))))))))
 
-(defun run-test-attempt/k (suite test start retry continue)
+(defun run-test-attempt/k (suite test start timeout-ms timeout retry continue)
   (let ((*attempt-secondary-conditions* nil))
     (let ((event
-            (with-escape-continuation (finish-attempt)
-              (handler-bind
-                  ((platform-timeout
-                     (lambda (condition)
-                       (unless *runner-default-condition-handler-disabled*
-                         (funcall
-                          finish-attempt
-                          (call-with-propagated-condition/k
-                           condition
-                           (lambda ()
-                             (make-event
-                              :fail suite test start
+          (with-escape-continuation
+            (finish-attempt)
+            (handler-bind ((platform-timeout
+                  (lambda (condition)
+                    (unless *runner-default-condition-handler-disabled*
+                      (funcall
+                        finish-attempt
+                        (call-with-propagated-condition/k
+                          condition
+                          (lambda ()
+                            (make-event
+                              :fail
+                              suite
+                              test
+                              start
                               :condition
-                              (make-condition
-                               (quote test-timeout)
-                               :timeout-ms (effective-timeout-ms test)))))))))
-                   (serious-condition
-                     (attempt-condition-handler
-                      finish-attempt suite test start)))
-                (call-test-attempt/restarts suite test start retry)))))
+                              (make-condition (quote test-timeout) :timeout-ms timeout-ms))))))))
+                           (serious-condition (attempt-condition-handler finish-attempt suite test start)))
+              (call-test-attempt/restarts suite test start timeout retry)))))
       (setf event (expected-failure-event suite test start event))
       (funcall continue event))))
 
 (defun retryable-event-p (event)
   (member (test-event-status event) '(:fail :error)))
 
-(defun run-test-attempts (suite test start remaining-retries)
-  (if (zerop remaining-retries)
-      (let ((*retry-budget-remaining* 0))
-        (run-test-attempt/k suite test start #'identity #'identity))
-      (labels ((attempt (retries)
-                 (let ((*retry-budget-remaining* retries))
-                   (run-test-attempt/k
-                    suite
-                    test
-                    start
-                    (lambda ()
-                      (attempt (1- retries)))
-                    (lambda (event)
-                      (if (and (plusp retries)
-                               (retryable-event-p event))
-                          (attempt (1- retries))
-                          event))))))
-        (attempt remaining-retries))))
+(defun run-test-attempts
+    (suite test start remaining-retries timeout-ms)
+  (let ((timeout (and timeout-ms
+                      (/ timeout-ms 1000.0))))
+    (if (zerop remaining-retries)
+        (let ((*retry-budget-remaining* 0))
+          (run-test-attempt/k
+           suite test start timeout-ms timeout
+           (function identity)
+           (function identity)))
+        (labels ((attempt (retries)
+                   (block retry-attempt
+                     (let ((*retry-budget-remaining* retries))
+                       (run-test-attempt/k
+                        suite
+                        test
+                        start
+                        timeout-ms
+                        timeout
+                        (lambda ()
+                          (return-from retry-attempt
+                            (attempt (1- retries))))
+                        (lambda (event)
+                          (if (and (plusp retries)
+                                   (retryable-event-p event))
+                              (attempt (1- retries))
+                              event)))))))
+          (attempt remaining-retries)))))
 
 (defun run-trusted-empty-test-case (suite test start)
   (expected-failure-event
@@ -253,24 +267,24 @@ handlers, so runner propagation cannot abort an enclosing runner."
    start
    (make-event :pass suite test start)))
 
-  (defun run-test-case/internal (suite test)
+(defun run-test-case/internal (suite test)
   (let ((start (get-internal-real-time)))
     (cond
       ((test-case-todo-reason test)
-       (make-event :todo suite test start
-                   :reason (test-case-todo-reason test)))
+        (make-event :todo suite test start :reason (test-case-todo-reason test)))
       ((test-case-skip-reason test)
-       (make-event :skip suite test start
-                   :reason (test-case-skip-reason test)))
-      ((let ((marker (test-case-trusted-empty-function test)))
-         (and (zerop (retry-count test))
-              (null (effective-timeout-ms test))
-              (test-case-hookless-p suite)
-              marker
-              (eq marker (test-case-function test))))
-       (run-trusted-empty-test-case suite test start))
+        (make-event :skip suite test start :reason (test-case-skip-reason test)))
       (t
-       (run-test-attempts suite test start (retry-count test))))))
+        (let ((remaining-retries (retry-count test))
+              (timeout-ms (effective-timeout-ms test))
+              (marker (test-case-trusted-empty-function test)))
+          (if (and
+              marker
+              (eq marker (test-case-function test))
+              (zerop remaining-retries)
+              (null timeout-ms)
+              (test-case-hookless-p suite)) (run-trusted-empty-test-case suite test start)
+            (run-test-attempts suite test start remaining-retries timeout-ms)))))))
 
 (defun run-test-case (suite test)
   (with-runner-condition-propagation (nil)

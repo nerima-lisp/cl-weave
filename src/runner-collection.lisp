@@ -168,18 +168,23 @@
           include-tags exclude-tags bail shard order seed
           retry timeout-ms max-workers)
   (make-collection-options
-   :name-filter (normalized-test-filter name-filter)
-   :location-filter (normalize-location-filter location-filter)
-   :test-path-filter (normalize-test-path-filter test-path-filter)
-   :include-tags (normalize-tags include-tags "include-tags")
-   :exclude-tags (normalize-tags exclude-tags "exclude-tags")
-   :bail (normalize-bail bail)
-   :shard (normalize-shard shard)
-   :order (normalize-sequence-order order)
-   :seed (normalize-sequence-seed seed)
-   :retry (normalize-retry-count retry)
-   :timeout-ms (normalize-timeout-ms timeout-ms)
-   :max-workers (normalize-max-workers max-workers)))
+   :name-filter
+   (and name-filter (normalized-test-filter name-filter))
+   :location-filter
+   (and location-filter (normalize-location-filter location-filter))
+   :test-path-filter
+   (and test-path-filter (normalize-test-path-filter test-path-filter))
+   :include-tags
+   (and include-tags (normalize-tags include-tags "include-tags"))
+   :exclude-tags
+   (and exclude-tags (normalize-tags exclude-tags "exclude-tags"))
+   :bail (and bail (normalize-bail bail))
+   :shard (and shard (normalize-shard shard))
+   :order (if order (normalize-sequence-order order) :defined)
+   :seed (if seed (normalize-sequence-seed seed) 0)
+   :retry (if retry (normalize-retry-count retry) 0)
+   :timeout-ms (and timeout-ms (normalize-timeout-ms timeout-ms))
+   :max-workers (and max-workers (normalize-max-workers max-workers))))
 
 (defun call-with-collection-context (suite options continue)
   (let* ((location-filter

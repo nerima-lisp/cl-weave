@@ -27,6 +27,27 @@
                   :to-be
                   expected-status)))))
 
+  (it "validates remaining leaves after finding a failure"
+    (let ((failure (cl-weave::make-test-event :status :fail)))
+      (expect (lambda ()
+                (cl-weave:results-status (list failure :invalid)))
+              :to-throw
+              "expected test events or nested event lists")))
+
+  (it "handles a large flat result set without recursion"
+    (let* ((event (cl-weave::make-test-event :status :pass))
+           (results (loop repeat 4097 collect event)))
+      (expect (cl-weave:results-status results)
+              :to-be-truthy)))
+
+  (it "rejects circular result trees"
+    (let ((results (list (cl-weave::make-test-event :status :pass))))
+      (setf (cdr results) results)
+      (expect (lambda ()
+                (cl-weave:results-status results))
+              :to-throw
+              "circular nested event lists are not supported")))
+
   (it "rejects every non-event leaf in a result tree"
     (dolist (invalid-results
              '(42

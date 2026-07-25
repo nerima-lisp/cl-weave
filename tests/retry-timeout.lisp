@@ -481,7 +481,33 @@
            (event (cl-weave::run-test-case suite test)))
       (expect (cl-weave::test-event-status event) :to-be :pass)
       (expect attempts :to-be 2)
-      (expect cleanup-count :to-be 2))))
+      (expect cleanup-count :to-be 2)))
+  (it "consumes one retry budget unit per failed attempt"
+    (let* ((attempts 0)
+           (test (cl-weave::make-test-case
+                  :name "retry budget failure"
+                  :retry 2
+                  :function (lambda ()
+                              (incf attempts)
+                              (expect t :to-be nil))))
+           (event (cl-weave::run-test-case
+                   (cl-weave::root-suite)
+                   test)))
+      (expect attempts :to-be 3)
+      (expect (cl-weave::test-event-status event) :to-be :fail)))
+  (it "consumes one retry budget unit per explicit retry restart"
+    (let* ((attempts 0)
+           (test (cl-weave::make-test-case
+                  :name "retry budget restart"
+                  :retry 2
+                  :function (lambda ()
+                              (incf attempts)
+                              (invoke-restart 'retry-test))))
+           (event (cl-weave::run-test-case
+                   (cl-weave::root-suite)
+                   test)))
+      (expect attempts :to-be 3)
+      (expect (cl-weave::test-event-status event) :to-be :error))))
 (describe "strict empty batch collection"
   (it "collects a root batch without invoking bodies and preserves event shape"
     (let* ((calls 0)
