@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/takeokunn/cl-weave/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/takeokunn/cl-weave/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-mdBook-0a7a5a)](https://takeokunn.github.io/cl-weave/)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs%20Material-0a7a5a)](https://takeokunn.github.io/cl-weave/)
 
 `cl-weave` is a modern Common Lisp testing framework inspired by Vitest and
 designed around Lisp's strengths: macros, conditions, dynamic bindings, and
@@ -36,8 +36,8 @@ contract, and every governance and policy document, is published at
 nix run . -- run cl-weave/tests
 ```
 
-See [Quick Start](https://takeokunn.github.io/cl-weave/quick-start.html) for
-more CLI examples and [Installation](https://takeokunn.github.io/cl-weave/installation.html)
+See [Quick Start](https://takeokunn.github.io/cl-weave/quick-start/) for
+more CLI examples and [Installation](https://takeokunn.github.io/cl-weave/installation/)
 for every install path.
 
 ## Install
@@ -67,7 +67,7 @@ maintenance, and release policies are available in the
 
 ## Support
 
-Use the [Support Policy](https://takeokunn.github.io/cl-weave/support-policy.html)
+Use the [Support Policy](https://takeokunn.github.io/cl-weave/support-policy/)
 for the canonical support boundaries, and
 [private GitHub security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new)
 for vulnerability reporting. Do not put exploit details in a public issue.

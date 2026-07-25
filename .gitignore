@@ -23,6 +23,9 @@ result
 result-*
 .direnv/
 
+# MkDocs local build output (docs/mkdocs.yml sets site_dir: ../site)
+/site/
+
 # Editor and OS noise
 .DS_Store
 *~

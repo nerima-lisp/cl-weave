@@ -59,7 +59,9 @@ Because Common Lisp already exports `CL:DESCRIBE`, test packages should import
 fixtures and cases keep the same semantics as hand-written suites. Table forms
 compose with canonical modifiers such as `it-only-each`,
 `it-concurrent-each`, `it-sequential-each`, `it-fails-each`, `it-skip-each`,
-and `it-todo-each`. Fixture hooks use the canonical Lisp names.
+and `it-todo-each`, and with the suite-level table variants
+`describe-only-each`, `describe-skip-each`, and `describe-todo-each`. Fixture
+hooks use the canonical Lisp names.
 [ai-contract.md](ai-contract.md) is the machine-readable normalization
 contract for agents. Runtime metadata also exposes `referenceDocuments`,
 `supportChannels`, `securityContacts`, `lifecycle`,
@@ -131,6 +133,9 @@ Use `unwind-protect` inside `around-each` when the fixture owns cleanup.
 `after-each` and `after-all` teardown runs even when a test body or hook exits
 non-locally — including SBCL timeouts and debugger restarts — so fixtures that
 release resources in a teardown hook are not skipped when a case times out.
+When a hook itself fails, cl-weave signals a `hook-failure` condition whose
+readers `hook-failure-phase` and `hook-failure-causes` identify which lifecycle
+phase failed and the underlying conditions it collected.
 Fixture hooks intentionally use canonical Lisp names rather than camelCase
 aliases, because Common Lisp uppercases unescaped symbols while reading source.
 
@@ -272,7 +277,10 @@ reported normally.
 `it-concurrent` and `(:execution-mode :concurrent)` mark a case as safe
 to run beside adjacent concurrent cases. `describe-concurrent` sets the same
 execution mode for descendant cases, and
-`it-sequential` opts a single case back out. Report order
+`it-sequential` opts a single case back out. `describe-sequential` is the
+suite-level inverse — it forces sequential execution for its descendants, which
+is useful for nesting a serial group inside an otherwise concurrent parent.
+Report order
 stays deterministic: events are emitted in the selected definition order. When
 `:bail` is enabled, concurrent batching is disabled so fast-fail behavior
 remains exact. `run-all :max-workers N`, `--max-workers N`, and

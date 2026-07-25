@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="cl-weave">
+  <rect width="32" height="32" rx="7" fill="#0a7a5a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round">
+    <path d="M7 10c3.5 0 3.5 12 7 12s3.5-12 7-12"/>
+    <path d="M25 22c-3.5 0-3.5-12-7-12s-3.5 12-7 12"/>
+  </g>
+</svg>
