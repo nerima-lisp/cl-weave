@@ -10,7 +10,7 @@ before generating tests or interpreting project-specific matcher failures. The
 command loads the requested ASDF system and then emits JSON by default:
 
 ```sh
-timeout 120s nix run . -- metadata cl-weave/tests --output cl-weave-metadata.json
+timeout 120s nix run . -- metadata cl-weave/test --output cl-weave-metadata.json
 ```
 
 Agents embedded in a Lisp process can call `(cl-weave:framework-metadata)` to
@@ -88,7 +88,7 @@ verification and scope policy for those channels lives in
       "name": "source-self-test",
       "kind": "nix",
       "installCommand": [],
-      "runCommand": ["nix", "run", ".", "--", "run", "cl-weave/tests"],
+      "runCommand": ["nix", "run", ".", "--", "run", "cl-weave/test"],
       "scope": "Run the bundled ASDF test system through the packaged CLI.",
       "references": ["README.md", "docs/src/distribution-policy.md"]
     },
@@ -309,7 +309,7 @@ verification and scope policy for those channels lives in
     "policyDocument": "docs/src/release-process.md",
     "provider": "github-actions",
     "workflowPath": ".github/workflows/ci.yml",
-    "jobName": "nix",
+    "jobName": "check",
     "triggers": [
       "pull_request",
       "push:main",
@@ -770,7 +770,7 @@ For Nix CLI CI and agent runs, the packaged application writes the same
 reporter payload directly to an artifact file:
 
 ```sh
-timeout 360s nix run . -- run cl-weave/tests --reporter json --output cl-weave-results.json
+timeout 360s nix run . -- run cl-weave/test --reporter json --output cl-weave-results.json
 ```
 
 `--output` affects only reporter output. The process still exits
@@ -783,7 +783,7 @@ External snapshots are sidecar artifacts controlled by dynamic bindings or
 CLI/environment settings:
 
 ```sh
-timeout 360s nix run . -- run cl-weave/tests --update-snapshots --snapshot-dir tests/__snapshots__/ --snapshot-file snapshots.sexp
+timeout 360s nix run . -- run cl-weave/test --update-snapshots --snapshot-dir tests/__snapshots__/ --snapshot-file snapshots.sexp
 ```
 
 Snapshot files are Lisp-readable alists keyed by the explicit snapshot key
@@ -833,7 +833,7 @@ side.
 Coverage output is a separate artifact, not a reporter schema field:
 
 ```sh
-timeout 360s nix run . -- run cl-weave/tests --coverage --coverage-output cl-weave.coverage
+timeout 360s nix run . -- run cl-weave/test --coverage --coverage-output cl-weave.coverage
 ```
 
 The CLI instruments product sources but not the test system and saves an SBCL
@@ -1377,7 +1377,7 @@ Agents can discover selected tests without executing hooks or test bodies:
 The packaged CLI exposes the same discovery mode:
 
 ```sh
-timeout 120s nix run . -- list cl-weave/tests --reporter json --filter parser --shard 1/2 --sequence random --seed 12345
+timeout 120s nix run . -- list cl-weave/test --reporter json --filter parser --shard 1/2 --sequence random --seed 12345
 ```
 
 The JSON test plan reporter prints one object:

@@ -15,7 +15,7 @@ updates:
   # Composite action pins live in their own action.yml and need a dedicated
   # directory entry to be tracked.
   - package-ecosystem: github-actions
-    directory: /.github/actions/setup-nix-cachix
+    directory: /.github/actions/nix-setup
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

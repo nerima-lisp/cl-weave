@@ -40,7 +40,7 @@
   '((:name "source-self-test"
      :kind "nix"
      :install-command ()
-     :run-command ("nix" "run" "." "--" "run" "cl-weave/tests")
+     :run-command ("nix" "run" "." "--" "run" "cl-weave/test")
      :scope "Run the bundled ASDF test system through the packaged CLI."
      :references ("README.md"
                   "docs/src/distribution-policy.md"))
@@ -206,7 +206,7 @@
   '(:policy-document "docs/src/release-process.md"
     :provider "github-actions"
     :workflow-path ".github/workflows/ci.yml"
-    :job-name "nix"
+    :job-name "check"
     :triggers ("pull_request" "push:main" "workflow_dispatch")
     :systems ("x86_64-linux")
     :artifact-bundle "cl-weave-test-reports-x86_64-linux"

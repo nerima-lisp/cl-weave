@@ -5,11 +5,14 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "CHANGELOG.md"
       - "flake.nix"
       - "flake.lock"
       - ".github/workflows/docs.yml"
+      - ".github/actions/nix-setup/action.yml"
   workflow_dispatch:
 
+# No token by default; each job opts into exactly the scopes it needs.
 permissions: {}
 
 concurrency:
@@ -25,24 +28,26 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Nix and Cachix
-        uses: ./.github/actions/setup-nix-cachix
+      - name: Set up Nix
+        uses: ./.github/actions/nix-setup
         with:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           # Never hand the push token to pull_request runs (local `./` action is
           # resolved from the PR head). Empty token => pull-only.
           cachix-auth-token: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # `packages.docs` runs `mkdocs build --strict`, so a broken link or a page
+      # missing from the nav fails here. `cp -rL` dereferences the store
+      # symlink, and the chmod makes the copy writable for the upload action.
       - name: Build documentation
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          timeout 540s nix build .#docs
+          timeout 540s nix build .#docs --print-build-logs
           cp -rL result public
           chmod -R u+w public
 
