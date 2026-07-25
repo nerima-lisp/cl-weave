@@ -379,22 +379,28 @@
           inherit version;
           src = source;
           dontBuild = true;
+          dontStrip = true;
+          nativeBuildInputs = [ pkgs.sbcl ];
           installPhase = ''
             mkdir -p $out/share/common-lisp/source/cl-weave
             mkdir -p $out/bin
             cp -R . $out/share/common-lisp/source/cl-weave
-            cat > $out/bin/cl-weave <<EOF
-            #!${pkgs.runtimeShell}
-            set -eu
-            export CL_SOURCE_REGISTRY="$out/share/common-lisp/source//:\''${CL_SOURCE_REGISTRY:-}"
-            exec ${pkgs.sbcl}/bin/sbcl --dynamic-space-size 4096 --noinform --non-interactive \\
-              --eval '(require :asdf)' \\
-              --eval '(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))' \\
-              --eval '(asdf:load-system :cl-weave)' \\
-              --eval '(cl-weave/cli:main)' \\
-              -- "\$@"
-            EOF
-            chmod +x $out/bin/cl-weave
+            mkdir -p /tmp/cl-weave-cache
+            export HOME=/var/empty
+            export TMPDIR=/tmp
+            export XDG_CACHE_HOME=/tmp/cl-weave-cache
+            export CL_SOURCE_REGISTRY="$out/share/common-lisp/source//:"
+            sbcl --dynamic-space-size 4096 --noinform --non-interactive \
+              --eval '(require :asdf)' \
+              --eval '(require :sb-cover)' \
+              --eval '(asdf:load-system :cl-weave)' \
+              --eval "(defparameter cl-weave/cli::*installed-source-root* #p\"$out/share/common-lisp/source/\")" \
+              --eval '(defun cl-weave/cli::saved-image-main () (setf *default-pathname-defaults* (uiop:getcwd) sb-ext:*runtime-pathname* #p"${pkgs.sbcl}/bin/sbcl") (uiop:setup-temporary-directory) (asdf:initialize-source-registry (list :source-registry (list :tree cl-weave/cli::*installed-source-root*) :inherit-configuration)) (asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration))) (cl-weave/cli:main))' \
+              --eval '(asdf:clear-output-translations)' \
+              --eval '(finish-output *standard-output*)' \
+              --eval '(finish-output *error-output*)' \
+              --eval "(sb-ext:save-lisp-and-die \"$out/bin/cl-weave\" :toplevel #'cl-weave/cli::saved-image-main :executable t :save-runtime-options t)"
+            rm -rf /tmp/cl-weave-cache
           '';
           meta = {
             description = "A modern, Vitest-inspired Common Lisp testing framework";

@@ -161,7 +161,31 @@
   (values))
 
 (defun results-status (results)
-  (every #'passed-event-p (normalize-run-results results)))
+  (let ((passedp t)
+        (leave-marker (list nil))
+        (active-conses (make-hash-table :test (function eq)))
+        (work (list results)))
+    (loop while work
+          for item = (pop work)
+          do (if (and (consp item)
+                      (eq (car item) leave-marker))
+                 (remhash (cdr item) active-conses)
+                 (cond
+                   ((null item))
+                   ((test-event-p item)
+                    (unless (passed-event-p item)
+                      (setf passedp nil)))
+                   ((consp item)
+                    (when (gethash item active-conses)
+                      (error "cl-weave: circular nested event lists are not supported."))
+                    (setf (gethash item active-conses) t)
+                    (push (cons leave-marker item) work)
+                    (push (cdr item) work)
+                    (push (car item) work))
+                   (t
+                    (error "cl-weave: expected test events or nested event lists, got ~S."
+                           item)))))
+    passedp))
 
 (defun run-all (&key (reporter :spec)
                   (stream *standard-output*)

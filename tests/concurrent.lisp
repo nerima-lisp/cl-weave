@@ -92,13 +92,23 @@
                 (lambda (function name)
                   (incf thread-count)
                   (funcall make-thread function name))))
-            (let ((events (cl-weave::collect-events root :max-workers 1)))
-              (expect (mapcar #'cl-weave::test-event-status events) :to-equal '(:pass :pass))
-              (expect
-                (reverse events-log)
-                :to-equal
-                '(:first-start :first-end :second-start :second-end))
-              (expect thread-count :to-be 0))))))
+            (dolist (tests
+                       (list (cl-weave::suite-children suite)
+                             (coerce (cl-weave::suite-children suite) 'vector)))
+              (setf events-log nil)
+              (let ((events
+                      (let ((cl-weave::*max-workers* 1))
+                        (cl-weave::run-concurrent-test-cases suite tests))))
+                (expect (mapcar #'cl-weave::test-event-status events) :to-equal '(:pass :pass))
+                (expect
+                  (mapcar #'cl-weave::test-event-path events)
+                  :to-equal
+                  '(("worker limit" "first") ("worker limit" "second")))
+                (expect
+                  (reverse events-log)
+                  :to-equal
+                  '(:first-start :first-end :second-start :second-end))))
+            (expect thread-count :to-be 0)))))
 
   (progn
   (it
