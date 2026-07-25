@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    permissions:
+      contents: write # Create the GitHub Release and upload assets.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify tag matches cl-weave.asd version
+        run: |
+          set -euo pipefail
+          # Single source of truth is the .asd :version form (mirrors flake.nix).
+          asd_version="$(sed -n 's/^[[:space:]]*:version "\([^"]*\)".*/\1/p' cl-weave.asd | head -n1)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "asd=$asd_version tag=$tag_version"
+          if [[ "$asd_version" != "$tag_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match cl-weave.asd version $asd_version" >&2
+            exit 1
+          fi
+
+      - name: Set up Nix and Cachix
+        uses: ./.github/actions/setup-nix-cachix
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and bundle test report artifacts
+        run: |
+          set -euo pipefail
+          outputs="$(timeout 600s nix build --no-link --print-out-paths \
+            ".#checks.x86_64-linux.json-results-artifact" \
+            ".#checks.x86_64-linux.jsonl-events-artifact" \
+            ".#checks.x86_64-linux.cli-json-results" \
+            ".#checks.x86_64-linux.ai-metadata-artifact" \
+            ".#checks.x86_64-linux.plan-artifact" \
+            ".#checks.x86_64-linux.watch-once-artifact" \
+            ".#checks.x86_64-linux.tap-artifact" \
+            ".#checks.x86_64-linux.junit-artifact" \
+            ".#checks.x86_64-linux.coverage-artifact")"
+          mkdir -p release-artifacts
+          while IFS= read -r output; do
+            test -d "$output"
+            cp -R "$output"/. release-artifacts/
+          done <<< "$outputs"
+          tar -czf "cl-weave-test-reports-${GITHUB_REF_NAME}.tar.gz" -C release-artifacts .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: cl-weave-test-reports-${{ github.ref_name }}.tar.gz

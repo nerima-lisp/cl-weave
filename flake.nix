@@ -28,27 +28,44 @@
           path: type: nixpkgs.lib.cleanSourceFilter path type && builtins.baseNameOf path != ".direnv";
       };
 
+      # Single source of truth for the package version: the `:version` form in
+      # cl-weave.asd. A release only ever edits the .asd file and every Nix
+      # package (default + docs) follows automatically. Nix regexes are
+      # whole-string anchored and `.` never spans newlines, so the version is
+      # extracted line-by-line rather than with one multi-line match.
+      version =
+        let
+          lines = nixpkgs.lib.splitString "\n" (builtins.readFile ./cl-weave.asd);
+          versionLine = builtins.head (
+            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
+          );
+        in
+        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+
       mkDocs =
         pkgs:
         pkgs.stdenvNoCC.mkDerivation {
           pname = "cl-weave-docs";
-          version = "0.10.0";
+          inherit version;
           src = pkgs.lib.fileset.toSource {
             root = ./docs;
             fileset = pkgs.lib.fileset.unions [
-              ./docs/book.toml
+              ./docs/mkdocs.yml
               ./docs/src
             ];
           };
-          nativeBuildInputs = [ pkgs.mdbook ];
+          nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
+          # Build fully offline: Material for MkDocs bundles all of its assets,
+          # so no network access is required inside the Nix sandbox. --strict
+          # promotes broken links and unlisted pages to build failures.
           buildPhase = ''
             runHook preBuild
-            mdbook build --dest-dir "$out" .
+            mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
             runHook postBuild
           '';
           dontInstall = true;
           meta = {
-            description = "Rendered mdBook documentation for cl-weave";
+            description = "Rendered MkDocs (Material) documentation for cl-weave";
             homepage = "https://github.com/takeokunn/cl-weave";
             license = pkgs.lib.licenses.mit;
           };
@@ -59,6 +76,10 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.coreutils
+            pkgs.jq
+            pkgs.libxml2
+            pkgs.nixfmt
+            pkgs.perl
             pkgs.sbcl
             paredit-cli.packages.${pkgs.stdenv.hostPlatform.system}.default
           ];
@@ -331,6 +352,22 @@
             src = source;
             name = "cl-weave-paredit-lint";
           };
+
+          # Enforce the formatter that `nix fmt` already applies, so drift is
+          # caught by `nix flake check` (and therefore CI) rather than in review.
+          nixfmt = pkgs.stdenvNoCC.mkDerivation {
+            name = "cl-weave-nixfmt-check";
+            src = source;
+            nativeBuildInputs = [ pkgs.nixfmt ];
+            buildPhase = ''
+              runHook preBuild
+              find . -name '*.nix' -print0 | xargs -0 nixfmt --check
+              runHook postBuild
+            '';
+            installPhase = ''
+              touch "$out"
+            '';
+          };
         }
       );
 
@@ -339,7 +376,7 @@
 
         default = pkgs.stdenv.mkDerivation {
           pname = "cl-weave";
-          version = "0.10.0";
+          inherit version;
           src = source;
           dontBuild = true;
           installPhase = ''

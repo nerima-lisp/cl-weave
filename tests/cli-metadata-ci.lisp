@@ -220,19 +220,29 @@
   (it "keeps CI workflow contract synchronized with metadata"
     (let* ((metadata (cl-weave/metadata:framework-metadata))
            (ci (getf metadata :continuous-integration))
-           (workflow (read-text-file #P".github/workflows/ci.yml")))
+           (workflow (read-text-file #P".github/workflows/ci.yml"))
+           (action (read-text-file +setup-nix-cachix-action-path+)))
       (expect (probe-file (merge-pathnames (getf ci :workflow-path) (uiop:getcwd)))
+              :not :to-be nil)
+      (expect (probe-file (merge-pathnames +setup-nix-cachix-action-path+
+                                           (uiop:getcwd)))
               :not :to-be nil)
       (expect workflow :to-contain "pull_request:")
       (expect workflow :to-contain "branches: [main]")
       (expect workflow :to-contain "workflow_dispatch:")
+      ;; The workflow is matrix-ready: each system is declared in the matrix and
+      ;; the artifact bundle is templated, so the concrete system resolves
+      ;; through ${{ matrix.system }}.
       (dolist (system (getf ci :systems))
-        (expect workflow :to-contain system))
+        (expect workflow :to-contain (format nil "system: ~A" system)))
       (expect workflow :to-contain
-              (format nil "name: ~A" (getf ci :artifact-bundle)))
-      (expect workflow :to-contain "uses: cachix/cachix-action@")
+              (format nil "name: ~A" (ci-templated-artifact-bundle ci)))
+      ;; Nix/Cachix setup is delegated to the shared composite action, so the
+      ;; cachix-action pin and the cache modes live there rather than inline.
+      (expect workflow :to-contain "uses: ./.github/actions/setup-nix-cachix")
+      (expect action :to-contain "uses: cachix/cachix-action@")
       (dolist (mode (getf ci :cache-modes))
-        (expect workflow :to-contain mode))
+        (expect action :to-contain mode))
       (expect (getf ci :quality-gate-source) :to-equal "qualityGates")
       (expect (getf metadata :quality-gates) :to-satisfy (function consp))))
 
@@ -250,63 +260,81 @@
                  ((and (not pull-request-p) token-present-p) :push-enabled)
                  (t :pull-only))))
       (let ((ci (read-text-file #P".github/workflows/ci.yml"))
-            (docs (read-text-file #P".github/workflows/docs.yml")))
-        (dolist (workflow (list ci docs))
-          (let ((action-lines (workflow-remote-action-lines workflow))
-                (checkout (workflow-step-for-name workflow "Checkout"))
-                (selection
-                  (workflow-step-for-name workflow "Select Cachix mode"))
-                (pull-cache
-                  (workflow-step-for-name workflow "Configure Cachix (pull-only)"))
-                (push-cache
-                  (workflow-step-for-name workflow "Configure Cachix (push-enabled)")))
+            (docs (read-text-file #P".github/workflows/docs.yml"))
+            (action (read-text-file +setup-nix-cachix-action-path+)))
+        ;; Every remote action -- across both workflows and the shared composite
+        ;; action -- is pinned to an immutable 40-char SHA with a version comment.
+        (dolist (source (list ci docs action))
+          (let ((action-lines (workflow-remote-action-lines source)))
             (expect action-lines :to-satisfy (function consp))
             (dolist (line action-lines)
               (expect (workflow-action-immutably-pinned-p line) :to-be-truthy)
-              (expect line :to-contain " # v"))
+              (expect line :to-contain " # v"))))
+        ;; Each workflow checks out without persisting credentials, delegates
+        ;; Nix/Cachix setup to the one composite action, and gates the push token
+        ;; on non-pull_request at the workflow boundary -- a local `./` action is
+        ;; resolved from the PR head, so the gate must precede handing in the
+        ;; token. Its only secret references are those two forwarded inputs.
+        (dolist (workflow (list ci docs))
+          (let ((checkout (workflow-step-for-name workflow "Checkout"))
+                (setup (workflow-step-for-name workflow "Set up Nix and Cachix")))
             (expect checkout :not :to-be nil)
             (expect checkout :to-contain "persist-credentials: false")
-            (expect selection :not :to-be nil)
-            (expect selection :to-contain "id: cachix-mode")
-            (expect selection
+            (expect setup :not :to-be nil)
+            (expect setup :to-contain "uses: ./.github/actions/setup-nix-cachix")
+            (expect setup
                     :to-contain
-                    "if: ${{ env.CACHIX_CACHE != '' && github.event_name != 'pull_request' }}")
-            (expect selection
-                    :to-contain
-                    (format nil
-                            "env:~%          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}"))
-            (expect selection
-                    :to-contain
-                    "if [[ -n \"$CACHIX_AUTH_TOKEN\" ]]; then")
-            (expect selection
-                    :to-contain
-                    "printf '%s\\n' 'push-enabled=true' >> \"$GITHUB_OUTPUT\"")
-            (expect selection
-                    :to-contain
-                    "printf '%s\\n' 'push-enabled=false' >> \"$GITHUB_OUTPUT\"")
-            (expect selection :not :to-contain "echo ")
-            (expect selection :not :to-contain "set -x")
-            (expect (count-occurrences "\"$CACHIX_AUTH_TOKEN\"" selection)
-                    :to-be 1)
-            (expect (count-occurrences "\"$GITHUB_OUTPUT\"" selection)
-                    :to-be 2)
-            (expect (count-occurrences "push-enabled=" selection) :to-be 2)
-            (expect pull-cache
-                    :to-contain
-                    "if: ${{ env.CACHIX_CACHE != '' && (github.event_name == 'pull_request' || steps.cachix-mode.outputs.push-enabled != 'true') }}")
-            (expect pull-cache :to-contain "skipPush: true")
-            (expect pull-cache :not :to-contain "secrets.")
-            (expect push-cache
-                    :to-contain
-                    "if: ${{ env.CACHIX_CACHE != '' && github.event_name != 'pull_request' && steps.cachix-mode.outputs.push-enabled == 'true' }}")
-            (expect push-cache
-                    :to-contain
-                    "authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}")
-            (expect (subseq push-cache 0 (search "uses:" push-cache))
-                    :not :to-contain
-                    "secrets.")
-            (expect (count-occurrences "secrets.CACHIX_AUTH_TOKEN" workflow)
-                    :to-be 2)))
+                    "cachix-auth-token: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}")
+            (expect setup :to-contain "github-token: ${{ secrets.GITHUB_TOKEN }}"))
+          (expect (count-occurrences "secrets.CACHIX_AUTH_TOKEN" workflow)
+                  :to-be 1)
+          (expect (count-occurrences "secrets.GITHUB_TOKEN" workflow)
+                  :to-be 1))
+        ;; The composite action holds the pull-vs-push gating exactly once, in
+        ;; terms of its own inputs, and never names a secret itself.
+        (let ((selection (action-step-for-name action "Select Cachix mode"))
+              (pull-cache
+                (action-step-for-name action "Configure Cachix (pull-only)"))
+              (push-cache
+                (action-step-for-name action "Configure Cachix (push-enabled)")))
+          (expect selection :not :to-be nil)
+          (expect selection :to-contain "id: cachix-mode")
+          (expect selection :to-contain "shell: bash")
+          (expect selection
+                  :to-contain
+                  "if: ${{ inputs.cachix-cache != '' && github.event_name != 'pull_request' }}")
+          (expect selection
+                  :to-contain
+                  (format nil
+                          "env:~%        CACHIX_AUTH_TOKEN: ${{ inputs.cachix-auth-token }}"))
+          (expect selection
+                  :to-contain
+                  "if [[ -n \"$CACHIX_AUTH_TOKEN\" ]]; then")
+          (expect selection
+                  :to-contain
+                  "printf '%s\\n' 'push-enabled=true' >> \"$GITHUB_OUTPUT\"")
+          (expect selection
+                  :to-contain
+                  "printf '%s\\n' 'push-enabled=false' >> \"$GITHUB_OUTPUT\"")
+          (expect selection :not :to-contain "echo ")
+          (expect selection :not :to-contain "set -x")
+          (expect (count-occurrences "\"$CACHIX_AUTH_TOKEN\"" selection)
+                  :to-be 1)
+          (expect (count-occurrences "\"$GITHUB_OUTPUT\"" selection)
+                  :to-be 2)
+          (expect (count-occurrences "push-enabled=" selection) :to-be 2)
+          (expect pull-cache
+                  :to-contain
+                  "if: ${{ inputs.cachix-cache != '' && (github.event_name == 'pull_request' || steps.cachix-mode.outputs.push-enabled != 'true') }}")
+          (expect pull-cache :to-contain "skipPush: true")
+          (expect pull-cache :not :to-contain "authToken:")
+          (expect push-cache
+                  :to-contain
+                  "if: ${{ inputs.cachix-cache != '' && github.event_name != 'pull_request' && steps.cachix-mode.outputs.push-enabled == 'true' }}")
+          (expect push-cache
+                  :to-contain
+                  "authToken: ${{ inputs.cachix-auth-token }}")
+          (expect action :not :to-contain "secrets."))
         (dolist (row '((nil nil nil :disabled)
                        (nil t t :disabled)
                        (t t nil :pull-only)
@@ -319,12 +347,6 @@
             (expect (expected-cachix-action
                      cache-present-p pull-request-p token-present-p)
                     :to-be expected)))
-        (dolist (name '("Select Cachix mode"
-                        "Configure Cachix (pull-only)"
-                        "Configure Cachix (push-enabled)"))
-          (expect (workflow-step-for-name ci name)
-                  :to-equal
-                  (workflow-step-for-name docs name)))
         (expect (workflow-job-preamble ci "nix") :not :to-contain "secrets.")
         (expect (workflow-job-preamble docs "build") :not :to-contain "secrets.")
         (expect docs :to-contain "permissions: {}")
@@ -361,7 +383,7 @@
           (when artifacts
             (expect materialize-step
                     :to-contain
-                    (format nil ".#checks.x86_64-linux.~A" name))
+                    (format nil ".#checks.${{ matrix.system }}.~A" name))
             (dolist (artifact artifacts)
               (expect artifact-section :to-contain artifact)))))))
 

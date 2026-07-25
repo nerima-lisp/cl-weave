@@ -15,70 +15,55 @@ concurrency:
 
 jobs:
   nix:
-    name: nix (x86_64-linux)
-    runs-on: ubuntu-latest
+    name: nix (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 24
-    env:
-      CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
+    strategy:
+      fail-fast: false
+      # Single active entry today. The flake exposes checks for every system in
+      # `systems`, so covering another platform is a one-line addition here
+      # (e.g. `{ system: aarch64-darwin, runner: macos-14 }`).
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+      - name: Set up Nix and Cachix
+        uses: ./.github/actions/setup-nix-cachix
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Select Cachix mode
-        id: cachix-mode
-        if: ${{ env.CACHIX_CACHE != '' && github.event_name != 'pull_request' }}
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          if [[ -n "$CACHIX_AUTH_TOKEN" ]]; then
-            printf '%s\n' 'push-enabled=true' >> "$GITHUB_OUTPUT"
-          else
-            printf '%s\n' 'push-enabled=false' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Configure Cachix (pull-only)
-        if: ${{ env.CACHIX_CACHE != '' && (github.event_name == 'pull_request' || steps.cachix-mode.outputs.push-enabled != 'true') }}
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
-        with:
-          name: ${{ env.CACHIX_CACHE }}
-          extraPullNames: nix-community
-          skipPush: true
-
-      - name: Configure Cachix (push-enabled)
-        if: ${{ env.CACHIX_CACHE != '' && github.event_name != 'pull_request' && steps.cachix-mode.outputs.push-enabled == 'true' }}
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
-        with:
-          name: ${{ env.CACHIX_CACHE }}
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          extraPullNames: nix-community
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          # Never hand the push token to pull_request runs: a local `./` action is
+          # resolved from the PR head, so gating here (not just inside the action)
+          # keeps a same-repo PR from reading the secret. Empty token => pull-only.
+          cachix-auth-token: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run flake checks
         timeout-minutes: 10
-        run: timeout 600s nix flake check --print-build-logs --max-jobs 1
+        # --max-jobs 2 tuned for the 16 GB GitHub-hosted runner: each SBCL check
+        # caps at a 4 GB dynamic space, so two in parallel stay well within RAM.
+        # Lower to 1 if OOM appears on a smaller runner.
+        run: timeout 600s nix flake check --print-build-logs --max-jobs 2
 
       - name: Materialize check artifacts
         timeout-minutes: 2
         run: |
           set -euo pipefail
           outputs="$(timeout 120s nix build --no-link --print-out-paths \
-            ".#checks.x86_64-linux.json-results-artifact" \
-            ".#checks.x86_64-linux.jsonl-events-artifact" \
-            ".#checks.x86_64-linux.cli-json-results" \
-            ".#checks.x86_64-linux.ai-metadata-artifact" \
-            ".#checks.x86_64-linux.plan-artifact" \
-            ".#checks.x86_64-linux.watch-once-artifact" \
-            ".#checks.x86_64-linux.tap-artifact" \
-            ".#checks.x86_64-linux.junit-artifact" \
-            ".#checks.x86_64-linux.coverage-artifact")"
+            ".#checks.${{ matrix.system }}.json-results-artifact" \
+            ".#checks.${{ matrix.system }}.jsonl-events-artifact" \
+            ".#checks.${{ matrix.system }}.cli-json-results" \
+            ".#checks.${{ matrix.system }}.ai-metadata-artifact" \
+            ".#checks.${{ matrix.system }}.plan-artifact" \
+            ".#checks.${{ matrix.system }}.watch-once-artifact" \
+            ".#checks.${{ matrix.system }}.tap-artifact" \
+            ".#checks.${{ matrix.system }}.junit-artifact" \
+            ".#checks.${{ matrix.system }}.coverage-artifact")"
           while IFS= read -r output; do
             test -d "$output"
             cp -R "$output"/. .
@@ -88,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: cl-weave-test-reports-x86_64-linux
+          name: cl-weave-test-reports-${{ matrix.system }}
           path: |
             cl-weave-results.json
             cl-weave-events.jsonl
