@@ -1,8 +1,16 @@
 # cl-weave documentation — MkDocs + Material configuration.
 #
 # Build:   mkdocs build -f docs/mkdocs.yml --strict
-# Serve:   mkdocs serve  -f docs/mkdocs.yml
+# Serve:   mkdocs serve -f docs/mkdocs.yml --no-strict
 # The Nix flake (`nix build .#docs`) drives the same config offline.
+#
+# Always invoke mkdocs from the repository root: pymdownx.snippets resolves
+# base_path against the working directory, and docs/src/changelog.md includes
+# the top-level CHANGELOG.md from there.
+
+# Declared here as well as passed on the command line, so `mkdocs serve` uses
+# the same gate and no call path can forget --strict.
+strict: true
 
 site_name: cl-weave
 site_description: >-
@@ -93,7 +101,13 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # docs/src/changelog.md is a one-line include of the top-level CHANGELOG.md,
+  # so the site and the repository can never drift apart. check_paths turns a
+  # missing include into a build failure, matching what --strict does for links.
+  - pymdownx.snippets:
+      base_path:
+        - "."
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -102,14 +116,13 @@ markdown_extensions:
   # Content tabs (e.g. the Nix run / profile / local-checkout install paths).
   - pymdownx.tabbed:
       alternate_style: true
-  # Task lists, key bindings, smart symbols, emoji.
+  # Task lists, key bindings, smart symbols.
+  # pymdownx.emoji is deliberately absent: the docs standard forbids emoji, and
+  # leaving the extension configured invites someone to conclude otherwise.
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.keys
   - pymdownx.smartsymbols
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - attr_list
   - md_in_html
   - def_list
@@ -119,8 +132,16 @@ markdown_extensions:
       permalink: true
       title: On this page
 
+# Six sections, in this order, per the org docs standard. The order follows the
+# reader's state: Getting Started has not run anything yet, Guide has it working
+# but does not know the design, Reference is looking up one answer, Internals is
+# about to change the implementation, Project is about to contribute. Readership
+# shrinks down the list, so reference and internals sit at the back.
+#
+# --strict fails the build on a page that is not listed here, which is the point:
+# the nav cannot silently fall behind docs/src/.
 nav:
-  - Home: README.md
+  - Home: index.md
   - Getting Started:
       - Installation: installation.md
       - Quick Start: quick-start.md
@@ -138,19 +159,27 @@ nav:
       - Reporters and CI: reporters-and-ci.md
       - AI Discovery: ai-discovery.md
   - Reference:
+      - API Reference: api-reference.md
       - AI Contract: ai-contract.md
       - Runtime Support: runtime-support.md
       - Doctor Report: doctor-report.md
-  - Governance:
+  - Internals:
       - Project Scope: project-scope.md
+      - Community Health: community-health.md
+  - Project:
+      - Development: development.md
+      - Changelog: changelog.md
       - Governance: governance.md
       - Triage Policy: triage-policy.md
+      - Issue Reporting Guide: issue-reporting.md
+      - Pull Request Guide: pull-request-template.md
       - Support Policy: support-policy.md
       - Versioning Policy: versioning-policy.md
       - Maintenance Policy: maintenance-policy.md
       - Distribution Policy: distribution-policy.md
       - Release Process: release-process.md
-  - Contributing:
-      - Community Health: community-health.md
-      - Issue Reporting Guide: issue-reporting.md
-      - Pull Request Template: pull-request-template.md
+
+# Working notes and audit records go under docs/notes/ and stay off the site.
+# Without this declaration --strict fails the moment such a file is added.
+not_in_nav: |
+  notes/

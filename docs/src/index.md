@@ -140,6 +140,16 @@ major version:
 - [AI Discovery](ai-discovery.md) — the machine-readable metadata contract
   for agents and generators.
 
+## Reference Map
+
+- [API Reference](api-reference.md) — every exported symbol, grouped by concept.
+- [AI Contract](ai-contract.md) — the frozen artifact and metadata schemas.
+- [Runtime Support](runtime-support.md) — supported implementations and
+  platforms.
+- [Doctor Report](doctor-report.md) — the `doctor` health checks.
+- [Development](development.md) — build, test, coverage and formatting commands.
+- [Changelog](changelog.md) — the release history.
+
 ## Nix Workflow
 
 The [flake.nix](https://github.com/nerima-lisp/cl-weave/blob/main/flake.nix) at
@@ -150,12 +160,13 @@ the repository root packages `cl-weave` as a Nix flake:
   S-expression edits.
 - `nix run . -- <command>` — the packaged CLI (`run`, `list`, `watch`,
   `doctor`, `metadata`, `version`, `help`).
+- `nix run .#test` — the self-test suite through `run-tests.lisp`.
 - `nix flake check` — every CI entrypoint (test suite, reporters, coverage
-  gate, AI metadata, CLI smoke tests, `paredit-lint` structural parse check)
-  as reproducible derivations.
+  gate, AI metadata, CLI smoke tests, `paredit-lint` structural parse check,
+  the treefmt formatting gate, and the docs build) as reproducible derivations.
 - `nix build .#docs` — builds this documentation site with MkDocs (Material)
   in `--strict` mode, so broken links fail the build.
-- `nix fmt` — formats `flake.nix` with `nixfmt`.
+- `nix fmt` — formats Nix sources with treefmt (nixfmt).
 
 Running `direnv allow` loads the devShell automatically.
 
