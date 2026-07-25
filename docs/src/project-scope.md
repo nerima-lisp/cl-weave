@@ -43,4 +43,4 @@ Open an issue when a change would affect:
 5. adoption or migration guidance, or
 6. documented support and release policy.
 
-If the change is security-sensitive, use [private GitHub security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new) instead.
+If the change is security-sensitive, use [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new) instead.

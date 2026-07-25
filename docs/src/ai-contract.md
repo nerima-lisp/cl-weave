@@ -43,9 +43,9 @@ verification and scope policy for those channels lives in
 {
   "schemaVersion": 23,
   "kind": "cl-weave-metadata",
-  "version": "0.11.0",
-  "homepage": "https://github.com/takeokunn/cl-weave",
-  "bugTracker": "https://github.com/takeokunn/cl-weave/issues",
+  "version": "1.0.0",
+  "homepage": "https://github.com/nerima-lisp/cl-weave",
+  "bugTracker": "https://github.com/nerima-lisp/cl-weave/issues",
   "license": "MIT",
   "policyDocuments": [
     "docs/src/community-health.md",
@@ -103,8 +103,8 @@ verification and scope policy for those channels lives in
     {
       "name": "nix-remote-cli",
       "kind": "nix",
-      "installCommand": ["nix", "profile", "install", "github:takeokunn/cl-weave"],
-      "runCommand": ["nix", "run", "github:takeokunn/cl-weave", "--", "--help"],
+      "installCommand": ["nix", "profile", "install", "github:nerima-lisp/cl-weave"],
+      "runCommand": ["nix", "run", "github:nerima-lisp/cl-weave", "--", "--help"],
       "scope": "Install and run the packaged CLI without cloning the repository.",
       "references": ["README.md", "docs/src/distribution-policy.md"]
     }
@@ -113,13 +113,13 @@ verification and scope policy for those channels lives in
     {
       "name": "issue-tracker",
       "kind": "github",
-      "target": "https://github.com/takeokunn/cl-weave/issues",
+      "target": "https://github.com/nerima-lisp/cl-weave/issues",
       "scope": "Reproducible bugs, documentation gaps, and concrete feature requests."
     },
     {
       "name": "pull-requests",
       "kind": "github",
-      "target": "https://github.com/takeokunn/cl-weave/pulls",
+      "target": "https://github.com/nerima-lisp/cl-weave/pulls",
       "scope": "Validated fixes that are ready for review."
     },
     {
@@ -182,17 +182,17 @@ verification and scope policy for those channels lives in
       "contactLinks": [
         {
           "name": "Support policy",
-          "target": "https://github.com/takeokunn/cl-weave/blob/main/docs/src/support-policy.md",
+          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md",
           "purpose": "Check whether the request belongs in issue tracking and what detail is required."
         },
         {
           "name": "Security reporting",
-          "target": "https://github.com/takeokunn/cl-weave/security/advisories/new",
+          "target": "https://github.com/nerima-lisp/cl-weave/security/advisories/new",
           "purpose": "Report vulnerabilities through the private security contact path."
         },
         {
           "name": "Issue reporting guide",
-          "target": "https://github.com/takeokunn/cl-weave/blob/main/docs/src/issue-reporting.md",
+          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md",
           "purpose": "Review the canonical reproduction format before filing a bug."
         }
       ]
@@ -231,12 +231,12 @@ verification and scope policy for those channels lives in
     {
       "name": "security-reporting",
       "kind": "github",
-      "target": "https://github.com/takeokunn/cl-weave/security/advisories/new",
+      "target": "https://github.com/nerima-lisp/cl-weave/security/advisories/new",
       "scope": "Private vulnerability reporting through GitHub security advisories."
     }
   ],
   "lifecycle": {
-    "stage": "pre-1.0",
+    "stage": "stable",
     "status": "active",
     "supportedLine": "main",
     "supportDocument": "docs/src/support-policy.md",
@@ -288,7 +288,7 @@ verification and scope policy for those channels lives in
   },
   "releaseProcess": {
     "policyDocument": "docs/src/release-process.md",
-    "releaseStage": "pre-1.0",
+    "releaseStage": "stable",
     "checklist": [
       "Run the full test suite.",
       "Run nix flake check --print-build-logs when Nix is available.",

@@ -68,4 +68,4 @@ If the problem involves unintended shell execution, path traversal, unsafe
 snapshot writes, or subprocess isolation escapes, report it through the security
 process instead of opening a public issue.
 
-Use [private GitHub security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new) for the current reporting policy.
+Use [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new) for the current reporting policy.

@@ -53,8 +53,8 @@
                   "docs/src/distribution-policy.md"))
     (:name "nix-remote-cli"
      :kind "nix"
-     :install-command ("nix" "profile" "install" "github:takeokunn/cl-weave")
-     :run-command ("nix" "run" "github:takeokunn/cl-weave" "--" "--help")
+     :install-command ("nix" "profile" "install" "github:nerima-lisp/cl-weave")
+     :run-command ("nix" "run" "github:nerima-lisp/cl-weave" "--" "--help")
      :scope "Install and run the packaged CLI without cloning the repository."
      :references ("README.md"
                   "docs/src/distribution-policy.md"))))
@@ -62,11 +62,11 @@
 (defparameter *metadata-support-channels*
   '((:name "issue-tracker"
      :kind "github"
-     :target "https://github.com/takeokunn/cl-weave/issues"
+     :target "https://github.com/nerima-lisp/cl-weave/issues"
      :scope "Reproducible bugs, documentation gaps, and concrete feature requests.")
     (:name "pull-requests"
      :kind "github"
-     :target "https://github.com/takeokunn/cl-weave/pulls"
+     :target "https://github.com/nerima-lisp/cl-weave/pulls"
      :scope "Validated fixes that are ready for review.")
     (:name "support-policy"
      :kind "document"
@@ -109,13 +109,13 @@
                   "docs/src/issue-reporting.md")
      :required-sections nil
      :contact-links ((:name "Support policy"
-                      :target "https://github.com/takeokunn/cl-weave/blob/main/docs/src/support-policy.md"
+                      :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md"
                       :purpose "Check whether the request belongs in issue tracking and what detail is required.")
                      (:name "Security reporting"
-                      :target "https://github.com/takeokunn/cl-weave/security/advisories/new"
+                      :target "https://github.com/nerima-lisp/cl-weave/security/advisories/new"
                       :purpose "Report vulnerabilities through the private security contact path.")
                      (:name "Issue reporting guide"
-                      :target "https://github.com/takeokunn/cl-weave/blob/main/docs/src/issue-reporting.md"
+                      :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md"
                       :purpose "Review the canonical reproduction format before filing a bug.")))
     (:name "pull-request-template"
      :kind "github-pull-request-template"
@@ -140,11 +140,11 @@
 (defparameter *metadata-security-contacts*
   '((:name "security-reporting"
      :kind "github"
-     :target "https://github.com/takeokunn/cl-weave/security/advisories/new"
+     :target "https://github.com/nerima-lisp/cl-weave/security/advisories/new"
      :scope "Private vulnerability reporting through GitHub security advisories.")))
 
 (defparameter *metadata-lifecycle*
-  '(:stage "pre-1.0"
+  '(:stage "stable"
     :status "active"
     :supported-line "main"
     :support-document "docs/src/support-policy.md"
@@ -187,7 +187,7 @@
 
 (defparameter *metadata-release-process*
   '(:policy-document "docs/src/release-process.md"
-    :release-stage "pre-1.0"
+    :release-stage "stable"
     :checklist
     ("Run the full test suite."
      "Run nix flake check --print-build-logs when Nix is available."

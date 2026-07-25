@@ -14,8 +14,8 @@ channels:
   checkout to validate the bundled ASDF test suite.
 - `nix-local-cli`: install with `nix profile install .` from the current
   checkout root, then run `nix run . -- --help` to validate the packaged CLI.
-- `nix-remote-cli`: run `nix profile install github:takeokunn/cl-weave` and
-  `nix run github:takeokunn/cl-weave -- --help` to validate the packaged CLI
+- `nix-remote-cli`: run `nix profile install github:nerima-lisp/cl-weave` and
+  `nix run github:nerima-lisp/cl-weave -- --help` to validate the packaged CLI
   fetched from the repository reference.
 
 ## Verification Expectations
@@ -28,8 +28,8 @@ channels:
 - Inspect `flake.lock` changes as dependency updates. A lock-file update changes
   the dependency graph even when the Common Lisp sources are unchanged.
 - Verify a pinned revision with `nix flake check
-  github:takeokunn/cl-weave/<revision> --print-build-logs`, then build the same
-  reference with `nix build github:takeokunn/cl-weave/<revision> --no-link`.
+  github:nerima-lisp/cl-weave/<revision> --print-build-logs`, then build the same
+  reference with `nix build github:nerima-lisp/cl-weave/<revision> --no-link`.
   This verifies the checks and package from the exact source reference that a
   consumer will use.
 - Run the source checkout path before release so the repository still passes its

@@ -1,7 +1,7 @@
 # Release Process
 
-This document describes the intended release flow for `cl-weave` while the
-project remains pre-1.0.
+This document describes the release flow for `cl-weave`, which follows
+[Semantic Versioning](versioning-policy.md) as of `1.0.0`.
 
 ## Release Goals
 
@@ -16,10 +16,11 @@ For public-surface discipline and migration expectations, see
 
 ## Suggested Release Checklist
 
-1. Bump the version string in lockstep across `cl-weave.asd` (`:version`),
-   both `version = "..."` lines in `flake.nix`, and the `"version"` field in
-   the embedded JSON contract in `docs/src/ai-contract.md`. Releases use a
-   minor-version-only bump while pre-1.0.
+1. Bump the version string in lockstep across `cl-weave.asd` (`:version`) and
+   the `"version"` field in the embedded JSON contract in
+   `docs/src/ai-contract.md`. (`flake.nix` derives its package version from the
+   `.asd` `:version`, so it needs no manual edit.) Choose the major/minor/patch
+   increment per the [versioning policy](versioning-policy.md).
 2. Run the full test suite.
 3. Run `nix flake check --print-build-logs` when Nix is available.
 4. Summarize user-visible changes in the release notes.

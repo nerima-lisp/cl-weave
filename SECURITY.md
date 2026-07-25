@@ -11,7 +11,7 @@ supported-surface policy.
 ## Reporting a Vulnerability
 
 Do not open a public issue for a suspected vulnerability. Report it through
-[GitHub private security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new).
+[GitHub private security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new).
 
 Include a minimal reproduction, affected version or commit, impact, and any
 suggested mitigation. Avoid publishing exploit details until a maintainer has

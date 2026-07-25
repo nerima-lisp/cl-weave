@@ -15,7 +15,7 @@ Pick the path that matches how you want to use the framework.
     is added to your profile:
 
     ```sh
-    nix run github:takeokunn/cl-weave -- --help
+    nix run github:nerima-lisp/cl-weave -- --help
     ```
 
     Ideal for CI and AI agents that only need a single invocation.
@@ -25,7 +25,7 @@ Pick the path that matches how you want to use the framework.
     Add the `cl-weave` CLI to your Nix profile so it is on `PATH`:
 
     ```sh
-    nix profile install github:takeokunn/cl-weave
+    nix profile install github:nerima-lisp/cl-weave
     ```
 
 === "Local checkout (contributors)"
