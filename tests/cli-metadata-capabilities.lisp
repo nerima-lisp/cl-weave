@@ -11,6 +11,7 @@
            (sequence-option (find-metadata-entry :name "--sequence" options))
            (max-workers-option
              (find-metadata-entry :name "--max-workers" options))
+           (seed-option (find-metadata-entry :name "--seed" options))
            (snapshot-option
              (find-metadata-entry :name "--update-snapshots" options)))
       (expect filter-option :not :to-be nil)
@@ -48,6 +49,10 @@
       (expect (getf max-workers-option :commands) :to-contain "watch")
       (expect (getf max-workers-option :commands) :not :to-contain "list")
       (expect (getf max-workers-option :value-kind) :to-be :positive-integer)
+      ;; --seed advertises a positive-integer contract that matches its
+      ;; positive-only parser (0 and negatives are rejected).
+      (expect seed-option :not :to-be nil)
+      (expect (getf seed-option :value-kind) :to-be :positive-integer)
       (expect (getf max-workers-option :environment)
               :to-contain "CL_WEAVE_MAX_WORKERS")
       (expect snapshot-option :not :to-be nil)

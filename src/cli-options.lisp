@@ -334,9 +334,14 @@
   (declare (ignore ignore))
   (list value))
 
-(defun require-option-argument (flag rest)
+(defun require-option-argument (flag rest &optional inline-p)
+  ;; When INLINE-P, the value was given explicitly as `--flag=VALUE`, so it is
+  ;; taken verbatim even if it looks like an option token (e.g.
+  ;; `--filter=--foo`) -- that inline form exists precisely to pass values that
+  ;; begin with dashes. The separate `--flag VALUE` form still rejects a
+  ;; following option token as a missing argument.
   (let ((value (first rest)))
-    (unless (and value (not (option-token-p value)))
+    (unless (and value (or inline-p (not (option-token-p value))))
       (error 'cli-error :message (format nil "~A requires an argument" flag)))
     value))
 
@@ -380,10 +385,10 @@
        rest)
       (:collection
        (push-cli-option-field options (cli-spec-field spec)
-                              (require-option-argument flag rest))
+                              (require-option-argument flag rest inline-p))
        (rest rest))
       (:value
-       (let* ((raw (require-option-argument flag rest))
+       (let* ((raw (require-option-argument flag rest inline-p))
               (name (or (cli-spec-argument-name spec) flag))
               (value (call-cli-option-parser (cli-spec-parser spec) raw name)))
          (set-cli-option-field options (cli-spec-field spec) value)

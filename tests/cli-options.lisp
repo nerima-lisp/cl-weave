@@ -1,6 +1,16 @@
 (in-package #:cl-weave/tests)
 
 (describe "cli options"
+  (it "accepts an inline option value that begins with dashes"
+    ;; Regression: `--flag=VALUE` must take VALUE verbatim even when it looks
+    ;; like an option token; that inline form exists precisely to pass values
+    ;; that begin with dashes.
+    (let ((options (parse-cli '("run" "--filter=--foo"))))
+      (expect (cl-weave/cli::cli-options-name-filter options) :to-equal "--foo"))
+    ;; The separated `--flag VALUE` form still rejects a following option token.
+    (expect (lambda () (parse-cli '("run" "--filter" "--foo")))
+            :to-throw "requires an argument"))
+
   (it "parses canonical run options into explicit data"
     (let ((options (parse-cli '("run"
                       "cl-weave/tests"

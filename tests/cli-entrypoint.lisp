@@ -532,6 +532,20 @@
         (delete-file output-file)))))
 
 (it
+  "reports doctor success so a failing check drives a non-zero exit"
+  ;; A healthy run (no unresolved system) succeeds; a bogus requested system
+  ;; makes a check fail, and report-doctor must return false so main exits
+  ;; non-zero and CI can gate on `cl-weave doctor SYSTEM`.
+  (let ((healthy (parse-cli '("doctor")))
+        (broken (parse-cli '("doctor" "no-such-system-xyzzy"))))
+    (expect (with-output-to-string (stream)
+              (expect (cl-weave/cli::report-doctor healthy stream) :to-be-truthy))
+            :to-contain "\"status\":\"pass\"")
+    (expect (with-output-to-string (stream)
+              (expect (cl-weave/cli::report-doctor broken stream) :to-be-falsy))
+            :to-contain "\"status\":\"fail\"")))
+
+(it
   "normalizes doctor reporter spec to JSON output"
   (let* ((options (parse-cli '("doctor" "--reporter" "spec")))
          (output
