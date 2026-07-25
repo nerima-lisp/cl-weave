@@ -437,11 +437,20 @@
     ("to-match-inline-snapshot"
      (expect '(:ok 42) :to-match-inline-snapshot "(:ok 42)"))
     ("to-match-snapshot"
-     (let ((cl-weave::*snapshot-directory* (test-snapshot-directory "cl-weave-core-snapshots"))
-           (cl-weave::*snapshot-file-name* "matchers.snapshots"))
-       (cl-weave:with-snapshot-updates
-         (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
-       (expect '(:ok 42) :to-match-snapshot "matcher external snapshot")))
+     ;; Write and read the snapshot in a throwaway temp directory that is
+     ;; deleted afterwards, like the sibling snapshot tests. Using a persistent
+     ;; directory left the written file behind in the working tree.
+     (let* ((snapshot-root (make-test-temporary-directory "cl-weave-core-snapshots"))
+            (cl-weave::*snapshot-directory* snapshot-root)
+            (cl-weave::*snapshot-file-name* "matchers.snapshots"))
+       (unwind-protect
+            (progn
+              (cl-weave:with-snapshot-updates
+                (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
+              (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
+         (uiop:delete-directory-tree snapshot-root
+                                     :validate t
+                                     :if-does-not-exist :ignore))))
     ("to-match-snapshot-sequence"
      (let* ((snapshot-root (make-test-temporary-directory "snapshot-sequence"))
             (cl-weave::*snapshot-directory* snapshot-root)

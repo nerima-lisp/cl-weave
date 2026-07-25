@@ -8,6 +8,9 @@
 coverage-report-*/
 coverage-filter-*/
 cl-weave-coverage-report/
+# Snapshot directory some self-tests write under the working tree when no
+# temporary root env var is set; it is regenerated and must not be committed.
+cl-weave-core-snapshots/
 cl-weave.coverage
 cl-weave-results.json
 cl-weave-events.jsonl
