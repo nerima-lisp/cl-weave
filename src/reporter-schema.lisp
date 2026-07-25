@@ -174,7 +174,11 @@ S-expression artifact (TAG :SCHEMA-VERSION SCHEMA-VERSION ...summary...
 PAYLOAD-KEY (serialized elements)) to STREAM, where the summary plist
 comes from SUMMARY-FN and each element is serialized by SERIALIZER-FN."
   `(defun ,name (,collection ,stream)
+     ;; *print-circle* keeps the serializer from hanging on a circular value in
+     ;; a journaled/asserted slot (matching the cycle-safe JSON reporter) while
+     ;; still emitting a READ-able form via #N= labels.
      (let ((*print-pretty* nil)
+           (*print-circle* t)
            (summary (,summary-fn ,collection)))
        (prin1 (append (list ,tag :schema-version ,schema-version)
                       summary

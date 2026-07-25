@@ -124,9 +124,16 @@
              always (keywordp (car tail)))))
 
 (defun json-alist-p (value)
+  ;; A JSON object is written from an association list of *dotted* pairs
+  ;; (KEY . VALUE). Requiring `(atom (cdr entry))` is what distinguishes a
+  ;; genuine alist from a list of plists such as the operand reports
+  ;; ((:form A :value 1) (:form B :value 2)): the latter's entries are proper
+  ;; lists (cdr is a cons), so they render as a JSON array of objects rather
+  ;; than collapsing into one object with duplicate keys.
   (and (proper-list-p value)
        (every (lambda (entry)
                 (and (consp entry)
+                     (atom (cdr entry))
                      (let ((key (car entry)))
                        (or (keywordp key)
                            (stringp key)

@@ -229,6 +229,11 @@
                             (cons "string-key" 2)
                             (cons 'symbol-key 3))
                       "{\"keywordKey\":1,\"string-key\":2,\"symbol-key\":3}")
+                ;; A list of plists (e.g. the smart-assertion operand reports)
+                ;; must serialize as an array of objects, not collapse into one
+                ;; object with duplicate keys.
+                (list '((:form a :value 1) (:form b :value 2))
+                      "[{\"form\":\"A\",\"value\":1},{\"form\":\"B\",\"value\":2}]")
                 (list '(1 :array-value) "[1,\"array-value\"]")
                 (list #\A "\"A\"")
                 (list #P"relative/path" "\"relative\\/path\"")
