@@ -17,8 +17,12 @@
       (list (lambda () (gen-list :not-a-generator)) "property generator")
       (list (lambda () (gen-list (gen-boolean) :min-length 2 :max-length 1))
             "MIN-LENGTH <= MAX-LENGTH")
+      (list (lambda () (gen-list (gen-boolean) :min-length -1 :max-length 3))
+            "non-negative MIN-LENGTH")
       (list (lambda () (gen-string :min-length 2 :max-length 1))
             "MIN-LENGTH <= MAX-LENGTH")
+      (list (lambda () (gen-string :min-length -1 :max-length 3))
+            "non-negative MIN-LENGTH")
       (list (lambda () (gen-vector :not-a-generator)) "property generator")
       (list (lambda () (gen-vector (gen-boolean) :min-length 2 :max-length 1))
             "MIN-LENGTH <= MAX-LENGTH")
@@ -45,8 +49,11 @@
               :to-be 5)
       (expect (funcall (cl-weave::property-generator-shrink positive) 8)
               :to-equal '(2 4))
+      ;; Shrinking moves toward zero: the least-extreme in-range value (-2) and
+      ;; the halved value (-4), never the far MIN bound (-10, more extreme
+      ;; than the -8 input).
       (expect (funcall (cl-weave::property-generator-shrink negative) -8)
-              :to-equal '(-10 -4))))
+              :to-equal '(-2 -4))))
 
   (it "shrinks heterogeneous one-of values through matching built-in domains"
     (let ((generator (gen-one-of (gen-character :alphabet "ab")

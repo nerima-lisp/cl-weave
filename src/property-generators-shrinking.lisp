@@ -6,6 +6,9 @@
   value)
 
 (defun ensure-bounded-sequence-lengths (min-length max-length label)
+  (when (minusp min-length)
+    (error "cl-weave: ~A requires a non-negative MIN-LENGTH, got ~S."
+           label min-length))
   (when (> min-length max-length)
     (error "cl-weave: ~A requires MIN-LENGTH <= MAX-LENGTH, got ~S and ~S."
            label min-length max-length)))

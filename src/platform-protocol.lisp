@@ -15,6 +15,15 @@
 
 (defvar *platform-capabilities* nil)
 (defvar *platform-timeout-caller* nil)
+;; Predicate that recognizes the platform's raw timeout interrupt (e.g. an
+;; SBCL sb-ext:timeout) before it is translated into PLATFORM-TIMEOUT. Portable
+;; code uses PLATFORM-TIMEOUT-INTERRUPT-P so it can let that interrupt propagate
+;; instead of swallowing it as an ordinary serious-condition.
+(defvar *platform-timeout-condition-predicate* nil)
+
+(defun platform-timeout-interrupt-p (condition)
+  (and *platform-timeout-condition-predicate*
+       (funcall *platform-timeout-condition-predicate* condition)))
 
 (defun platform-capability-available-p (capability)
   (not (null (member capability *platform-capabilities* :test #'eq))))

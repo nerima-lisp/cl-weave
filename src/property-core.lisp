@@ -157,11 +157,19 @@
 
 (defun integer-shrink-candidates (value min max)
   (declare (type integer value min max))
-  (loop for candidate in (list 0 min (truncate value 2))
-        when (and (integerp candidate)
-                  (<= min candidate max))
-          collect candidate into candidates
-        finally (return (remove-duplicates candidates :test #'eql))))
+  ;; Shrink toward zero. The most useful reachable target is the in-range value
+  ;; closest to zero (0 when it is in range, otherwise the nearest bound), never
+  ;; the raw MIN bound: for a negative range MIN is the *most* extreme value, so
+  ;; offering it as a candidate could let the greedy runner accept a larger
+  ;; magnitude than the input it was shrinking. Clamping zero into [MIN, MAX]
+  ;; and halving toward zero both have magnitude <= |VALUE|, so a shrink step
+  ;; never moves away from smaller.
+  (let ((toward-zero (max min (min max 0))))
+    (loop for candidate in (list toward-zero (truncate value 2))
+          when (and (integerp candidate)
+                    (<= min candidate max))
+            collect candidate into candidates
+          finally (return (remove-duplicates candidates :test #'eql)))))
 
 (defun make-integer-producer (min max)
   (declare (type integer min max))

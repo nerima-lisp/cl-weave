@@ -14,7 +14,7 @@ Maintainers are responsible for:
   [versioning-policy.md](versioning-policy.md)
 - keeping machine-readable metadata, release notes, and policy documents in sync
 - requiring regression coverage for public-surface changes when practical
-- enforcing security handling through [private GitHub security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new)
+- enforcing security handling through [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new)
 
 Repository-wide review ownership is declared in
 [../.github/CODEOWNERS](../../.github/CODEOWNERS). CODEOWNERS routing is the

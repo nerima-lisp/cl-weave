@@ -66,7 +66,7 @@
           dontInstall = true;
           meta = {
             description = "Rendered MkDocs (Material) documentation for cl-weave";
-            homepage = "https://github.com/takeokunn/cl-weave";
+            homepage = "https://github.com/nerima-lisp/cl-weave";
             license = pkgs.lib.licenses.mit;
           };
         };
@@ -404,7 +404,7 @@
           '';
           meta = {
             description = "A modern, Vitest-inspired Common Lisp testing framework";
-            homepage = "https://github.com/takeokunn/cl-weave";
+            homepage = "https://github.com/nerima-lisp/cl-weave";
             license = pkgs.lib.licenses.mit;
             platforms = pkgs.lib.platforms.unix;
             mainProgram = "cl-weave";

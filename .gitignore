@@ -6,6 +6,7 @@
 
 # Coverage and test run artifacts
 coverage-report-*/
+coverage-filter-*/
 cl-weave-coverage-report/
 cl-weave.coverage
 cl-weave-results.json

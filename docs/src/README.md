@@ -12,7 +12,7 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     Install it in one command, then write your first suite in under a minute:
 
     ```sh
-    nix run github:takeokunn/cl-weave -- --help   # run without installing
+    nix run github:nerima-lisp/cl-weave -- --help   # run without installing
     ```
 
     Continue with [Installation](installation.md) → [Quick Start](quick-start.md)
@@ -70,10 +70,11 @@ run in CI, embed in ASDF projects, and extend from the REPL.
 
 ## Status
 
-Pre-1.0. The capability list below is the intended public surface, and it is
-validated by the CI entrypoints documented in [Reporters and CI](reporters-and-ci.md)
-on Linux. Pre-1.0 releases may still introduce deliberate breaking
-changes; the expectations are documented in [Versioning Policy](versioning-policy.md):
+Stable (`1.0`). The capability list below is the committed public surface, and
+it is validated by the CI entrypoints documented in [Reporters and CI](reporters-and-ci.md)
+on Linux. Within the `1.x` series, changes stay backward-compatible under
+[Semantic Versioning](versioning-policy.md); breaking changes ship only in a new
+major version:
 
 - `describe` / `it` hierarchical test DSL
 - `expect` matcher assertions with readable failure reports
@@ -141,7 +142,7 @@ changes; the expectations are documented in [Versioning Policy](versioning-polic
 
 ## Nix Workflow
 
-The [flake.nix](https://github.com/takeokunn/cl-weave/blob/main/flake.nix) at
+The [flake.nix](https://github.com/nerima-lisp/cl-weave/blob/main/flake.nix) at
 the repository root packages `cl-weave` as a Nix flake:
 
 - `nix develop` — a devShell with SBCL and GNU coreutils, and
@@ -166,7 +167,7 @@ boundaries.
 Use [Issue Reporting Guide](issue-reporting.md) for reproducible bugs
 and behavior questions.
 
-Use [private GitHub security advisories](https://github.com/takeokunn/cl-weave/security/advisories/new)
+Use [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new)
 for vulnerability reporting. Do not put exploit details in a public issue.
 
 ## Project Operations
@@ -175,13 +176,13 @@ for vulnerability reporting. Do not put exploit details in a public issue.
 - AI contract: [docs/src/ai-contract.md](ai-contract.md)
 - Issue reporting guide: [docs/src/issue-reporting.md](issue-reporting.md)
 - Pull request guidance: [docs/src/pull-request-template.md](pull-request-template.md)
-- Pull request form: [.github/pull_request_template.md](https://github.com/takeokunn/cl-weave/blob/main/.github/pull_request_template.md)
-- Pull request queue: <https://github.com/takeokunn/cl-weave/pulls>
-- Bug report form: [.github/ISSUE_TEMPLATE/bug_report.md](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/bug_report.md)
-- Feature request form: [.github/ISSUE_TEMPLATE/feature_request.md](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/feature_request.md)
-- Issue template routing: [.github/ISSUE_TEMPLATE/config.yml](https://github.com/takeokunn/cl-weave/blob/main/.github/ISSUE_TEMPLATE/config.yml)
+- Pull request form: [.github/pull_request_template.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/pull_request_template.md)
+- Pull request queue: <https://github.com/nerima-lisp/cl-weave/pulls>
+- Bug report form: [.github/ISSUE_TEMPLATE/bug_report.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/bug_report.md)
+- Feature request form: [.github/ISSUE_TEMPLATE/feature_request.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/feature_request.md)
+- Issue template routing: [.github/ISSUE_TEMPLATE/config.yml](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/config.yml)
 - Community health contract: [docs/src/community-health.md](community-health.md)
-- Code ownership: [.github/CODEOWNERS](https://github.com/takeokunn/cl-weave/blob/main/.github/CODEOWNERS)
+- Code ownership: [.github/CODEOWNERS](https://github.com/nerima-lisp/cl-weave/blob/main/.github/CODEOWNERS)
 - Governance: [docs/src/governance.md](governance.md)
 - Maintenance policy: [docs/src/maintenance-policy.md](maintenance-policy.md)
 - Distribution policy: [docs/src/distribution-policy.md](distribution-policy.md)
@@ -191,9 +192,9 @@ for vulnerability reporting. Do not put exploit details in a public issue.
 - Versioning policy: [docs/src/versioning-policy.md](versioning-policy.md)
 - Project scope: [docs/src/project-scope.md](project-scope.md)
 - Triage policy: [docs/src/triage-policy.md](triage-policy.md)
-- Security reporting: <https://github.com/takeokunn/cl-weave/security/advisories/new>
-- Issue tracker: <https://github.com/takeokunn/cl-weave/issues>
-- Release notes: <https://github.com/takeokunn/cl-weave/releases>
+- Security reporting: <https://github.com/nerima-lisp/cl-weave/security/advisories/new>
+- Issue tracker: <https://github.com/nerima-lisp/cl-weave/issues>
+- Release notes: <https://github.com/nerima-lisp/cl-weave/releases>
 
 Runtime metadata mirrors these operations surfaces through `policyDocuments`,
 `referenceDocuments`, `supportChannels`, `communityHealth`,
@@ -202,4 +203,4 @@ agent-side OSS operations discovery.
 
 ## License
 
-MIT. See [LICENSE](https://github.com/takeokunn/cl-weave/blob/main/LICENSE).
+MIT. See [LICENSE](https://github.com/nerima-lisp/cl-weave/blob/main/LICENSE).

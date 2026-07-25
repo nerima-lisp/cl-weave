@@ -3,6 +3,8 @@
 #+sbcl
 (progn
   (pushnew :timeout *platform-capabilities* :test #'eq)
+  (setf *platform-timeout-condition-predicate*
+        (lambda (condition) (typep condition 'sb-ext:timeout)))
   (setf *platform-timeout-caller*
         (lambda (timeout-seconds callable continue)
           (handler-case

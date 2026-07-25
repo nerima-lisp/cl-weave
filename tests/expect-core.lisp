@@ -109,6 +109,14 @@
        (expect t)))
     #+sbcl
     ("to-be-nan" (expect (quiet-nan) :to-be-nan))
+    #+sbcl
+    ("ordered comparison matchers fail cleanly on NaN instead of trapping"
+     (progn
+       (expect-not (quiet-nan) :to-be-greater-than 0)
+       (expect-not (quiet-nan) :to-be-greater-than-or-equal 0)
+       (expect-not (quiet-nan) :to-be-less-than 0)
+       (expect-not (quiet-nan) :to-be-less-than-or-equal 0)
+       (expect-not (quiet-nan) :to-be-close-to 1.0)))
     ("to-be-one-of list" (expect :ready :to-be-one-of '(:pending :ready :done)))
     ("to-be-one-of vector and hash-table values"
      (progn

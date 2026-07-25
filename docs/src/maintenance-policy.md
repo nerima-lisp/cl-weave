@@ -1,7 +1,8 @@
 # Maintenance Policy
 
-`cl-weave` is pre-1.0 and evolves with an emphasis on deterministic output,
-coherent public APIs, and explicit upgrade notes.
+`cl-weave` is stable (`1.x`) and evolves under [Semantic Versioning](versioning-policy.md)
+with an emphasis on deterministic output, coherent public APIs, and explicit
+upgrade notes.
 
 For the release labeling and public-surface discipline, see
 [versioning-policy.md](versioning-policy.md).
@@ -22,9 +23,9 @@ For the release labeling and public-surface discipline, see
   `CHANGELOG.md`, and, when practical, accompanied by regression tests.
 - Public reporter formats, CLI flags, and adoption guidance should stay in sync
   with the behavior exercised by the test suite.
-- Pre-1.0 breaking changes are expected when they simplify the surface or
-  remove design debt, but they must be called out clearly in the release notes
-  and versioning policy.
+- Breaking changes to the public surface ship only in a new major version, are
+  called out clearly in the release notes and versioning policy, and carry a
+  migration note at the point of change.
 
 ## Support Channels
 

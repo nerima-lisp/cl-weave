@@ -42,7 +42,16 @@ appears on the time-travel timeline."
     (dolist (hook hooks (nreverse errors))
       (let ((error (handler-case
                        (progn (funcall hook) nil)
-                     (serious-condition (condition) condition))))
+                     ;; Collect hook conditions and continue cleanup, but let a
+                     ;; platform timeout interrupt firing inside a hook
+                     ;; propagate so it reaches the platform timeout handler and
+                     ;; is reported as a proper test-timeout rather than a
+                     ;; spurious hook failure carrying a leaked internal
+                     ;; condition.
+                     (serious-condition (condition)
+                       (when (platform-timeout-interrupt-p condition)
+                         (error condition))
+                       condition))))
         (when (and phase *execution-journal*)
           (record-journal-frame :hook :form phase :pass (null error)))
         (when error

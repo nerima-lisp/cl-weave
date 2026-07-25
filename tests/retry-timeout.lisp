@@ -241,6 +241,27 @@
       (expect attempts :to-be 2)
       (expect (cl-weave::test-event-status event) :to-be :pass)))
 
+  (it "reports a timeout that fires inside a hook as a structured timeout"
+    ;; Regression: a before/after-each hook slower than the remaining budget
+    ;; must surface as a test-timeout, not a spurious hook-failure carrying a
+    ;; leaked internal timeout condition.
+    (dolist (phase '(:before-each :after-each))
+      (let* ((suite (cl-weave::make-suite
+                     :name "slow hook timeout"
+                     :before-each (when (eq phase :before-each)
+                                    (list (lambda () (sleep 0.1))))
+                     :after-each (when (eq phase :after-each)
+                                   (list (lambda () (sleep 0.1))))))
+             (test (cl-weave::make-test-case
+                    :name "fast body"
+                    :timeout-ms 10
+                    :function (lambda () t))))
+        (cl-weave::add-child suite test)
+        (let ((event (cl-weave::run-test-case suite test)))
+          (expect (cl-weave::test-event-status event) :to-be :fail)
+          (expect (cl-weave::test-event-condition event)
+                  :to-be-instance-of 'cl-weave:test-timeout)))))
+
   (it "runs after-each cleanup when an attempt times out"
     (let* ((events nil)
            (suite (cl-weave::make-suite

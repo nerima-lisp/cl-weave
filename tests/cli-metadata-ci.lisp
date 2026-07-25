@@ -33,7 +33,7 @@
                             :continuity-expectation "custom continuity expectation")
                       :release-process
                       (list :policy-document "docs/src/release-process.md"
-                            :release-stage "pre-1.0"
+                            :release-stage "stable"
                             :checklist '("custom release check")
                             :contract-sync-requirements
                             '("custom sync requirement"))
@@ -151,7 +151,7 @@
       (expect output :to-contain "\"workflowPath\":\".github\\/workflows\\/ci.yml\"")
       (expect output :to-contain "\"cacheModes\":[\"pull-only\"]")
       (expect output :to-contain "\"primaryImplementation\":\"SBCL\"")
-      (expect output :to-contain "\"releaseStage\":\"pre-1.0\"")
+      (expect output :to-contain "\"releaseStage\":\"stable\"")
       (expect output :not :to-contain "\"cl-weave-metadata\"")
       (expect output :not :to-contain "\"cl-weave\"")
       (expect output :not :to-contain "\"--testNamePattern\"")

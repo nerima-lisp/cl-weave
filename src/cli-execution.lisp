@@ -252,7 +252,11 @@ dynamic environment, so worker threads inherit them."
        (call-run-command options stream)))))
 
 (defun command-plan-success-kind-p (plan)
-  (member (getf plan :kind) '(:doctor :metadata :list) :test #'eq))
+  ;; METADATA and LIST are pure queries that always succeed once they emit
+  ;; output. DOCTOR is a health check: its callback returns the pass/fail of
+  ;; the report, so it is intentionally excluded here and its result governs
+  ;; the process exit code.
+  (member (getf plan :kind) '(:metadata :list) :test #'eq))
 
 (defun execute-command-plan (plan options)
   (let ((result

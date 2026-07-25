@@ -110,7 +110,7 @@
     (:name "--seed"
      :commands ("run" "list" "watch")
      :argument "INTEGER"
-     :value-kind :integer
+     :value-kind :positive-integer
      :choices nil
      :environment ("CL_WEAVE_SEQUENCE_SEED")
      :description "Deterministic random sequence seed")

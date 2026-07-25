@@ -13,6 +13,18 @@
               (lambda (candidates)
                 (member '(:x) candidates :test #'equal)))))
 
+  (it "shrinks integers toward zero without offering a more extreme bound"
+    ;; Regression: the MIN bound must never be a shrink candidate. For a
+    ;; negative range MIN is the most extreme value, so offering it let a
+    ;; greedy shrink move to a larger magnitude than the input it started from.
+    (let ((candidates (cl-weave::integer-shrink-candidates -3 -100 100)))
+      (expect candidates :not :to-contain -100)
+      (expect candidates
+              :to-satisfy (lambda (cs) (every (lambda (c) (< (abs c) 3)) cs))))
+    ;; When zero is out of range, shrink toward the nearest reachable bound.
+    (expect (cl-weave::integer-shrink-candidates 80 10 100) :to-contain 10)
+    (expect (cl-weave::integer-shrink-candidates -80 -100 -10) :to-contain -10))
+
   (it "shrinks strings and vectors safely"
     (let ((string-generator (gen-string :min-length 1 :max-length 4 :alphabet "ab"))
           (vector-generator (gen-vector (gen-member '(:a :b))
