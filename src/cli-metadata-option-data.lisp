@@ -114,6 +114,20 @@
      :choices nil
      :environment ("CL_WEAVE_SEQUENCE_SEED")
      :description "Deterministic random sequence seed")
+    (:name "--journal"
+     :commands ("run" "watch")
+     :argument nil
+     :value-kind :boolean
+     :choices nil
+     :environment nil
+     :description "Record an execution journal timeline for each test attempt")
+    (:name "--random-seed"
+     :commands ("run" "watch")
+     :argument "INTEGER"
+     :value-kind :non-negative-integer
+     :choices nil
+     :environment nil
+     :description "Seed CL:RANDOM per test for deterministic, replayable runs")
     (:name "--coverage"
      :commands ("run" "watch")
      :argument nil

@@ -61,33 +61,46 @@
      :steps (property-shrink-state-steps state)
      :max-steps (property-shrink-state-max-steps state))))
 
+(defun record-shrink-step-frame (index candidate accepted-p)
+  "Record a :SHRINK-STEP journal frame for a shrink candidate attempt, a no-op
+when journaling is inactive. INDEX is the generator argument position that
+changed; CANDIDATE is the full argument tuple tried; ACCEPTED-P is whether it
+reproduced the original failure and became the new, smaller shrink frontier.
+Chronologically interleaving these with assertion frames turns a property
+test's timeline into a visible record of how PROPERTY-RUNNER walked from the
+first failing case down to the minimal one."
+  (record-journal-frame :shrink-step :form candidate :expected index :pass accepted-p))
+
 (defun call-property-shrink-candidate/k (state index candidate accept reject)
   (let* ((current (property-shrink-state-current state))
          (next (copy-list current)))
     (setf (nth index next) candidate)
-    (let ((next-cyclic-p
-            (candidate-requires-safe-equality-p next #'equal))
-          (candidate-condition
-            (property-failure-condition
-             (property-shrink-state-function state) next)))
-      (if (and
-           (not
-            (if (or next-cyclic-p
-                    (property-shrink-state-current-cyclic-p state))
-                (cycle-safe-candidate-equal-p next current #'equal)
-                (equal next current)))
-           (not
-            (if next-cyclic-p
-                (find-if
-                 (lambda (visited)
-                   (cycle-safe-candidate-equal-p next visited #'equal))
-                 (property-shrink-state-cyclic-visited state))
-                (nth-value
-                 1
-                 (gethash next (property-shrink-state-visited state)))))
-           candidate-condition
-           (same-property-failure-p
-            (property-shrink-state-original state) candidate-condition))
+    (let* ((next-cyclic-p
+             (candidate-requires-safe-equality-p next #'equal))
+           (candidate-condition
+             (property-failure-condition
+              (property-shrink-state-function state) next))
+           (accepted-p
+             (and
+              (not
+               (if (or next-cyclic-p
+                       (property-shrink-state-current-cyclic-p state))
+                   (cycle-safe-candidate-equal-p next current #'equal)
+                   (equal next current)))
+              (not
+               (if next-cyclic-p
+                   (find-if
+                    (lambda (visited)
+                      (cycle-safe-candidate-equal-p next visited #'equal))
+                    (property-shrink-state-cyclic-visited state))
+                   (nth-value
+                    1
+                    (gethash next (property-shrink-state-visited state)))))
+              candidate-condition
+              (same-property-failure-p
+               (property-shrink-state-original state) candidate-condition))))
+      (record-shrink-step-frame index next accepted-p)
+      (if accepted-p
           (funcall accept
                    (property-shrink-state-with-current
                     state next next-cyclic-p))

@@ -655,3 +655,34 @@
               (second case))))
 
 )
+
+(describe "cli time-travel options"
+  (it "parses --journal and --random-seed"
+    (let ((options (parse-cli '("run" "--journal" "--random-seed" "77"
+                                "--system" "cl-weave/tests"))))
+      (expect (cl-weave/cli::cli-options-journal options) :to-be t)
+      (expect (cl-weave/cli::cli-options-random-seed options) :to-be 77)))
+
+  (it "defaults the time-travel options to disabled"
+    (let ((options (parse-cli '("run" "--system" "cl-weave/tests"))))
+      (expect (cl-weave/cli::cli-options-journal options) :to-be nil)
+      (expect (cl-weave/cli::cli-options-random-seed options) :to-be nil)))
+
+  (it "accepts a zero random seed"
+    (let ((options (parse-cli '("run" "--random-seed" "0"))))
+      (expect (cl-weave/cli::cli-options-random-seed options) :to-be 0)))
+
+  (it "rejects a non-integer --random-seed"
+    (expect (lambda () (parse-cli '("run" "--random-seed" "abc")))
+            :to-throw 'cl-weave/cli::cli-error))
+
+  (it "binds the runtime toggles from parsed options"
+    (let ((options (cl-weave/cli::make-cli-options :journal t :random-seed 5)))
+      (cl-weave/cli::with-cli-journal-settings (options)
+        (expect cl-weave:*journal-enabled* :to-be t)
+        (expect cl-weave:*test-random-seed* :to-be 5))))
+
+  (it "documents the flags in CLI usage metadata"
+    (let ((usage (cl-weave/cli::cli-usage)))
+      (expect usage :to-contain "--journal")
+      (expect usage :to-contain "--random-seed INTEGER"))))

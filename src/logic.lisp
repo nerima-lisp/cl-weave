@@ -387,7 +387,8 @@
 (define-logic-query-family
     (logic-where logic-query)
     (logic-run logic-query)
-    (test-plan-where query-test-plan))
+    (test-plan-where query-test-plan)
+    (journal-where query-journal))
 
 (defun test-plan-entry-facts (entry)
   (let* ((path (test-plan-entry-path entry))
@@ -423,6 +424,49 @@
 
 (defun query-test-plan (plan-or-program clauses &key limit max-steps)
   (logic-query (normalize-test-plan-query-input plan-or-program)
+               clauses
+               :limit limit
+               :max-steps max-steps))
+
+(defun journal-frame-facts (frame)
+  "Turn one JOURNAL-FRAME into relation facts keyed by its index: (:frame
+index), (:kind index kind), (:form index form), (:actual index actual),
+(:expected index expected), (:pass index generalized-boolean), and
+(:elapsed-internal-time index ticks) always; (:matcher index matcher) only
+when the frame has one, mirroring how TEST-PLAN-ENTRY-FACTS omits absent
+optional fields."
+  (let ((index (journal-frame-index frame))
+        (matcher (journal-frame-matcher frame)))
+    (append (list (list :frame index)
+                  (list :kind index (journal-frame-kind frame))
+                  (list :form index (journal-frame-form frame))
+                  (list :actual index (journal-frame-actual frame))
+                  (list :expected index (journal-frame-expected frame))
+                  (list :pass index (and (journal-frame-pass frame) t))
+                  (list :elapsed-internal-time index
+                        (journal-frame-elapsed-internal-time frame)))
+            (when matcher
+              (list (list :matcher index matcher))))))
+
+(defun journal-facts (frames)
+  "Turn a list of JOURNAL-FRAMEs (as returned by REPLAY-TEST, a TEST-EVENT's
+journal, or WITH-EXECUTION-JOURNAL) into a flat relation program, ready for
+LOGIC-QUERY, LOGIC-RUN, or JOURNAL-WHERE."
+  (mapcan #'journal-frame-facts frames))
+
+(defun normalize-journal-query-input (value)
+  (if (and (listp value) (every #'journal-frame-p value))
+      (journal-facts value)
+      value))
+
+(defun query-journal (frames-or-program clauses &key limit max-steps)
+  "Query a time-travel timeline declaratively. FRAMES-OR-PROGRAM is either a
+list of JOURNAL-FRAMEs or an already-expanded fact program, so derived views
+can layer on top of JOURNAL-FACTS the same way QUERY-TEST-PLAN layers on
+TEST-PLAN-FACTS -- for example a rule finding the first failing assertion
+after a passing shrink step, expressed as relations instead of a hand-rolled
+timeline walk."
+  (logic-query (normalize-journal-query-input frames-or-program)
                clauses
                :limit limit
                :max-steps max-steps))

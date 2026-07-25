@@ -29,7 +29,12 @@
     "logic-test-plan"
     "ai-discovery-metadata"
     "public-package-exports"
-    "cps-continuation-helpers"))
+    "cps-continuation-helpers"
+    "time-travel-debugging"
+    "deterministic-replay"
+    "soft-assertions"
+    "interactive-breakpoints"
+    "journal-logic-queries"))
 
 (defparameter *metadata-capability-matrix*
   '((:name "vitest-dsl"
@@ -224,4 +229,37 @@
      :public-apis ("with-continuation-result" "with-continuation-values"
                    "expect-poll")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))))
+     :documentation ("README.md" "docs/src/ai-contract.md"))
+    (:name "time-travel-debugging"
+     :status "implemented"
+     :summary "An execution journal records a chronological timeline of assertions, mock calls, fixture hooks, property-shrink steps, and notes for each test attempt, surfaced through the spec and JSON reporters; record-journal-frame and the eql-specialized journal-frame-line-for-kind generic function let callers extend the timeline with their own frame kinds and renderers, and journal-frame-from-plist rebuilds a saved sexp timeline for offline analysis."
+     :public-apis ("*journal-enabled*" "journal-note" "with-execution-journal"
+                   "record-journal-frame" "journal-frame-line-for-kind"
+                   "journal-frame-from-plist" "journal-frames-from-plists")
+     :quality-gates ("flake-check" "json-results-artifact")
+     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+    (:name "deterministic-replay"
+     :status "implemented"
+     :summary "Per-test random seeding makes CL:RANDOM reproducible and order-independent, with recorded replay seeds and single-test replay for isolating failures."
+     :public-apis ("*test-random-seed*" "replay-test")
+     :quality-gates ("flake-check" "json-results-artifact")
+     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+    (:name "soft-assertions"
+     :status "implemented"
+     :summary "with-soft-assertions runs every expectation in a block and reports all failures together instead of stopping at the first."
+     :public-apis ("with-soft-assertions")
+     :quality-gates ("flake-check" "json-results-artifact")
+     :documentation ("README.md" "docs/src/assertions.md"))
+    (:name "interactive-breakpoints"
+     :status "implemented"
+     :summary "A journal frame index or predicate signals journal-breakpoint-hit mid-test, dropping into a live debugger (or a handler-bind-driven programmatic hook) with the test's dynamic environment intact, pairing with journal-diff to land exactly on a divergence."
+     :public-apis ("*journal-breakpoint*" "journal-breakpoint-hit"
+                   "journal-breakpoint-hit-frame")
+     :quality-gates ("flake-check" "json-results-artifact")
+     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+    (:name "journal-logic-queries"
+     :status "implemented"
+     :summary "journal-facts adapts a time-travel timeline into the same relation-fact shape as test-plan-facts, so journal-where queries assertion, mock-call, hook, shrink-step, and note frames with the same Prolog-style engine and rule composition as test-plan-where."
+     :public-apis ("journal-facts" "journal-where" "query-journal")
+     :quality-gates ("flake-check" "json-results-artifact")
+     :documentation ("README.md" "docs/src/time-travel-debugging.md" "docs/src/logic-programming.md"))))

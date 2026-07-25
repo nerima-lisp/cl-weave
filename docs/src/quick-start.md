@@ -35,6 +35,7 @@ timeout 120s nix run . -- list cl-weave/tests --reporter json --filter 'math > a
 timeout 120s nix run . -- metadata cl-weave/tests --output cl-weave-metadata.json
 timeout 120s nix run . -- doctor --reporter json --output cl-weave-doctor.json
 timeout 360s nix run . -- run cl-weave/tests --bail=1 --sequence random --seed 12345
+timeout 360s nix run . -- run cl-weave/tests --journal --random-seed 12345 --reporter json --output cl-weave-results.json
 timeout 360s nix run . -- watch cl-weave/tests --filter parser
 timeout 120s nix run . -- watch cl-weave/tests --once --reporter json --filter 'math > adds' --output cl-weave-watch-once.json
 ```

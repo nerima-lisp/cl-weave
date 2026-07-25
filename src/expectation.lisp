@@ -16,7 +16,7 @@
      (lambda (raw-pass reported-actual reported-expected)
        (let* ((pass (if negated (not raw-pass) raw-pass))
               (detail
-                (when (or capture-success-detail-p (not pass))
+                (when (or capture-success-detail-p (not pass) (journaling-active-p))
                   (make-assertion-detail
                    :form form
                    :matcher matcher-name
@@ -24,6 +24,8 @@
                    :expected reported-expected
                    :negated negated
                    :pass raw-pass))))
+         (when (journaling-active-p)
+           (record-assertion-frame detail))
          (unless pass
            (signal-assertion-failure detail))
          (values pass detail))))))

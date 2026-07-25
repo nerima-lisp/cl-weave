@@ -18,6 +18,7 @@
    (coverage-systems '() :type list)
    coverage-minimum-expression coverage-minimum-branch
    (pass-with-no-tests t)
+   journal random-seed
    snapshot-directory snapshot-file update-snapshots version help)
   (:options
    (:flag "--help" :kind :flag :field :help)
@@ -41,6 +42,8 @@
    (:flag "--shard" :kind :value :field :shard :parser parse-shard-option)
    (:flag "--sequence" :kind :value :field :order :parser parse-sequence-order-option)
    (:flag "--seed" :kind :value :field :seed :parser parse-positive-integer)
+   (:flag "--journal" :kind :flag :field :journal)
+   (:flag "--random-seed" :kind :value :field :random-seed :parser parse-non-negative-integer)
    (:flag "--coverage-output" :kind :value :field :coverage-output)
    (:flag "--coverage-report-directory" :kind :value :field :coverage-report-directory)
    (:flag "--coverage-include" :kind :collection :field :coverage-include-pathnames)

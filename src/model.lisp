@@ -38,6 +38,9 @@
       (note-test-registry-change-unlocked)
       registration))))
 (defvar *test-context* nil)
+(defvar *soft-assertion-sink* nil
+  "When bound to an adjustable vector (inside WITH-SOFT-ASSERTIONS), a failing
+assertion is collected there and execution continues instead of unwinding.")
 (defvar *assertion-count* nil)
 (defvar *expected-assertion-count* nil)
 (defvar *expected-assertion-count-form* nil)
@@ -110,7 +113,7 @@
 
 (define-record-class test-event
   (status path condition secondary-conditions assertion reason location
-   elapsed-internal-time))
+   elapsed-internal-time journal replay-seed))
 
 (define-record-class test-plan-entry
   (path status reason focused retry timeout-ms concurrent location tags))
@@ -505,7 +508,15 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
 (define-tail-registration register-after-each suite-after-each suite-after-each-tail)
 
 (defun signal-assertion-failure (detail)
-  (error 'assertion-failure :detail detail))
+  "Signal an assertion failure. Inside WITH-SOFT-ASSERTIONS the DETAIL is
+collected and returned so the surrounding form keeps running; otherwise the
+failure unwinds the test as usual."
+  (let ((sink *soft-assertion-sink*))
+    (if sink
+        (progn
+          (vector-push-extend detail sink)
+          detail)
+        (error 'assertion-failure :detail detail))))
 
 (defun assertion-counting-active-p ()
   (integerp *assertion-count*))

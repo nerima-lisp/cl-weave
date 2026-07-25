@@ -25,7 +25,9 @@
      :assertion assertion
      :reason reason
      :location (test-case-location test)
-     :elapsed-internal-time (- (get-internal-real-time) start)))
+     :elapsed-internal-time (- (get-internal-real-time) start)
+     :journal (current-journal-frames)
+     :replay-seed *attempt-replay-seed*))
 
   (defun make-pass-event-with-path (test path start)
     (make-instance
@@ -37,7 +39,9 @@
      :assertion nil
      :reason nil
      :location (test-case-location test)
-     :elapsed-internal-time (- (get-internal-real-time) start))))
+     :elapsed-internal-time (- (get-internal-real-time) start)
+     :journal (current-journal-frames)
+     :replay-seed *attempt-replay-seed*)))
 
 (defun normalize-retry-count (retry)
   (cond
@@ -199,30 +203,40 @@ handlers, so runner propagation cannot abort an enclosing runner."
                                   :condition condition))))))))
 
 (defun run-test-attempt/k (suite test start retry continue)
-  (let ((*attempt-secondary-conditions* nil))
-    (let ((event
-            (with-escape-continuation (finish-attempt)
-              (handler-bind
-                  ((platform-timeout
-                     (lambda (condition)
-                       (unless *runner-default-condition-handler-disabled*
-                         (funcall
-                          finish-attempt
-                          (call-with-propagated-condition/k
-                           condition
-                           (lambda ()
-                             (make-event
-                              :fail suite test start
-                              :condition
-                              (make-condition
-                               (quote test-timeout)
-                               :timeout-ms (effective-timeout-ms test)))))))))
-                   (serious-condition
-                     (attempt-condition-handler
-                      finish-attempt suite test start)))
-                (call-test-attempt/restarts suite test start retry)))))
-      (setf event (expected-failure-event suite test start event))
-      (funcall continue event))))
+  (let* ((*attempt-replay-seed* (replay-seed-for-attempt (test-path suite test)))
+         (*attempt-secondary-conditions* nil)
+         (*execution-journal* (when *journal-enabled* (make-execution-journal))))
+    (call-with-test-randomness
+     *attempt-replay-seed*
+     (lambda ()
+       (let ((event
+               (with-escape-continuation (finish-attempt)
+                 (handler-bind
+                     ((platform-timeout
+                        (lambda (condition)
+                          (unless *runner-default-condition-handler-disabled*
+                            (funcall
+                             finish-attempt
+                             (call-with-propagated-condition/k
+                              condition
+                              (lambda ()
+                                (make-event
+                                 :fail suite test start
+                                 :condition
+                                 (make-condition
+                                  (quote test-timeout)
+                                  :timeout-ms (effective-timeout-ms test)))))))))
+                      (serious-condition
+                        (attempt-condition-handler
+                         finish-attempt suite test start)))
+                   (call-test-attempt/restarts suite test start retry)))))
+         (setf event (expected-failure-event suite test start event))
+         ;; The pass event is built inside the body continuation, before
+         ;; after-each cleanup runs; re-attach the now-complete timeline so
+         ;; after-each hook frames are included on every outcome.
+         (when (journaling-active-p)
+           (setf (test-event-journal event) (current-journal-frames)))
+         (funcall continue event))))))
 
 (defun retryable-event-p (event)
   (member (test-event-status event) '(:fail :error)))
