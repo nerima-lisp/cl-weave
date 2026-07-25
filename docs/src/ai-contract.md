@@ -43,7 +43,7 @@ verification and scope policy for those channels lives in
 {
   "schemaVersion": 23,
   "kind": "cl-weave-metadata",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "homepage": "https://github.com/takeokunn/cl-weave",
   "bugTracker": "https://github.com/takeokunn/cl-weave/issues",
   "license": "MIT",
