@@ -1,10 +1,23 @@
 {
   description = "cl-weave: a modern Common Lisp testing framework";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  inputs.paredit-cli = {
-    url = "github:takeokunn/paredit-cli";
-    inputs.nixpkgs.follows = "nixpkgs";
+  inputs = {
+    # nixos-unstable, not nixpkgs-unstable: it advances only after the NixOS
+    # release tests pass, so it is less likely to land a broken build.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # `inputs.nixpkgs.follows` is mandatory on every input: without it each one
+    # drags in its own nixpkgs, inflating flake.lock and rebuilding the same
+    # derivations.
+    paredit-cli = {
+      url = "github:takeokunn/paredit-cli";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -12,6 +25,7 @@
       self,
       nixpkgs,
       paredit-cli,
+      treefmt-nix,
     }:
     let
       systems = [
@@ -42,16 +56,34 @@
         in
         builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
 
+      # treefmt drives `nix fmt` and the `checks.<system>.formatting` gate, so
+      # the formatter and the CI gate can never disagree about what "formatted"
+      # means. Scope is Nix only: nixfmt (RFC style) is a low-diff formatter,
+      # whereas a YAML formatter mangles the GitHub Actions `on:` key and
+      # reformatting Markdown would churn the whole docs tree.
+      treefmtEval = forAllSystems (
+        pkgs:
+        treefmt-nix.lib.evalModule pkgs {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+        }
+      );
+
       mkDocs =
         pkgs:
         pkgs.stdenvNoCC.mkDerivation {
           pname = "cl-weave-docs";
           inherit version;
+          # Rooted at the repository, not at ./docs, because
+          # docs/src/changelog.md is a pymdownx.snippets include of the
+          # top-level CHANGELOG.md and snippets resolves base_path against the
+          # working directory mkdocs runs in.
           src = pkgs.lib.fileset.toSource {
-            root = ./docs;
+            root = ./.;
             fileset = pkgs.lib.fileset.unions [
               ./docs/mkdocs.yml
               ./docs/src
+              ./CHANGELOG.md
             ];
           };
           nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
@@ -60,7 +92,7 @@
           # promotes broken links and unlisted pages to build failures.
           buildPhase = ''
             runHook preBuild
-            mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
+            mkdocs build --strict --config-file docs/mkdocs.yml --site-dir "$out"
             runHook postBuild
           '';
           dontInstall = true;
@@ -86,8 +118,14 @@
         };
       });
 
-      formatter = forAllSystems (pkgs: pkgs.nixfmt);
+      # `nix fmt` entry point.
+      formatter = forAllSystems (
+        pkgs: treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.wrapper
+      );
 
+      # Granularity lives here, NOT in extra GitHub Actions jobs: `nix flake
+      # check` evaluates each attribute as its own derivation, in parallel, with
+      # build caching. Add a check here rather than a job in ci.yml.
       checks = forAllSystems (
         pkgs:
         let
@@ -129,13 +167,16 @@
             };
         in
         {
-          test = mkCheck {
+          # The whole self-test suite. Named `default` because that is the
+          # attribute the org standard reserves for a package's test run, so
+          # `nix flake check` reports the same thing everywhere.
+          default = mkCheck {
             name = "cl-weave-test";
             timeoutSeconds = 360;
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
             ];
           };
 
@@ -145,7 +186,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "json"
               "--filter"
@@ -166,7 +207,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "jsonl"
               "--filter"
@@ -187,7 +228,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "json"
               "--filter"
@@ -208,7 +249,7 @@
             command = [
               packaged-cli
               "metadata"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "json"
               "--output"
@@ -226,7 +267,7 @@
             command = [
               packaged-cli
               "list"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "json"
               "--filter"
@@ -247,7 +288,7 @@
             command = [
               packaged-cli
               "watch"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--once"
               "--reporter"
               "json"
@@ -269,7 +310,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "tap"
               "--filter"
@@ -290,7 +331,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--filter"
               "filtering > runs only tests matching a path substring"
               "--fail-with-no-tests"
@@ -303,7 +344,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--reporter"
               "junit"
               "--filter"
@@ -325,7 +366,7 @@
             command = [
               packaged-cli
               "run"
-              "cl-weave/tests"
+              "cl-weave/test"
               "--coverage"
               "--coverage-output"
               "cl-weave.coverage"
@@ -355,19 +396,14 @@
 
           # Enforce the formatter that `nix fmt` already applies, so drift is
           # caught by `nix flake check` (and therefore CI) rather than in review.
-          nixfmt = pkgs.stdenvNoCC.mkDerivation {
-            name = "cl-weave-nixfmt-check";
-            src = source;
-            nativeBuildInputs = [ pkgs.nixfmt ];
-            buildPhase = ''
-              runHook preBuild
-              find . -name '*.nix' -print0 | xargs -0 nixfmt --check
-              runHook postBuild
-            '';
-            installPhase = ''
-              touch "$out"
-            '';
-          };
+          formatting = treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.check self;
+
+          # The docs package builds with `mkdocs --strict`, so a broken link or
+          # a page missing from the nav fails the build. Without this the docs
+          # are only ever built by the publish workflow, which runs after a
+          # merge to main, meaning such a break surfaces as a failed deploy
+          # rather than as a failed pull request.
+          docs = self.packages.${pkgs.stdenv.hostPlatform.system}.docs;
         }
       );
 
@@ -440,6 +476,36 @@
               mainProgram = "cl-weave";
             };
           };
+
+          # `nix run .#test` — the org-standard test entry point. It drives the
+          # root run-tests.lisp rather than the packaged CLI so that the plain
+          # `sbcl --script run-tests.lisp` path (the one a contributor uses in
+          # a REPL-less shell, and the one every sibling repository exposes)
+          # keeps being exercised. `checks.default` covers the packaged CLI.
+          test =
+            let
+              runner = pkgs.writeShellApplication {
+                name = "cl-weave-test";
+                runtimeInputs = [
+                  pkgs.coreutils
+                  pkgs.sbcl
+                ];
+                text = ''
+                  export HOME="''${TMPDIR:-/tmp}/cl-weave-home"
+                  mkdir -p "$HOME"
+                  export CL_SOURCE_REGISTRY="${source}//:"
+                  exec timeout 600s sbcl --script ${source}/run-tests.lisp
+                '';
+              };
+            in
+            {
+              type = "app";
+              program = "${runner}/bin/cl-weave-test";
+              meta = {
+                description = "Run the cl-weave self-test suite";
+                mainProgram = "cl-weave-test";
+              };
+            };
         }
       );
     };
