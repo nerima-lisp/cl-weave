@@ -63,6 +63,26 @@ coverage.dat
 /coverage-report-*/
 /coverage-filter-*/
 
+# t/support.lisp's make-test-temporary-directory resolves its root from
+# NIX_BUILD_TOP, then PWD. Inside the Nix sandbox that is the build directory,
+# but `sbcl --script run-tests.lisp` in a checkout puts these under the
+# repository root instead. Names are <prefix>-<base36 time>-<base36 random>,
+# so each prefix needs its own glob.
+/cl-weave-core-snapshots-*/
+/cli-load-order-*/
+/mismatch-structured-*/
+/sequence-extra-*/
+/sequence-mismatch-*/
+/snapshot-api-*/
+/snapshot-concurrency-*/
+/snapshot-file-lock-*/
+/snapshot-linearization-*/
+/snapshot-lock-registry-*/
+/snapshot-permissions-new-*/
+/snapshot-sequence-*/
+/watch-forward-dependencies-*/
+/watch-signature-*/
+
 # Reporter artifacts the CLI writes into the working tree when it is run
 # outside the Nix sandbox. `nix flake check` regenerates all of them.
 cl-weave-results.json
