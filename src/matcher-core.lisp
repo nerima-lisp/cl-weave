@@ -46,7 +46,8 @@
       ((and (= (length tail) 2) (eq (first tail) :description))
        (matcher-description-value (second tail) (matcher-spec-name spec)))
       (t
-       (error "cl-weave: matcher spec ~S must end with no metadata, a description string, or :description string."
+       (error "cl-weave: matcher spec ~S must end with no metadata, a ~
+               description string, or :description string."
               spec)))))
 
 (defun extend-expect (specs)
@@ -62,10 +63,28 @@
              operator
              (list actual expected))))
 
+  (defun matcher-description-fragments-p (form)
+    (and (consp form)
+         (eq (first form) :description)
+         (rest form)
+         (every (function stringp) (rest form))))
+
   (defun split-matcher-body (body)
-    (if (and (consp body) (stringp (first body)))
-        (values (first body) (rest body))
-        (values nil body))))
+    "Return the leading description of BODY and the forms that follow it.
+
+The description may also be written as a leading (:description \"a\" \"b\")
+form, whose parts are joined here. That spelling exists because a description
+longer than 100 columns cannot be one literal: Common Lisp has no string
+continuation, and a newline inside a literal becomes part of the string. The
+form is unambiguous because :description names no function, so it could never
+have been a matcher body form."
+    (cond
+      ((and (consp body) (stringp (first body)))
+       (values (first body) (rest body)))
+      ((and (consp body) (matcher-description-fragments-p (first body)))
+       (values (apply (function concatenate) 'string (rest (first body)))
+               (rest body)))
+      (t (values nil body)))))
 
 (defmacro defmatcher (name (actual expected) &body body)
   (unless (symbolp name)

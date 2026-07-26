@@ -49,8 +49,10 @@
    (:flag "--coverage-include" :kind :collection :field :coverage-include-pathnames)
    (:flag "--coverage-exclude" :kind :collection :field :coverage-exclude-pathnames)
    (:flag "--coverage-system" :kind :collection :field :coverage-systems)
-   (:flag "--coverage-min-expression" :kind :value :field :coverage-minimum-expression :parser parse-percentage)
-   (:flag "--coverage-min-branch" :kind :value :field :coverage-minimum-branch :parser parse-percentage)
+   (:flag "--coverage-min-expression" :kind :value
+    :field :coverage-minimum-expression :parser parse-percentage)
+   (:flag "--coverage-min-branch" :kind :value
+    :field :coverage-minimum-branch :parser parse-percentage)
    (:flag "--snapshot-dir" :kind :value :field :snapshot-directory :parser parse-pathname-option)
    (:flag "--snapshot-file" :kind :value :field :snapshot-file)
    (:flag "--bail" :kind :optional-value :field :bail :parser parse-bail-option :default "true"))

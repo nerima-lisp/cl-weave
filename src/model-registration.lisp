@@ -117,7 +117,8 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
                         (if base
                             (merge-pathnames pathname base)
                             (error
-                             "cl-weave: relative watch dependency ~S requires a test source location."
+                             "cl-weave: relative watch dependency ~S requires ~
+                              a test source location."
                              dependency))))
                   (canonical
                     (collapse-parent-directory-components

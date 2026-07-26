@@ -321,7 +321,8 @@
     ((and vector (not string))
      (coerce actual 'list))
     (t
-     (error "Matcher :to-match-snapshot-sequence expects a list or non-string vector of states, got ~S."
+     (error "Matcher :to-match-snapshot-sequence expects a list or non-string ~
+             vector of states, got ~S."
             actual))))
 
 (defun snapshot-sequence-key (prefix index)

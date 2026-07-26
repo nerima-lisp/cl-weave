@@ -76,7 +76,8 @@
              (let* ((test
                       (candidate-hash-test-function test-token))
                     (equalp-test-p (eq test-token :equalp)))
-               (if (and (member test-token (quote (:equal :equalp))) (candidate-container-p object equalp-test-p))
+               (if (and (member test-token (quote (:equal :equalp)))
+                        (candidate-container-p object equalp-test-p))
                    (let ((cache
                            (cache-for
                             test-token

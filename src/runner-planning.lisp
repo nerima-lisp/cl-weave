@@ -85,7 +85,8 @@
      (values :skip nil))))
 
 (defun describe-event-collection-step
-    (suite child children control filter ancestor-focused suppressed-status suppressed-reason execution-mode)
+    (suite child children control filter ancestor-focused
+     suppressed-status suppressed-reason execution-mode)
   (multiple-value-bind (selection-kind child-focused)
       (classify-selected-child suite child filter ancestor-focused)
     (ecase selection-kind

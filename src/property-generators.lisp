@@ -112,7 +112,8 @@
                     when (funcall predicate value)
                       return value
                     finally
-                       (error "cl-weave: gen-such-that could not produce a matching value in ~D attempts."
+                       (error "cl-weave: gen-such-that could not produce a ~
+                               matching value in ~D attempts."
                               attempts)))
    :shrink (lambda (value)
              (remove-if-not predicate

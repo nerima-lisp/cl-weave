@@ -44,7 +44,8 @@
                          collect value)
                    count)))
         (t
-         (error "Matcher ~S expects a finite proper list, non-string vector, or hash table of candidates."
+         (error "Matcher ~S expects a finite proper list, non-string vector, ~
+                 or hash table of candidates."
                 matcher))))))
 
 (defun one-of-report (actual raw-candidates candidate-count matched-index)
@@ -194,7 +195,8 @@
          ((functionp value)
           (list :matcher :predicate :value value))
          (t
-          (error "Matcher ~S expected NIL, a condition class designator, string, or predicate, got ~S."
+          (error "Matcher ~S expected NIL, a condition class designator, ~
+                  string, or predicate, got ~S."
                  matcher value)))))))
 
 (defun thrown-condition-matches-p (condition expectation)

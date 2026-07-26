@@ -17,7 +17,8 @@
 
 (defun ensure-run-reporter (reporter)
   (unless (member reporter (run-reporters))
-    (error "cl-weave: run mode supports spec, sexp, json, jsonl, tap, github, and junit reporters."))
+    (error "cl-weave: run mode supports spec, sexp, json, jsonl, tap, github, ~
+            and junit reporters."))
   reporter)
 
 (defun ensure-list-reporter (reporter)

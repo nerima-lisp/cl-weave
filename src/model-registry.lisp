@@ -211,4 +211,6 @@
     (record-registration-owner-unlocked child pathname)
     (note-test-registry-change-unlocked)
     child)
-  (defun add-child (parent child) (with-test-registry-lock (add-owned-child-unlocked parent child nil))))
+  (defun add-child (parent child)
+    (with-test-registry-lock
+      (add-owned-child-unlocked parent child nil))))

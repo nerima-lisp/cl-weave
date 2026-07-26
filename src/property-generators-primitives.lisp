@@ -71,8 +71,10 @@
                         (max-length 16)
                         (alphabet "abcdefghijklmnopqrstuvwxyz"))
   (let ((character-generator (gen-character :alphabet alphabet)))
-    (make-bounded-sequence-generator :string character-generator min-length max-length
-                                     "gen-string" #'stringp "" (lambda (items) (coerce items 'string))
+    (make-bounded-sequence-generator :string character-generator
+                                     min-length max-length
+                                     "gen-string" #'stringp ""
+                                     (lambda (items) (coerce items 'string))
                                      :hash-test #'equal)))
 
 (defun gen-vector (element-generator &key (min-length 0) (max-length 8))

@@ -138,7 +138,8 @@
             (list :slot slot-name))))
 
 (defmatcher :to-have-method-specialized-on (actual expected)
-  "Passes when ACTUAL names a generic function with a method specialized on the EXPECTED specializers."
+  (:description "Passes when ACTUAL names a generic function with a method "
+                "specialized on the EXPECTED specializers.")
   (let* ((expected-specializers (expected-one expected :to-have-method-specialized-on))
          (generic-function
            (generic-function-designator-function actual :to-have-method-specialized-on))

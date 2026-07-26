@@ -143,7 +143,8 @@
                owners
                generation)
             (error
-             "cl-weave: test registry changed during incremental reload; reload result was discarded.")))))
+             "cl-weave: test registry changed during incremental reload; ~
+              reload result was discarded.")))))
     t))
 
   (defun run-system (system &key (reporter :spec)

@@ -20,7 +20,9 @@
       (setf (cdr head-last) tail)
       (values head tail-last))))
  (defun collect-suite-events/k
-    (suite control continue filter &optional ancestor-focused suppressed-status suppressed-reason inherited-execution-mode)
+    (suite control continue filter
+     &optional ancestor-focused suppressed-status suppressed-reason
+       inherited-execution-mode)
   (if (or (execution-control-stopped control)
           (not (selected-suite-p suite filter ancestor-focused)))
       (funcall continue nil nil)
@@ -78,7 +80,9 @@
 
 
 (defun collect-children/k
-    (suite children control continue filter &optional ancestor-focused suppressed-status suppressed-reason execution-mode)
+    (suite children control continue filter
+     &optional ancestor-focused suppressed-status suppressed-reason
+       execution-mode)
   (macrolet ((recur (remaining next-continue)
   `(collect-children/k
     suite
@@ -354,11 +358,16 @@
 
 
 
-(declaim (ftype (function (suite list function selection-filter &optional t t t t) *) collect-children-plan/k))
+(declaim (ftype (function (suite list function selection-filter
+                           &optional t t t t)
+                          *)
+                collect-children-plan/k))
 
 
 (defun collect-suite-plan/k
-    (suite continue filter &optional ancestor-focused suppressed-status suppressed-reason inherited-execution-mode)
+    (suite continue filter
+     &optional ancestor-focused suppressed-status suppressed-reason
+       inherited-execution-mode)
   (if (not (selected-suite-p suite filter ancestor-focused))
       (funcall continue nil nil)
       (let ((active-execution-mode
@@ -378,7 +387,9 @@
 
 
 (defun collect-children-plan/k
-    (suite children continue filter &optional ancestor-focused suppressed-status suppressed-reason execution-mode)
+    (suite children continue filter
+     &optional ancestor-focused suppressed-status suppressed-reason
+       execution-mode)
   (macrolet ((recur (remaining next-continue)
   `(collect-children-plan/k
     suite

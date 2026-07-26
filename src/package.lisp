@@ -292,7 +292,15 @@ command line can do stays reachable from a REPL.")
    #:with-replaced-function
    #:with-restored-binding
    #:with-restored-bindings
-   #:with-restored-hash-table #:dispose-mock #:mock-disposed-error #:mock-disposed-error-mock #:active-spy-disposal-error #:active-spy-disposal-error-mock #:active-spy-disposal-error-symbol))
+   #:with-restored-hash-table
+
+   ;; Mock disposal
+   #:dispose-mock
+   #:mock-disposed-error
+   #:mock-disposed-error-mock
+   #:active-spy-disposal-error
+   #:active-spy-disposal-error-mock
+   #:active-spy-disposal-error-symbol))
 
 (defpackage #:cl-weave/cli
   (:use #:cl)
