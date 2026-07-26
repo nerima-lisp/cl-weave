@@ -123,38 +123,23 @@
             &key reporter
               (stream *standard-output*)
               (name-filter *test-name-filter*)
-              location-filter
-              include-tags
-              exclude-tags
-              shard
-              order
-              seed
-              bail
-              retry
-              timeout-ms
-              max-workers)
+              location-filter include-tags exclude-tags shard order seed bail retry timeout-ms max-workers)
   (when reporter
     (ensure-run-reporter reporter)
     (ensure-output-stream stream))
-  (let* ((collection-options
-           (normalize-collection-options
-            :name-filter name-filter
-            :location-filter location-filter
-            :include-tags include-tags
-            :exclude-tags exclude-tags
-            :shard shard
-            :order order
-            :seed seed
-            :bail bail
-            :retry retry
-            :timeout-ms timeout-ms
-            :max-workers max-workers))
-         (events
-           (collect-events-with-options
-            (resolve-suite-designator suite-designator)
-            collection-options)))
-    (emit-run-report reporter events stream)
-    events))
+  (call-with-snapshot-session
+   (lambda ()
+     (let* ((collection-options
+              (normalize-collection-options
+               :name-filter name-filter :location-filter location-filter
+               :include-tags include-tags :exclude-tags exclude-tags :shard shard
+               :order order :seed seed :bail bail :retry retry
+               :timeout-ms timeout-ms :max-workers max-workers))
+            (events
+              (collect-events-with-options
+               (resolve-suite-designator suite-designator) collection-options)))
+       (emit-run-report reporter events stream)
+       events))))
 
 (defun explain! (results &optional (stream *standard-output*))
   (ensure-output-stream stream)
@@ -191,59 +176,28 @@
 (defun run-all (&key (reporter :spec)
                   (stream *standard-output*)
                   (name-filter *test-name-filter*)
-                  location-filter
-                  test-path-filter
-                  include-tags
-                  exclude-tags
-                  shard
-                  order
-                  seed
-                  bail
-                  retry
-                  timeout-ms
-                  max-workers
-                  coverage
-                  coverage-output
-                  coverage-report-directory
-                  coverage-include-pathnames
-                  coverage-exclude-pathnames
-                  coverage-minimum-expression
-                  coverage-minimum-branch
-                  (pass-with-no-tests t)
-                  (coverage-reset t))
+                  location-filter test-path-filter include-tags exclude-tags shard order seed bail retry timeout-ms max-workers
+                  coverage coverage-output coverage-report-directory coverage-include-pathnames coverage-exclude-pathnames
+                  coverage-minimum-expression coverage-minimum-branch (pass-with-no-tests t) (coverage-reset t))
   (ensure-run-reporter reporter)
   (ensure-output-stream stream)
-  (let ((collection-options
-          (normalize-collection-options
-           :name-filter name-filter
-           :location-filter location-filter
-           :test-path-filter test-path-filter
-           :include-tags include-tags
-           :exclude-tags exclude-tags
-           :shard shard
-           :order order
-           :seed seed
-           :bail bail
-           :retry retry
-           :timeout-ms timeout-ms
-           :max-workers max-workers)))
-    (call-with-coverage
-     coverage
-     coverage-output
-     coverage-report-directory
-     coverage-reset
-     (lambda ()
-       (let ((events
-               (collect-events-with-options
-                (root-suite)
-                collection-options)))
-         (emit-run-report reporter events stream)
-         (and (or pass-with-no-tests events)
-              (every #'passed-event-p events))))
-     :include-pathnames coverage-include-pathnames
-     :exclude-pathnames coverage-exclude-pathnames
-     :minimum-expression coverage-minimum-expression
-     :minimum-branch coverage-minimum-branch)))
+  (call-with-snapshot-session
+   (lambda ()
+     (let ((collection-options
+             (normalize-collection-options
+              :name-filter name-filter :location-filter location-filter :test-path-filter test-path-filter
+              :include-tags include-tags :exclude-tags exclude-tags :shard shard :order order :seed seed
+              :bail bail :retry retry :timeout-ms timeout-ms :max-workers max-workers)))
+       (call-with-coverage
+        coverage coverage-output coverage-report-directory coverage-reset
+        (lambda ()
+          (let ((events (collect-events-with-options (root-suite) collection-options)))
+            (emit-run-report reporter events stream)
+            (and (or pass-with-no-tests events) (every #'passed-event-p events))))
+        :include-pathnames coverage-include-pathnames
+        :exclude-pathnames coverage-exclude-pathnames
+        :minimum-expression coverage-minimum-expression
+        :minimum-branch coverage-minimum-branch)))))
 
 (defun split-path-string (string)
   "Split a ' > '-joined Vitest-style path into its component strings."

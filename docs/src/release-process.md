@@ -1,7 +1,7 @@
 # Release Process
 
 This document describes the release flow for `cl-weave`, which follows
-[Semantic Versioning](versioning-policy.md) as of `1.0.0`.
+[Semantic Versioning](versioning-policy.md). Stable releases began at `1.0.0`.
 
 ## Release Goals
 
@@ -36,6 +36,17 @@ For public-surface discipline and migration expectations, see
    source and Nix install paths.
 9. Confirm the release notes mention any intentional public-surface breaks or
    migration steps.
+10. Merge the reviewed release pull request to the default branch. Discover its
+    name with `DEFAULT=$(gh repo view --json defaultBranchRef --jq
+    .defaultBranchRef.name)` and fetch it with `git fetch origin "$DEFAULT"`.
+11. Create an annotated tag from the merged commit and push it: `git tag -a
+    vX.Y.Z "origin/$DEFAULT" -m "Release vX.Y.Z"` followed by `git push origin
+    vX.Y.Z`. The release workflow rejects tags that are not stable `vX.Y.Z`
+    versions, do not match `cl-weave.asd`, or are not reachable from the
+    repository default branch.
+12. Verify the workflow completed successfully and that the matching GitHub
+    Release contains the generated test-report archive and the expected
+    `CHANGELOG.md` section.
 
 GitHub Releases are the canonical public release notes. Keep `CHANGELOG.md` as
 a concise, versioned index of those user-visible changes and links to the

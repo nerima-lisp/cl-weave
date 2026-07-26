@@ -57,6 +57,16 @@ each tag range. There is no 0.3.0 section because no v0.3.0 tag was ever cut.
   time. Common Lisp has no string continuation, so this is the only way to
   write a description longer than one line without changing its value.
 
+## [1.0.1] - 2026-07-26
+
+### Changed
+
+- Snapshot assertions reuse the loaded snapshot document within a test run and
+  write a changed document once at run completion, reducing repeated snapshot
+  file reads while preserving matching and update behavior.
+- Release publishing now requires a stable SemVer tag whose ASDF version
+  matches and whose commit is reachable from the repository default branch.
+
 ## [1.0.0] - 2026-07-25
 
 ### Changed

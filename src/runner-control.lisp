@@ -53,9 +53,6 @@
     *test-sequence-seed*
     *default-retry*
     *retry-budget-remaining*
-    ;; Captured so concurrent workers inherit the collection-time propagation
-    ;; setting (nil) instead of reverting to the global default (t); this keeps
-    ;; parallel execution semantics identical to sequential execution.
     *runner-propagate-conditions*
     *default-timeout-ms*
     *max-workers*
@@ -64,6 +61,7 @@
     *snapshot-directory*
     *snapshot-file-name*
     *update-snapshots*
+    *snapshot-session*
     *property-test-count*
     *property-seed*
     *recursive-generator-depth*

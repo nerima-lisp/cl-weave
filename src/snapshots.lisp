@@ -205,33 +205,60 @@
                   :reason reason
                   :difference difference))))
 
+(defstruct snapshot-session-file
+    file entries entry-index operations dirty-p)
+
+(defstruct (snapshot-session (:constructor make-snapshot-session ()))
+    (files (make-hash-table :test #'equal))
+    #+sb-thread (lock (sb-thread:make-mutex :name "cl-weave snapshot session")))
+
+(defvar *snapshot-session* nil)
+
+(defmacro with-snapshot-session-lock ((session) &body body)
+    #+sb-thread `(sb-thread:with-mutex ((snapshot-session-lock ,session)) ,@body)
+    #-sb-thread `(progn ,@body))
+
 (defun read-snapshot-file-unlocked (file)
     (when (probe-file file)
       (with-open-file (stream file :direction :input)
         (let ((*read-eval* nil))
           (read stream nil nil)))))
 
-  (defun read-snapshot-file ()
-    (let ((file (canonical-snapshot-file-pathname)))
-      (when (probe-file file)
-        (call-with-snapshot-file-lock
-         file
-         (lambda ()
-           (read-snapshot-file-unlocked file))))))
+  (defun snapshot-session-refresh-index (file)
+    (let ((index (make-hash-table :test #'equal)))
+      (dolist (entry (snapshot-session-file-entries file))
+        (when (consp entry)
+          (setf (gethash (car entry) index) entry)))
+      (setf (snapshot-session-file-entry-index file) index)))
 
-(defun snapshot-entry (key entries)
-  (assoc key entries :test #'string=))
+(defun snapshot-session-load-file (file)
+    (call-with-snapshot-file-lock
+     file
+     (lambda ()
+       (let ((entries (copy-tree (read-snapshot-file-unlocked file))))
+         (make-snapshot-session-file
+          :file file :entries entries
+          :entry-index (let ((index (make-hash-table :test #'equal)))
+                         (dolist (entry entries index)
+                           (when (consp entry)
+                             (setf (gethash (car entry) index) entry)))))))))
 
-(defun snapshot-entries ()
-  (copy-tree (read-snapshot-file)))
+(defun snapshot-session-file-for (file)
+    (let ((session *snapshot-session*))
+      (or (with-snapshot-session-lock (session)
+            (gethash file (snapshot-session-files session)))
+          (let ((loaded (snapshot-session-load-file file)))
+            (with-snapshot-session-lock (session)
+              (or (gethash file (snapshot-session-files session))
+                  (setf (gethash file (snapshot-session-files session)) loaded)))))))
 
-(defun snapshot-value (key)
-  (unless (stringp key)
-    (error "cl-weave:snapshot-value expects a string snapshot key."))
-  (let ((entry (snapshot-entry key (read-snapshot-file))))
-    (if entry
-        (values (cdr entry) t)
-        (values nil nil))))
+(defun read-snapshot-file ()   (let ((file (canonical-snapshot-file-pathname)))     (if *snapshot-session*         (let ((session-file (snapshot-session-file-for file)))           (multiple-value-bind (staged-p entries)               (with-snapshot-session-lock (*snapshot-session*)                 (values (snapshot-session-file-operations session-file)                         (copy-tree (snapshot-session-file-entries session-file))))             (if staged-p                 entries                 (call-with-snapshot-file-lock                  file                  (lambda ()                    (let ((disk-entries (read-snapshot-file-unlocked file)))                      (with-snapshot-session-lock (*snapshot-session*)                        (unless (snapshot-session-file-operations session-file)                          (setf (snapshot-session-file-entries session-file) disk-entries)                          (snapshot-session-refresh-index session-file))                        (copy-tree (snapshot-session-file-entries session-file)))))))))         (when (probe-file file)           (call-with-snapshot-file-lock            file            (lambda ()              (read-snapshot-file-unlocked file)))))))
+
+(defun snapshot-entries () (copy-tree (snapshot-current-entries)))
+
+(defun snapshot-entry (key entries) (assoc key entries :test #'string=))
+
+(defun snapshot-value (key) (unless (stringp key) (error "cl-weave:snapshot-value expects a string snapshot key.")) (let ((entry (snapshot-current-entry key))) (if entry (values (cdr entry) t) (values nil nil))))
 
 (defun write-snapshot-file-unlocked (entries file)
   (multiple-value-bind (temporary-file stream)
@@ -259,14 +286,7 @@
         (unless published-p
           (ignore-errors (delete-file temporary-file)))))))
 
-  (defun write-snapshot-file (entries)
-    (let ((file (snapshot-file-pathname)))
-      (ensure-directories-exist file)
-      (setf file (canonical-snapshot-file-pathname file))
-      (call-with-snapshot-file-lock
-       file
-       (lambda ()
-         (write-snapshot-file-unlocked entries file)))))
+  (defun write-snapshot-file (entries) (let ((file (snapshot-file-pathname))) (ensure-directories-exist file) (setf file (canonical-snapshot-file-pathname file)) (call-with-snapshot-file-lock file (lambda () (write-snapshot-file-unlocked entries file))) (when *snapshot-session* (with-snapshot-session-lock (*snapshot-session*) (remhash file (snapshot-session-files *snapshot-session*))))))
 
   (defun call-with-snapshot-update-transaction (function)
     (let ((file (snapshot-file-pathname)))
@@ -389,93 +409,68 @@
       (multiple-value-call on-mismatch
         (snapshot-comparison-values key actual-string entry))))
 
-(defun call-with-snapshot-sequence-comparison/k
-    (values entries prefix count index on-match on-mismatch)
-  (let ((entry-index (make-hash-table :test #'equal)))
-    (dolist (entry entries)
-      (when (and (consp entry)
-                 (not (nth-value 1 (gethash (car entry) entry-index))))
-        (setf (gethash (car entry) entry-index) entry)))
-    (loop for value in values
-          for position from index
-          for key = (snapshot-sequence-key prefix position)
-          for actual-string = (snapshot-string value)
-          for entry = (gethash key entry-index)
-          do (multiple-value-bind (matched reported-actual reported-expected)
-                 (call-with-snapshot-comparison/k
-                  key actual-string entry
-                  (lambda () (values t nil nil))
-                  (lambda (actual expected)
-                    (values nil actual expected)))
-               (unless matched
-                 (return
-                   (multiple-value-call on-mismatch
-                     (snapshot-sequence-context-values
-                      reported-actual reported-expected
-                      prefix position count)))))
-          finally
-             (let ((extra-entry
-                     (find-if (lambda (candidate)
-                                (let ((candidate-index
-                                        (and (consp candidate)
-                                             (snapshot-sequence-key-index
-                                              prefix (car candidate)))))
-                                  (and candidate-index
-                                       (>= candidate-index count))))
-                              entries)))
-               (return
-                 (if extra-entry
-                     (multiple-value-call on-mismatch
-                       (snapshot-sequence-extra-values
-                        prefix
-                        (snapshot-sequence-key-index prefix (car extra-entry))
-                        count
-                        extra-entry))
-                     (funcall on-match)))))))
+(defun call-with-snapshot-sequence-comparison/k (values entries prefix count index on-match on-mismatch &optional entry-index) (let ((entry-index (or entry-index (let ((index (make-hash-table :test (function equal)))) (dolist (entry entries index) (when (and (consp entry) (not (nth-value 1 (gethash (car entry) index)))) (setf (gethash (car entry) index) entry))))))) (loop for value in values for position from index for key = (snapshot-sequence-key prefix position) for actual-string = (snapshot-string value) for entry = (gethash key entry-index) do (multiple-value-bind (matched reported-actual reported-expected) (call-with-snapshot-comparison/k key actual-string entry (lambda () (values t nil nil)) (lambda (actual expected) (values nil actual expected))) (unless matched (return (multiple-value-call on-mismatch (snapshot-sequence-context-values reported-actual reported-expected prefix position count))))) finally (let ((extra-entry (find-if (lambda (candidate) (let ((candidate-index (and (consp candidate) (snapshot-sequence-key-index prefix (car candidate))))) (and candidate-index (>= candidate-index count)))) entries))) (return (if extra-entry (multiple-value-call on-mismatch (snapshot-sequence-extra-values prefix (snapshot-sequence-key-index prefix (car extra-entry)) count extra-entry)) (funcall on-match)))))))
 
-(defun snapshot-match-or-update-p (actual expected)
-  (let* ((key (snapshot-key-from-expected expected))
-         (actual-string (snapshot-string actual)))
-    (if (snapshot-update-enabled-p)
-        (call-with-snapshot-update-transaction
-         (lambda (entries file)
-           (let ((entry (snapshot-entry key entries)))
-             (unless (and entry (string= actual-string (cdr entry)))
-               (write-snapshot-file-unlocked
-                (replace-snapshot-entry key actual-string entries)
-                file))
-             t)))
-        (let* ((entries (read-snapshot-file))
-               (entry (snapshot-entry key entries)))
-          (if (and entry (string= actual-string (cdr entry)))
-              t
-              (multiple-value-bind (reported-actual reported-expected)
-                  (snapshot-comparison-values key actual-string entry)
-                (values nil reported-actual reported-expected)))))))
+(defun snapshot-sequence-replacement (prefix values entries)
+    (append (remove-snapshot-sequence-entries prefix entries)
+            (loop for value in values for index from 0
+                  collect (cons (snapshot-sequence-key prefix index)
+                                (snapshot-string value)))))
 
-(defun snapshot-sequence-match-or-update-p (actual expected)
-  (let* ((prefix (snapshot-sequence-prefix-from-expected expected))
-         (values (snapshot-sequence-values actual))
-         (count (length values)))
-    (if (snapshot-update-enabled-p)
-        (call-with-snapshot-update-transaction
-         (lambda (entries file)
-           (let* ((retained-entries
-                    (remove-snapshot-sequence-entries prefix entries))
-                  (sequence-entries
-                    (loop for value in values
-                          for index from 0
-                          collect
-                          (cons (snapshot-sequence-key prefix index)
-                                (snapshot-string value))))
-                  (next-entries
-                    (append retained-entries sequence-entries)))
-             (unless (equal next-entries entries)
-               (write-snapshot-file-unlocked next-entries file))
-             t)))
-        (let ((entries (read-snapshot-file)))
-          (call-with-snapshot-sequence-comparison/k
-           values entries prefix count 0
-           (lambda () t)
-           (lambda (reported-actual reported-expected)
-             (values nil reported-actual reported-expected)))))))
+  (defun snapshot-session-current-file ()
+    (snapshot-session-file-for (canonical-snapshot-file-pathname)))
+
+  (defun snapshot-current-entries ()
+    (if *snapshot-session*
+        (let ((session *snapshot-session*)
+              (file (snapshot-session-current-file)))
+          (with-snapshot-session-lock (session)
+            (snapshot-session-file-entries file)))
+        (read-snapshot-file)))
+
+  (defun snapshot-current-entry (key)
+    (if *snapshot-session*
+        (let ((session *snapshot-session*)
+              (file (snapshot-session-current-file)))
+          (with-snapshot-session-lock (session)
+            (gethash key (snapshot-session-file-entry-index file))))
+        (snapshot-entry key (read-snapshot-file))))
+
+  (defun snapshot-session-stage (operation) (ensure-directories-exist (snapshot-file-pathname)) (let ((session *snapshot-session*) (file (snapshot-session-current-file))) (with-snapshot-session-lock (session) (setf (snapshot-session-file-entries file) (ecase (car operation) (:replace (replace-snapshot-entry (second operation) (third operation) (snapshot-session-file-entries file))) (:sequence (snapshot-sequence-replacement (second operation) (third operation) (snapshot-session-file-entries file))))) (snapshot-session-refresh-index file) (push operation (snapshot-session-file-operations file)) (setf (snapshot-session-file-dirty-p file) t))))
+
+  (defun snapshot-session-stage-replacement (key actual-string)
+    (snapshot-session-stage (list :replace key actual-string)))
+
+  (defun snapshot-session-stage-sequence (prefix values)
+    (snapshot-session-stage (list :sequence prefix (copy-list values))))
+
+  (defun snapshot-session-apply-operation (operation entries)
+    (ecase (car operation)
+      (:replace (replace-snapshot-entry (second operation) (third operation) entries))
+      (:sequence (snapshot-sequence-replacement (second operation) (third operation) entries))))
+
+  (defun flush-snapshot-session (session) (let ((files (with-snapshot-session-lock (session) (loop for file being the hash-values of (snapshot-session-files session) when (snapshot-session-file-dirty-p file) collect file)))) (dolist (session-file files) (let ((file (snapshot-session-file-file session-file))) (call-with-snapshot-file-lock file (lambda () (let* ((disk-entries (read-snapshot-file-unlocked file)) (next-entries disk-entries)) (with-snapshot-session-lock (session) (dolist (operation (reverse (snapshot-session-file-operations session-file))) (setf next-entries (snapshot-session-apply-operation operation next-entries)))) (unless (equal disk-entries next-entries) (write-snapshot-file-unlocked next-entries file)) (with-snapshot-session-lock (session) (setf (snapshot-session-file-entries session-file) next-entries (snapshot-session-file-operations session-file) nil (snapshot-session-file-dirty-p session-file) nil) (snapshot-session-refresh-index session-file)))))))))
+
+  (defun call-with-snapshot-session (function) (if *snapshot-session* (funcall function) (let ((*snapshot-session* (make-snapshot-session))) (unwind-protect (funcall function) (flush-snapshot-session *snapshot-session*)))))
+
+  (defun snapshot-match-or-update-p (actual expected)
+    (let* ((key (snapshot-key-from-expected expected))
+           (actual-string (snapshot-string actual)))
+      (if (snapshot-update-enabled-p)
+          (if *snapshot-session*
+              (progn (snapshot-session-stage-replacement key actual-string) t)
+              (call-with-snapshot-update-transaction
+               (lambda (entries file)
+                 (let ((entry (snapshot-entry key entries)))
+                   (unless (and entry (string= actual-string (cdr entry)))
+                     (write-snapshot-file-unlocked
+                      (replace-snapshot-entry key actual-string entries) file))
+                   t))))
+          (let ((entry (snapshot-current-entry key)))
+            (if (and entry (string= actual-string (cdr entry)))
+                t
+                (multiple-value-bind (reported-actual reported-expected)
+                    (snapshot-comparison-values key actual-string entry)
+                  (values nil reported-actual reported-expected)))))))
+
+(defun snapshot-sequence-match-or-update-p (actual expected) (let* ((prefix (snapshot-sequence-prefix-from-expected expected)) (values (snapshot-sequence-values actual)) (count (length values))) (if (snapshot-update-enabled-p) (if *snapshot-session* (progn (snapshot-session-stage-sequence prefix values) t) (call-with-snapshot-update-transaction (lambda (entries file) (let ((next-entries (snapshot-sequence-replacement prefix values entries))) (unless (equal next-entries entries) (write-snapshot-file-unlocked next-entries file)) t)))) (let ((entries (snapshot-current-entries)) (entry-index (and *snapshot-session* (let ((session *snapshot-session*) (file (snapshot-session-current-file))) (with-snapshot-session-lock (session) (snapshot-session-file-entry-index file)))))) (call-with-snapshot-sequence-comparison/k values entries prefix count 0 (lambda () t) (lambda (reported-actual reported-expected) (values nil reported-actual reported-expected)) entry-index)))))

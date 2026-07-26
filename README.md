@@ -53,7 +53,7 @@ As a flake input, pin a release tag rather than following the default branch:
 ```nix
 # flake.nix
 inputs.cl-weave = {
-  url = "github:nerima-lisp/cl-weave/v1.0.0";
+  url = "github:nerima-lisp/cl-weave/v1.0.1";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
