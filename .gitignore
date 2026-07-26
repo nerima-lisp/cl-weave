@@ -63,7 +63,7 @@ coverage.dat
 /coverage-report-*/
 /coverage-filter-*/
 
-# t/support.lisp's make-test-temporary-directory resolves its root from
+# t/helpers-support.lisp's make-test-temporary-directory resolves its root from
 # NIX_BUILD_TOP, then PWD. Inside the Nix sandbox that is the build directory,
 # but `sbcl --script run-tests.lisp` in a checkout puts these under the
 # repository root instead. Names are <prefix>-<base36 time>-<base36 random>,
