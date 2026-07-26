@@ -36,6 +36,26 @@ each tag range. There is no 0.3.0 section because no v0.3.0 tag was ever cut.
 - The `ci.yml` job is named `check`, and the advertised
   `continuousIntegration.jobName` metadata follows it.
 - nixpkgs now tracks `nixos-unstable`.
+- Adopted the nerima-lisp coding standard. Test files are named after the
+  source file they cover (`t/journal-test.lisp` for `src/journal.lisp`, and
+  `<source>-<aspect>-test.lisp` where several files cover one source); shared
+  fixtures and assertion helpers carry the `helpers-` prefix. Every source
+  line now fits in 100 columns, no source file exceeds 500 lines, and each of
+  the three packages documents what it owns.
+- `src/model.lisp` was split into `model.lisp` (records and conditions),
+  `model-registry.lisp` (the global suite tree) and `model-registration.lisp`
+  (registration argument handling); the shrink-candidate equality classifier
+  moved from `src/property-generators.lisp` to
+  `src/property-generators-equality.lisp`. No behaviour changed.
+- `flake.nix` declares only the two verified systems, `x86_64-linux` and
+  `aarch64-darwin` (ADR-0078).
+
+### Added
+
+- `defmatcher` and `expect-extend` accept a leading `(:description "a" "b")`
+  form in place of a description string, joining the parts at macroexpansion
+  time. Common Lisp has no string continuation, so this is the only way to
+  write a description longer than one line without changing its value.
 
 ## [1.0.0] - 2026-07-25
 
