@@ -23,22 +23,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      # Enforces the org invariant "git tag == .asd :version" at the only point
-      # where it can still be corrected cheaply. Without this gate the two drift
-      # silently, which is how cl-boundary-kit reached :version 1.0.0 while its
-      # newest tag was still v0.6.0.
-      - name: Verify tag matches .asd version
+      # Release metadata and provenance must agree before public assets are made.
+      - name: Verify release provenance and version
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           PACKAGE: cl-weave
         run: |
           set -euo pipefail
-          asd_version="$(sed -n 's/^[[:space:]]*:version "\([^"]*\)".*/\1/p' "$PACKAGE.asd" | head -n1)"
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Release tag $GITHUB_REF_NAME must use stable SemVer vX.Y.Z" >&2
+            exit 1
+          fi
+          asd_version="$(perl -ne 'if (/^[[:space:]]*:version "([^"]+)"/) { print $1; exit }' "$PACKAGE.asd")"
           tag_version="${GITHUB_REF_NAME#v}"
           echo "asd=$asd_version tag=$tag_version"
+          if [[ -z "$asd_version" ]]; then
+            echo "::error::$PACKAGE.asd does not contain a :version form" >&2
+            exit 1
+          fi
           if [[ "$asd_version" != "$tag_version" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match $PACKAGE.asd version $asd_version" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          tag_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          if ! git merge-base --is-ancestor "$tag_commit" "origin/$DEFAULT_BRANCH"; then
+            echo "::error::Tag $GITHUB_REF_NAME must point to a commit reachable from $DEFAULT_BRANCH" >&2
             exit 1
           fi
 
@@ -78,10 +91,11 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { found = 1; next }
-            found && /^## / { exit }
-            found { print }
+          VERSION="$version" perl -ne '
+            BEGIN { $version = $ENV{VERSION}; $found = 0; }
+            if (/^## \[\Q$version\E\] - /) { $found = 1; next; }
+            exit if $found && /^## /;
+            print if $found;
           ' CHANGELOG.md > release-notes.md
           if [[ ! -s release-notes.md ]]; then
             echo "::error::CHANGELOG.md has no section for [$version]" >&2

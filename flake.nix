@@ -424,10 +424,11 @@
             mkdir -p $out/share/common-lisp/source/cl-weave
             mkdir -p $out/bin
             cp -R . $out/share/common-lisp/source/cl-weave
-            mkdir -p /tmp/cl-weave-cache
             export HOME=/var/empty
-            export TMPDIR=/tmp
-            export XDG_CACHE_HOME=/tmp/cl-weave-cache
+            # Keep ASDF compilation output scoped to this Nix build.  A fixed
+            # /tmp cache is shared by concurrent macOS builds and races on FASLs.
+            export XDG_CACHE_HOME="$TMPDIR/cl-weave-cache"
+            mkdir -p "$XDG_CACHE_HOME"
             export CL_SOURCE_REGISTRY="$out/share/common-lisp/source//:"
             sbcl --dynamic-space-size 4096 --noinform --non-interactive \
               --eval '(require :asdf)' \
@@ -439,7 +440,7 @@
               --eval '(finish-output *standard-output*)' \
               --eval '(finish-output *error-output*)' \
               --eval "(sb-ext:save-lisp-and-die \"$out/bin/cl-weave\" :toplevel #'cl-weave/cli::saved-image-main :executable t :save-runtime-options t)"
-            rm -rf /tmp/cl-weave-cache
+            rm -rf "$XDG_CACHE_HOME"
           '';
           meta = {
             description = "A modern, Vitest-inspired Common Lisp testing framework";

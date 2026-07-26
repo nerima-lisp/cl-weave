@@ -1,6 +1,6 @@
 (in-package #:cl-weave/test)
 
-#+sb-thread
+(let ((cl-weave::*snapshot-session* nil)) #+sb-thread
 (describe "snapshot concurrency"
   (matcher-pass-cases
     ("snapshot APIs preserve concurrent mixed updates"
@@ -179,9 +179,9 @@
               (expect (hash-table-count lock-registry) :to-be 0))
          (uiop:delete-directory-tree snapshot-root
                                      :validate t
-                                     :if-does-not-exist :ignore))))))
+                                     :if-does-not-exist :ignore)))))))
 
-#+sbcl
+(let ((cl-weave::*snapshot-session* nil)) #+sbcl
 (describe "snapshot file permissions"
   (it "creates a 0600 snapshot under umask 022"
     (let* ((snapshot-root
@@ -244,4 +244,8 @@
           (sb-posix:umask old-umask))
         (uiop:delete-directory-tree snapshot-root
                                     :validate t
-                                    :if-does-not-exist :ignore))))))
+                                    :if-does-not-exist :ignore)))))))
+
+(describe "snapshot sessions" (it "makes staged updates visible and flushes them on scope exit" (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-session")) (cl-weave::*snapshot-directory* snapshot-root) (cl-weave::*snapshot-file-name* "session.snapshots") (cl-weave::*update-snapshots* t)) (unwind-protect (progn (let ((cl-weave::*snapshot-session* nil)) (cl-weave::call-with-snapshot-session (lambda () (expect (cl-weave::snapshot-match-or-update-p (list :value 1) (list "session/first")) :to-be-truthy) (expect (cl-weave::snapshot-match-or-update-p (list :value 2) (list "session/second")) :to-be-truthy) (multiple-value-bind (value present-p) (cl-weave:snapshot-value "session/first") (expect value :to-equal (cl-weave::snapshot-string (list :value 1))) (expect present-p :to-be-truthy))))) (expect (cl-weave:snapshot-entries) :to-equal (list (cons "session/first" (cl-weave::snapshot-string (list :value 1))) (cons "session/second" (cl-weave::snapshot-string (list :value 2)))))) (uiop:delete-directory-tree snapshot-root :validate t :if-does-not-exist :ignore))))))
+
+(it "flushes staged updates when execution exits with an error" (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-session-unwind")) (cl-weave::*snapshot-directory* snapshot-root) (cl-weave::*snapshot-file-name* "unwind.snapshots") (cl-weave::*update-snapshots* t)) (unwind-protect (progn (handler-case (let ((cl-weave::*snapshot-session* nil)) (cl-weave::call-with-snapshot-session (lambda () (cl-weave::snapshot-match-or-update-p (list :value :unwind) (list "session/unwind")) (error "expected test error")))) (error () nil)) (multiple-value-bind (value present-p) (cl-weave:snapshot-value "session/unwind") (expect value :to-equal (cl-weave::snapshot-string (list :value :unwind))) (expect present-p :to-be-truthy))) (uiop:delete-directory-tree snapshot-root :validate t :if-does-not-exist :ignore)))))

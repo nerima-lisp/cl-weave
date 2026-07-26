@@ -254,7 +254,7 @@
             (expect (getf expected :reason) :to-be :missing-snapshot))))))
 
   (it "reports external snapshot mismatches with first-difference data"
-    (let* ((snapshot-root (make-test-temporary-directory "mismatch-structured"))
+    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "mismatch-structured"))
            (cl-weave::*snapshot-directory* snapshot-root)
            (cl-weave::*snapshot-file-name* "mismatch-structured.snapshots")
            (key "mismatch-structured-snapshot"))
@@ -281,10 +281,10 @@
                      (expect (getf difference :actual) :to-equal "(:ok 43)"))))))
         (uiop:delete-directory-tree snapshot-root
                                     :validate t
-                                    :if-does-not-exist :ignore))))
+                                    :if-does-not-exist :ignore)))))
 
   (it "reports external snapshot sequence mismatches with state context"
-    (let* ((snapshot-root (make-test-temporary-directory "sequence-mismatch"))
+    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "sequence-mismatch"))
            (cl-weave::*snapshot-directory* snapshot-root)
            (cl-weave::*snapshot-file-name* "sequence-mismatch.snapshots")
            (prefix "vm/mismatch"))
@@ -319,7 +319,7 @@
                      (expect (getf difference :actual) :to-equal "(:pc 1 :acc 99)"))))))
         (uiop:delete-directory-tree snapshot-root
                                     :validate t
-                                    :if-does-not-exist :ignore))))
+                                    :if-does-not-exist :ignore)))))
 
   (it "compares large snapshot sequences through exactly one continuation"
     (let* ((count 20000)
@@ -340,7 +340,7 @@
 
   (progn
 (it "reports external snapshot sequence length drift"
-    (let* ((snapshot-root (make-test-temporary-directory "sequence-extra"))
+    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "sequence-extra"))
            (cl-weave::*snapshot-directory* snapshot-root)
            (cl-weave::*snapshot-file-name* "sequence-extra.snapshots")
            (prefix "vm/extra"))
@@ -371,7 +371,7 @@
                    (expect (getf expected :value) :to-equal "(:pc 1 :acc 1)")))))
         (uiop:delete-directory-tree snapshot-root
                                     :validate t
-                                    :if-does-not-exist :ignore))))
+                                    :if-does-not-exist :ignore)))))
   (it "evaluates dynamic matcher designators"
     (let ((matcher :to-be))
       (expect 1 matcher 1)
