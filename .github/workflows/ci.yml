@@ -56,7 +56,10 @@ jobs:
       # Runs the SBCL self-test suite (checks.default), the treefmt formatting
       # gate (checks.formatting), the mkdocs --strict build (checks.docs), and
       # the reporter/artifact contract checks.
-      # Add `--all-systems` only when CI covers more than one system.
+      # No `--all-systems`. It realises derivations rather than merely
+      # evaluating them, so on this x86_64-linux runner the aarch64-darwin
+      # attributes fail with "platform mismatch" instead of being skipped.
+      # Each runner checks its own system; see ADR-0078.
       - name: Run flake checks
         timeout-minutes: 10
         # --max-jobs 2 tuned for the 16 GB GitHub-hosted runner: each SBCL check
