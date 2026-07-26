@@ -24,6 +24,8 @@
      (:file "platform-portable")
      (:file "platform-sbcl")
      (:file "model")
+     (:file "model-registry")
+     (:file "model-registration")
      (:file "journal")
      (:file "replay")
      (:file "soft")
