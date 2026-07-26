@@ -104,7 +104,7 @@ The repository already demonstrates the pattern:
 ```sh
 nix develop
 nix run . -- --help
-nix run . -- run cl-weave/tests --reporter json --output cl-weave-results.json
+nix run . -- run cl-weave/test --reporter json --output cl-weave-results.json
 ```
 
 If a project already has a flake, mirror those commands for the project's test
@@ -116,13 +116,13 @@ Prefer the metadata command in automation instead of scraping README prose or
 reporter examples:
 
 ```sh
-nix run . -- metadata cl-weave/tests --reporter json --output cl-weave-metadata.json
+nix run . -- metadata cl-weave/test --reporter json --output cl-weave-metadata.json
 ```
 
 Use the machine-readable reporters for CI gates:
 
 ```sh
-nix run . -- run cl-weave/tests --reporter json --output cl-weave-results.json
-nix run . -- watch cl-weave/tests --once --reporter json --output cl-weave-watch-once.json
-nix run . -- list cl-weave/tests --reporter json --output cl-weave-plan.json
+nix run . -- run cl-weave/test --reporter json --output cl-weave-results.json
+nix run . -- watch cl-weave/test --once --reporter json --output cl-weave-watch-once.json
+nix run . -- list cl-weave/test --reporter json --output cl-weave-plan.json
 ```

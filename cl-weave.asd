@@ -1,12 +1,19 @@
 (in-package #:asdf-user)
 
 (defsystem "cl-weave"
+  ;; All eight metadata fields are mandatory across the org: :homepage,
+  ;; :bug-tracker and :source-control are what let a consumer find the project
+  ;; from an ASDF or Quicklisp listing alone.
   :description "A modern Common Lisp testing framework inspired by Vitest."
-  :author "takeokunn"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
+  ;; Single source of truth for the version. flake.nix reads this form, and
+  ;; release.yml refuses to publish a tag that disagrees with it.
+  :version "1.0.0"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
-  :version "1.0.0"
+  :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
   :serial t
   :components
   ((:module "src"
@@ -80,16 +87,24 @@
      (:file "cli-metadata-reporting")
      (:file "cli")
      (:file "cli-execution"))))
-  :in-order-to ((test-op (test-op "cl-weave/tests"))))
+  :in-order-to ((test-op (test-op "cl-weave/test"))))
 
-(defsystem "cl-weave/tests"
+;;; The test system is `cl-weave/test` (singular, slash-separated) with its
+;;; sources under t/. It is NOT `cl-weave-test` and NOT `cl-weave/tests`.
+(defsystem "cl-weave/test"
   :description "Self tests for cl-weave."
-  :author "takeokunn"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-weave"
+  :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
+  ;; cl-weave is its own test framework, so the suite depends on nothing else.
   :depends-on ("cl-weave")
   :serial t
   :components
-  ((:module "tests"
+  ((:module "t"
     :serial t
     :components
     ((:file "package")

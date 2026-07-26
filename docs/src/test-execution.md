@@ -14,7 +14,7 @@ name filter selects matching paths.
 For command-line and CI usage, use `--filter`:
 
 ```sh
-timeout 120s nix run . -- run cl-weave/tests --filter 'math > adds'
+timeout 120s nix run . -- run cl-weave/test --filter 'math > adds'
 ```
 
 Suites with no selected descendants do not run `before-all` or `after-all`, so
@@ -38,7 +38,7 @@ tests. A test belongs to shard `INDEX` when its ordinal maps to that slot.
 For command-line and CI usage, `--shard` uses `INDEX/COUNT`:
 
 ```sh
-timeout 120s nix run . -- run cl-weave/tests --shard 1/3 --reporter json
+timeout 120s nix run . -- run cl-weave/test --shard 1/3 --reporter json
 ```
 
 Sharding composes with filtering, list mode, bail, ASDF `run-system`, and watch
@@ -65,7 +65,7 @@ reproduce order-dependent failures.
 For command-line and CI usage:
 
 ```sh
-timeout 360s nix run . -- run cl-weave/tests --sequence random --seed 12345
+timeout 360s nix run . -- run cl-weave/test --sequence random --seed 12345
 ```
 
 `--seed` controls the sequence *ordering*; it is independent of `--random-seed`,
@@ -89,7 +89,7 @@ returning the event and its recorded timeline — the fastest way to reproduce a
 inspect one failure in isolation.
 
 ```sh
-timeout 360s nix run . -- run cl-weave/tests --journal --random-seed 20260724
+timeout 360s nix run . -- run cl-weave/test --journal --random-seed 20260724
 ```
 
 `--journal` records an execution-journal timeline (assertions, mock calls,
@@ -120,7 +120,7 @@ For command-line and CI usage, `list` prints the selected test plan
 and exits with status `0`:
 
 ```sh
-timeout 120s nix run . -- list cl-weave/tests --reporter json --filter 'math'
+timeout 120s nix run . -- list cl-weave/test --reporter json --filter 'math'
 ```
 
 List mode supports `spec`, `sexp`, `json`, and `jsonl` reporters. `--output FILE`
@@ -201,19 +201,19 @@ For command-line and CI usage, `--bail` accepts `true`, `yes`, `on`,
 `t`, `false`, `no`, `off`, `0`, `nil`, or a positive integer:
 
 ```sh
-timeout 120s nix run . -- run cl-weave/tests --bail 1
+timeout 120s nix run . -- run cl-weave/test --bail 1
 ```
 
 `--bail` is an optional-value flag, so it may also appear on its own. A bare
 `--bail` defaults to `true`, and the separated form only consumes the following
 token when that token is a valid bail literal (one of the values above). A
 positional target after a bare `--bail` is therefore left for argument parsing
-rather than swallowed, so both of these select `cl-weave/tests` with
+rather than swallowed, so both of these select `cl-weave/test` with
 fast-fail enabled:
 
 ```sh
-timeout 120s nix run . -- run --bail cl-weave/tests
-timeout 120s nix run . -- run cl-weave/tests --bail
+timeout 120s nix run . -- run --bail cl-weave/test
+timeout 120s nix run . -- run cl-weave/test --bail
 ```
 
 Use the inline `--bail=VALUE` form to force value parsing; an invalid inline
@@ -311,9 +311,9 @@ defaults to `*error-output*`.
 The script runner enables watch mode with environment variables:
 
 ```sh
-timeout 360s nix run . -- watch cl-weave/tests
-timeout 360s nix run . -- watch cl-weave/tests --once
-timeout 360s nix run . -- watch cl-weave/tests --watch-interval 0.25
+timeout 360s nix run . -- watch cl-weave/test
+timeout 360s nix run . -- watch cl-weave/test --once
+timeout 360s nix run . -- watch cl-weave/test --watch-interval 0.25
 ```
 
 CI should use `run` rather than `watch`, with `--reporter junit`, `tap`,

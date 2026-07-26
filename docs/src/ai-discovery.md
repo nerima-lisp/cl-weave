@@ -4,7 +4,7 @@ Agents and generators should start from runtime metadata instead of scraping
 source files or examples:
 
 ```sh
-timeout 120s nix run . -- metadata cl-weave/tests --reporter json --output cl-weave-metadata.json
+timeout 120s nix run . -- metadata cl-weave/test --reporter json --output cl-weave-metadata.json
 ```
 
 The metadata payload advertises CLI commands, typed options, finite choices,

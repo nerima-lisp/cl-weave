@@ -12,7 +12,7 @@ What changed and why:
 
 List the commands you ran:
 
-- `timeout 360s nix run . -- run cl-weave/tests`
+- `timeout 360s nix run . -- run cl-weave/test`
 - `timeout 600s nix flake check --print-build-logs`
 - any narrower command that directly exercises the change
 
