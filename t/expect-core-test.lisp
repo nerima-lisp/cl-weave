@@ -28,7 +28,7 @@
             (format nil "alpha~%beta")
             (format nil "alpha~%beta"))
            :to-be-null)
-   (let* ((snapshot-root
+   (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root
             (make-test-temporary-directory "snapshot-linearization"))
           (cl-weave::*snapshot-directory* snapshot-root)
           (cl-weave::*snapshot-file-name* "linearization.snapshots")
@@ -91,7 +91,7 @@
                       ("after" . "after"))))
        (uiop:delete-directory-tree snapshot-root
                                    :validate t
-                                   :if-does-not-exist :ignore)))))
+                                   :if-does-not-exist :ignore))))))
     ("to-equal" (expect (list :a 1) :to-equal (list :a 1)))
     ("to-equalp" (expect "ok" :to-equalp "OK"))
     ("to-be-truthy" (expect :value :to-be-truthy))
@@ -440,7 +440,7 @@
      ;; Write and read the snapshot in a throwaway temp directory that is
      ;; deleted afterwards, like the sibling snapshot tests. Using a persistent
      ;; directory left the written file behind in the working tree.
-     (let* ((snapshot-root (make-test-temporary-directory "cl-weave-core-snapshots"))
+     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "cl-weave-core-snapshots"))
             (cl-weave::*snapshot-directory* snapshot-root)
             (cl-weave::*snapshot-file-name* "matchers.snapshots"))
        (unwind-protect
@@ -450,9 +450,9 @@
               (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
          (uiop:delete-directory-tree snapshot-root
                                      :validate t
-                                     :if-does-not-exist :ignore))))
+                                     :if-does-not-exist :ignore)))))
     ("to-match-snapshot-sequence"
-     (let* ((snapshot-root (make-test-temporary-directory "snapshot-sequence"))
+     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-sequence"))
             (cl-weave::*snapshot-directory* snapshot-root)
             (cl-weave::*snapshot-file-name* "sequence.snapshots"))
        (unwind-protect
@@ -470,9 +470,9 @@
                 (expect present-p :to-be-truthy)))
          (uiop:delete-directory-tree snapshot-root
                                      :validate t
-                                     :if-does-not-exist :ignore))))
+                                     :if-does-not-exist :ignore)))))
     ("snapshot inspection API reads external snapshot artifacts"
-     (let* ((snapshot-root (make-test-temporary-directory "snapshot-api"))
+     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-api"))
             (cl-weave::*snapshot-directory* snapshot-root)
             (cl-weave::*snapshot-file-name* "api.snapshots")
             (key "snapshot-api-entry"))
@@ -495,7 +495,7 @@
                       :to-throw))
          (uiop:delete-directory-tree snapshot-root
                                      :validate t
-                                     :if-does-not-exist :ignore))))
+                                     :if-does-not-exist :ignore)))))
     ("to-match-snapshot rejects missing snapshots"
      (let ((cl-weave::*snapshot-directory* (test-snapshot-directory "cl-weave-core-snapshots"))
            (cl-weave::*snapshot-file-name* "missing.snapshots")
