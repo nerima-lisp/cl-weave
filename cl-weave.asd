@@ -40,6 +40,7 @@
      (:file "matcher-builtins")
      (:file "expectation")
      (:file "property-core")
+     (:file "property-generators-equality")
      (:file "property-generators-shrinking")
      (:file "property-generators-primitives")
      (:file "property-generators")
