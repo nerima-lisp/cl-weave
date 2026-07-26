@@ -138,4 +138,7 @@
   #-sb-thread
   (error "cl-weave: concurrent execution requires an implementation with SB-THREAD."))
 
-(declaim (ftype (function (suite list execution-control function selection-filter &optional t t t t) *) collect-children/k))
+(declaim (ftype (function (suite list execution-control function
+                           selection-filter &optional t t t t)
+                          *)
+                collect-children/k))

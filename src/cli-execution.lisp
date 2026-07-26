@@ -109,7 +109,8 @@ dynamic environment, so worker threads inherit them."
       :message
       (format
         nil
-        "Unable to locate ASDF system ~S. Run cl-weave from the project root, pass --load path/to/system.asd, or configure CL_SOURCE_REGISTRY."
+        "Unable to locate ASDF system ~S. Run cl-weave from the project root, ~
+         pass --load path/to/system.asd, or configure CL_SOURCE_REGISTRY."
         system))))
 
 (defun load-requested-inputs (options)

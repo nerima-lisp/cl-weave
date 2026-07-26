@@ -73,7 +73,8 @@ or a function of one FRAME argument."
   (cond
     ((null breakpoint) nil)
     ((or (integerp breakpoint) (functionp breakpoint)) breakpoint)
-    (t (error "cl-weave: breakpoint must be NIL, an integer frame index, or a function of one JOURNAL-FRAME argument, got ~S."
+    (t (error "cl-weave: breakpoint must be NIL, an integer frame index, or a ~
+               function of one JOURNAL-FRAME argument, got ~S."
               breakpoint))))
 
 (defun invoke-journal-breakpoint (frame)

@@ -1,5 +1,13 @@
 (defpackage #:cl-weave/metadata
   (:use #:cl)
+  (:documentation
+   "Static description of the framework itself: the command list, the CLI option
+table, the capability matrix, the quality gates and the documents the project
+publishes. Nothing here runs a test. It exists so that `cl-weave metadata` and
+`cl-weave doctor` can answer \"what can this framework do\" from one table
+instead of from prose that drifts, and so the self tests can hold README, CI
+and the flake to that same table. Depends on no other cl-weave package, which
+is what lets both #:cl-weave and #:cl-weave/cli import from it.")
   (:export
    #:framework-metadata
    #:*metadata-commands*
@@ -11,6 +19,17 @@
 
 (defpackage #:cl-weave
   (:use #:cl)
+  (:documentation
+   "The testing framework proper, and the only package a test file needs. It
+owns the whole path a test travels: the DSL that registers suites and cases,
+the matcher and expectation engine, fixtures, mocks, snapshots, property and
+mutation testing, the runner with its retry, timeout, sharding, concurrency
+and coverage behaviour, the reporters, and watch mode. The CLI is deliberately
+not here -- #:cl-weave/cli is a caller of this package, so everything the
+command line can do stays reachable from a REPL.")
+  ;; DESCRIBE is shadowed because cl-weave:describe is the suite-defining DSL
+  ;; form, not CL's object inspector. A test file therefore never sees
+  ;; cl:describe; call it as cl:describe if the inspector is what is wanted.
   (:shadow #:describe)
   (:import-from #:cl-weave/metadata
    #:framework-metadata)
@@ -273,10 +292,25 @@
    #:with-replaced-function
    #:with-restored-binding
    #:with-restored-bindings
-   #:with-restored-hash-table #:dispose-mock #:mock-disposed-error #:mock-disposed-error-mock #:active-spy-disposal-error #:active-spy-disposal-error-mock #:active-spy-disposal-error-symbol))
+   #:with-restored-hash-table
+
+   ;; Mock disposal
+   #:dispose-mock
+   #:mock-disposed-error
+   #:mock-disposed-error-mock
+   #:active-spy-disposal-error
+   #:active-spy-disposal-error-mock
+   #:active-spy-disposal-error-symbol))
 
 (defpackage #:cl-weave/cli
   (:use #:cl)
+  (:documentation
+   "The `cl-weave` executable: argument parsing, environment defaults, the run,
+list, watch, doctor, metadata, version and help commands, and the process exit
+status they produce. It is a thin translation layer -- every command resolves
+to calls into #:cl-weave and #:cl-weave/metadata -- so a behaviour that only
+the CLI can reach would be a bug. Exports only #:main; the command internals
+stay unexported because their shape is not something downstream should pin.")
   (:import-from #:cl-weave/metadata
    #:*metadata-commands*
    #:*metadata-cli-options*

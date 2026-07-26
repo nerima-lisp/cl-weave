@@ -74,7 +74,7 @@
      :scope "Canonical support boundaries, report contents, and escalation guidance.")))
 
 (defparameter *metadata-community-health*
-  '((:name "bug-report-form"
+  `((:name "bug-report-form"
      :kind "github-issue-template"
      :path ".github/ISSUE_TEMPLATE/bug_report.md"
      :purpose "Structured bug intake that routes reporters to the canonical issue reporting guide."
@@ -103,24 +103,28 @@
     (:name "issue-template-config"
      :kind "github-issue-template-config"
      :path ".github/ISSUE_TEMPLATE/config.yml"
-     :purpose "GitHub issue chooser configuration that redirects support and security traffic to canonical policies."
+     :purpose ,(concatenate 'string
+                            "GitHub issue chooser configuration that redirects support and "
+                            "security traffic to canonical policies.")
      :references ("docs/src/community-health.md"
                   "docs/src/support-policy.md"
                   "docs/src/issue-reporting.md")
      :required-sections nil
-     :contact-links ((:name "Support policy"
-                      :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md"
-                      :purpose "Check whether the request belongs in issue tracking and what detail is required.")
-                     (:name "Security reporting"
-                      :target "https://github.com/nerima-lisp/cl-weave/security/advisories/new"
-                      :purpose "Report vulnerabilities through the private security contact path.")
-                     (:name "Issue reporting guide"
-                      :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md"
-                      :purpose "Review the canonical reproduction format before filing a bug.")))
+     :contact-links
+     ((:name "Support policy"
+       :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md"
+       :purpose "Check whether the request belongs in issue tracking and what detail is required.")
+      (:name "Security reporting"
+       :target "https://github.com/nerima-lisp/cl-weave/security/advisories/new"
+       :purpose "Report vulnerabilities through the private security contact path.")
+      (:name "Issue reporting guide"
+       :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md"
+       :purpose "Review the canonical reproduction format before filing a bug.")))
     (:name "pull-request-template"
      :kind "github-pull-request-template"
      :path ".github/pull_request_template.md"
-     :purpose "Default PR body that mirrors the canonical review checklist and public-surface prompts."
+     :purpose
+     "Default PR body that mirrors the canonical review checklist and public-surface prompts."
      :references ("docs/src/community-health.md"
                   "docs/src/pull-request-template.md")
      :required-sections ("Summary"
@@ -151,10 +155,12 @@
     :versioning-document "docs/src/versioning-policy.md"))
 
 (defparameter *metadata-governance*
-  '(:policy-document "docs/src/governance.md"
+  `(:policy-document "docs/src/governance.md"
     :review-ownership ".github/CODEOWNERS"
     :maintainer-responsibilities
-    ("Triaging issues and pull requests against the documented project scope and support boundaries."
+    (,(concatenate 'string
+       "Triaging issues and pull requests against the documented project "
+       "scope and support boundaries.")
      "Protecting documented public-surface expectations recorded in the versioning policy."
      "Keeping machine-readable metadata, release notes, and policy documents synchronized."
      "Requiring regression coverage for public-surface changes when practical."
@@ -168,7 +174,9 @@
     :release-authority
     "Maintainers cut releases from the validated default branch state only."
     :continuity-expectation
-    "When the maintainer set changes, update governance, linked policies, and machine-readable metadata in the same patch."))
+    ,(concatenate 'string
+                  "When the maintainer set changes, update governance, linked policies, and "
+                  "machine-readable metadata in the same patch.")))
 
 (defparameter *metadata-runtime-support*
   '(:policy-document "docs/src/runtime-support.md"
@@ -186,20 +194,29 @@
      "MOP-dependent metadata and structural assertions")))
 
 (defparameter *metadata-release-process*
-  '(:policy-document "docs/src/release-process.md"
+  `(:policy-document "docs/src/release-process.md"
     :release-stage "stable"
     :checklist
     ("Run the full test suite."
      "Run nix flake check --print-build-logs when Nix is available."
      "Summarize user-visible changes in the release notes."
      "Check that README.md and docs/src/maintenance-policy.md still match the current workflow."
-     "Review docs/src/pull-request-template.md and .github/pull_request_template.md so release-bound changes still capture public-surface notes, validation commands, and follow-up risk in a consistent format."
-     "Verify that cl-weave metadata still advertises the expected package links, reporter list, and schema versions."
-     "Verify that docs/src/distribution-policy.md still matches the documented source and Nix install paths."
+     ,(concatenate 'string
+                   "Review docs/src/pull-request-template.md and .github/pull_request_template.md "
+                   "so release-bound changes still capture public-surface notes, validation "
+                   "commands, and follow-up risk in a consistent format.")
+     ,(concatenate 'string
+                   "Verify that cl-weave metadata still advertises the expected package links, "
+                   "reporter list, and schema versions.")
+     ,(concatenate 'string
+                   "Verify that docs/src/distribution-policy.md still matches the documented "
+                   "source and Nix install paths.")
      "Confirm the release notes mention any intentional public-surface breaks or migration steps.")
     :contract-sync-requirements
     ("Keep machine-readable metadata and human-facing documentation in sync."
-     "Keep distributionChannels, README.md, and docs/src/distribution-policy.md synchronized when install paths change."
+     ,(concatenate 'string
+                   "Keep distributionChannels, README.md, and docs/src/distribution-policy.md "
+                   "synchronized when install paths change.")
      "Update tests and docs/src/ai-contract.md when a machine-readable contract changes.")))
 
 (defparameter *metadata-continuous-integration*

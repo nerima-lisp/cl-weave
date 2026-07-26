@@ -47,7 +47,8 @@
         (:fail (incf failed))
         (:error (incf errored))))
     (format stream "<?xml version=\"1.0\" encoding=\"UTF-8\"?>~%")
-    (format stream "<testsuite name=\"cl-weave\" tests=\"~D\" failures=\"~D\" errors=\"~D\" skipped=\"~D\" time=\"~,3F\">~%"
+    (format stream "<testsuite name=\"cl-weave\" tests=\"~D\" failures=\"~D\" ~
+                    errors=\"~D\" skipped=\"~D\" time=\"~,3F\">~%"
             total
             failed
             errored

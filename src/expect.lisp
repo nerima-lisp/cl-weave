@@ -38,7 +38,8 @@
 (defmacro expect-poll (thunk &body body)
   (multiple-value-bind (options expectation) (split-leading-option-plist body)
     (when (null expectation)
-      (error "cl-weave: EXPECT-POLL requires a matcher, for example (EXPECT-POLL thunk :to-be expected)."))
+      (error "cl-weave: EXPECT-POLL requires a matcher, for example ~
+              (EXPECT-POLL thunk :to-be expected)."))
     `(progn
        (record-assertion)
        (call-polling-expectation-thunk
