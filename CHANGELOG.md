@@ -25,6 +25,14 @@ each tag range. There is no 0.3.0 section because no v0.3.0 tag was ever cut.
 
 ## [Unreleased]
 
+### Added
+
+- `packages.<system>.cl-weave` publishes the ASDF system itself, alongside
+  `packages.default`, which remains the delivered CLI. A sibling repository
+  that depends on cl-weave for its tests can now take that output directly
+  instead of rebuilding cl-weave from this repository's source, which is what
+  cl-prolog and cl-json-kit do today.
+
 ### Changed
 
 - Adopted the nerima-lisp package standard: the test system is now
