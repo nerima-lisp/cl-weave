@@ -24,12 +24,43 @@
         when position
           collect (subseq trimmed 0 position)))
 
-(defun packaged-cli-initializes-output-translations-p (flake)
-  (not (null
-        (search
-         "(asdf:initialize-output-translations (quote (:output-translations (t (:home \".cache\" \"common-lisp\" :implementation)) :ignore-inherited-configuration)))"
-         flake
-         :test (function char=)))))
+(defun declared-image-output-translations (system)
+  "The ASDF output-translation configuration a binary dumped from SYSTEM
+installs at startup.
+
+SYSTEM's own :ENTRY-POINT is resolved rather than a function being named here,
+so this follows the .asd if the entry point is renamed -- and it is read with
+ASDF/SYSTEM:COMPONENT-ENTRY-POINT, the same accessor cl-nix-forge's
+mkExecutable reads it with, so a declaration this cannot resolve is one the
+build cannot resolve either. Note that accessor is NOT reachable as
+ASDF:COMPONENT-ENTRY-POINT; asdf/interface does not re-export it.
+
+The rest of the startup sequence is stubbed, because calling it for real would
+replace the running suite's own ASDF configuration and then hand control to
+the CLI."
+  (let ((observed :not-called))
+    (sb-ext:without-package-locks
+      (with-mocked-functions
+          (((symbol-function 'uiop:setup-temporary-directory)
+            (lambda () nil))
+           ((symbol-function 'asdf:initialize-source-registry)
+            (lambda (&optional parameter)
+              (declare (ignore parameter))
+              nil))
+           ((symbol-function 'asdf:initialize-output-translations)
+            (lambda (&optional parameter)
+              (setf observed parameter)))
+           ((symbol-function 'cl-weave/cli::main)
+            (lambda (&optional argv)
+              (declare (ignore argv))
+              t)))
+        ;; The entry point resets this to the caller's directory; rebinding
+        ;; keeps that out of the suite's global state.
+        (let ((*default-pathname-defaults* *default-pathname-defaults*))
+          (funcall (uiop:ensure-function
+                    (asdf/system:component-entry-point
+                     (asdf:find-system system)))))))
+    observed))
 
 (defun workflow-action-reference (line)
   (let ((uses-position (search "uses:" line)))

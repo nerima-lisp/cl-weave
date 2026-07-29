@@ -167,4 +167,20 @@
             :to-satisfy
             (lambda (form)
               (and (tree-contains-p form :keep-files)
-                   (tree-contains-p form :on-failure))))))
+                   (tree-contains-p form :on-failure)))))
+
+  (it "starts a child from the SBCL running the suite"
+    (call-with-image-anchors
+     #P"/opt/sbcl/bin/sbcl"
+     #P"/opt/sbcl/lib/sbcl/sbcl.core"
+     (lambda ()
+       (expect (cl-weave::isolated-sbcl-program) :to-equal "/opt/sbcl/bin/sbcl"))))
+
+  (it "starts a child from PATH when the suite runs inside a delivered binary"
+    ;; In a standalone executable image the runtime and the core are the same
+    ;; file, and that file is cl-weave, which does not accept --script.
+    (call-with-image-anchors
+     #P"/opt/cl-weave/bin/cl-weave"
+     #P"/opt/cl-weave/bin/cl-weave"
+     (lambda ()
+       (expect (cl-weave::isolated-sbcl-program) :to-equal "sbcl")))))

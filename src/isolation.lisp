@@ -162,8 +162,16 @@ subsystems, which load after this file."
 
 #+sbcl
 (defun isolated-sbcl-program ()
+  ;; SB-EXT:*RUNTIME-PATHNAME* names the SBCL running us, which is the one an
+  ;; isolated child should be started with -- except in a standalone
+  ;; executable image, where the runtime and the core are the same file and
+  ;; that file is cl-weave itself, not a Lisp that understands --script. SBCL
+  ;; makes the two equal only in that shape, so it is a reliable test. Fall
+  ;; back to the SBCL on PATH there; RUN-PROGRAM below searches for it.
   (or (when (and (boundp 'sb-ext:*runtime-pathname*)
-                 sb-ext:*runtime-pathname*)
+                 sb-ext:*runtime-pathname*
+                 (not (equal sb-ext:*runtime-pathname*
+                             sb-ext:*core-pathname*)))
         (namestring sb-ext:*runtime-pathname*))
       "sbcl"))
 

@@ -106,6 +106,21 @@ a recognized XML entity reference."
              (return directory)
         finally (error "Failed to allocate test temporary directory for ~A." prefix)))
 
+(defun call-with-image-anchors (runtime core callable)
+  "Call CALLABLE with SB-EXT:*RUNTIME-PATHNAME* set to RUNTIME and
+SB-EXT:*CORE-PATHNAME* to CORE, restoring both afterwards. They are assigned
+rather than bound because SB-EXT is a locked package, which permits assignment
+to a special variable but not LET."
+  (let ((saved-runtime sb-ext:*runtime-pathname*)
+        (saved-core sb-ext:*core-pathname*))
+    (unwind-protect
+         (progn
+           (setf sb-ext:*runtime-pathname* runtime
+                 sb-ext:*core-pathname* core)
+           (funcall callable))
+      (setf sb-ext:*runtime-pathname* saved-runtime
+            sb-ext:*core-pathname* saved-core))))
+
 (defun read-text-file (pathname)
   (with-open-file (stream pathname :direction :input)
     (let ((contents (make-string (file-length stream))))

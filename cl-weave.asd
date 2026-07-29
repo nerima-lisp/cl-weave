@@ -14,6 +14,19 @@
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
+  ;; How the `cl-weave` executable is delivered belongs here, not in a build
+  ;; system: `(asdf:operate 'asdf:program-op "cl-weave")` and `nix build` must
+  ;; produce the same binary, and a save-lisp-and-die chain written out in Nix
+  ;; gives the two places to disagree about the entry point.
+  :build-operation "program-op"
+  :build-pathname "cl-weave"
+  :entry-point "cl-weave/cli::image-entry-point"
+  ;; sb-cover ships with SBCL, so this is not an external dependency; it is
+  ;; declared because `cl-weave run --coverage` needs it *inside* a dumped
+  ;; image, where REQUIRE can no longer reach SBCL's contrib directory.
+  ;; Saying it here rather than in the build makes the image, a plain
+  ;; `sbcl --script`, and a REPL all agree on what the system needs.
+  :depends-on ((:require "sb-cover"))
   :serial t
   :components
   ((:module "src"
@@ -89,7 +102,8 @@
      (:file "cli-metadata-json-schema-data")
      (:file "cli-metadata-reporting")
      (:file "cli")
-     (:file "cli-execution"))))
+     (:file "cli-execution")
+     (:file "cli-image"))))
   :in-order-to ((test-op (test-op "cl-weave/test"))))
 
 ;;; The test system is `cl-weave/test` (singular, slash-separated) with its
@@ -157,6 +171,7 @@
      (:file "cli-metadata-capability-data-test")
      (:file "cli-metadata-project-data-contracts-test")
      (:file "cli-execution-entrypoint-test")
+     (:file "cli-image-test")
      (:file "cli-metadata-project-data-community-health-test")
      (:file "watch-asdf-integration-test")
      (:file "watch-discovery-test")
