@@ -25,6 +25,8 @@ each tag range. There is no 0.3.0 section because no v0.3.0 tag was ever cut.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-30
+
 ### Added
 
 - `packages.<system>.cl-weave` publishes the ASDF system itself, alongside
