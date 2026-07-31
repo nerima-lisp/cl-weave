@@ -45,14 +45,16 @@
     let
       lib = nixpkgs.lib;
 
-      # Only what is verified: x86_64-linux by CI, aarch64-darwin by the
-      # maintainer's local `nix flake check`. aarch64-linux and x86_64-darwin
-      # are not declared because nothing runs them, and a platform no runner
-      # can build makes `nix flake check --all-systems` fail with "platform
-      # mismatch" rather than skip it. See ADR-0078.
+      # x86_64-linux and nothing else. Only what a gate verifies is declared,
+      # and the only gate is CI. aarch64-darwin was declared until the
+      # 2026-08-01 revision on the strength of the maintainer running
+      # `nix flake check` locally; running something by hand is not a gate, so
+      # the promise was withdrawn. aarch64-linux and x86_64-darwin were already
+      # absent for the same reason. Development happens on Linux, and every
+      # output -- packages, checks, apps AND devShells -- comes from this one
+      # list. See PACKAGE_STANDARD.md "systems".
       systems = [
         "x86_64-linux"
-        "aarch64-darwin"
       ];
 
       meta = {
@@ -108,7 +110,6 @@
       sourceInclude = [
         ./README.md
         ./LICENSE
-        ./CHANGELOG.md
         ./flake.nix
         ./.github
         ./docs
@@ -166,19 +167,17 @@
       # thing at greater length.
       timeoutSeconds = 600;
 
-      # Rooted at the repository, not at ./docs, because docs/src/changelog.md
-      # is a pymdownx.snippets include of the top-level CHANGELOG.md and
-      # snippets resolves base_path against the working directory mkdocs runs
-      # in. `mkDocsSite` builds with `--strict`, so a broken link or a page
-      # missing from the nav fails the build, and `checks.docs` runs it -- which
-      # is what keeps such a break inside a pull request instead of surfacing as
-      # a failed post-merge deploy.
+      # Rooted at the repository rather than at ./docs so that mkdocsYmlName
+      # below stays a repository-relative path and the site builds the same way
+      # from any working directory. `mkDocsSite` builds with `--strict`, so a
+      # broken link or a page missing from the nav fails the build, and
+      # `checks.docs` runs it -- which is what keeps such a break inside a pull
+      # request instead of surfacing as a failed post-merge deploy.
       docs = {
         root = ./.;
         fileset = lib.fileset.unions [
           ./docs/mkdocs.yml
           ./docs/src
-          ./CHANGELOG.md
         ];
         mkdocsYmlName = "docs/mkdocs.yml";
       };

@@ -6,7 +6,7 @@ This document describes the release flow for `cl-weave`, which follows
 ## Release Goals
 
 - Keep the public CLI and reporter contracts stable unless the GitHub Release
-  notes and `CHANGELOG.md` call out a deliberate break.
+  notes call out a deliberate break.
 - Keep machine-readable metadata and human-facing documentation in sync.
 - Keep downstream ASDF consumers able to adopt new versions with a small
   upgrade step.
@@ -45,12 +45,16 @@ For public-surface discipline and migration expectations, see
     versions, do not match `cl-weave.asd`, or are not reachable from the
     repository default branch.
 12. Verify the workflow completed successfully and that the matching GitHub
-    Release contains the generated test-report archive and the expected
-    `CHANGELOG.md` section.
+    Release exists with the generated test-report archive attached. The
+    workflow creates the release as an empty **draft**: it writes no body at
+    all. Paste in the notes from step 4 and publish with `gh release edit
+    vX.Y.Z --notes-file <file> --draft=false`.
 
-GitHub Releases are the canonical public release notes. Keep `CHANGELOG.md` as
-a concise, versioned index of those user-visible changes and links to the
-corresponding release.
+The GitHub Release description is the canonical public release history, and
+since the 2026-08-01 org revision it is the only one — this repository has no
+`CHANGELOG.md`. A draft appears neither under "Latest release" nor in the
+default output of `gh release list`, so a release whose notes were forgotten
+never reaches downstream.
 
 ## Maintenance Boundaries
 

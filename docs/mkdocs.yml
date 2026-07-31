@@ -3,10 +3,6 @@
 # Build:   mkdocs build -f docs/mkdocs.yml --strict
 # Serve:   mkdocs serve -f docs/mkdocs.yml --no-strict
 # The Nix flake (`nix build .#docs`) drives the same config offline.
-#
-# Always invoke mkdocs from the repository root: pymdownx.snippets resolves
-# base_path against the working directory, and docs/src/changelog.md includes
-# the top-level CHANGELOG.md from there.
 
 # Declared here as well as passed on the command line, so `mkdocs serve` uses
 # the same gate and no call path can forget --strict.
@@ -101,13 +97,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  # docs/src/changelog.md is a one-line include of the top-level CHANGELOG.md,
-  # so the site and the repository can never drift apart. check_paths turns a
-  # missing include into a build failure, matching what --strict does for links.
-  - pymdownx.snippets:
-      base_path:
-        - "."
-      check_paths: true
+  # pymdownx.snippets is deliberately absent: its only use here was including
+  # the top-level CHANGELOG.md, and the org abolished CHANGELOG.md in the
+  # 2026-08-01 revision. Leaving the extension configured invites a new use.
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -168,7 +160,6 @@ nav:
       - Community Health: community-health.md
   - Project:
       - Development: development.md
-      - Changelog: changelog.md
       - Governance: governance.md
       - Triage Policy: triage-policy.md
       - Issue Reporting Guide: issue-reporting.md

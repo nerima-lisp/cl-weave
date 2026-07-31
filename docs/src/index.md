@@ -148,7 +148,8 @@ major version:
   platforms.
 - [Doctor Report](doctor-report.md) — the `doctor` health checks.
 - [Development](development.md) — build, test, coverage and formatting commands.
-- [Changelog](changelog.md) — the release history.
+- [GitHub Releases](https://github.com/nerima-lisp/cl-weave/releases) — the
+  release history.
 
 ## Nix Workflow
 

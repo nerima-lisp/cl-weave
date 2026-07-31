@@ -52,9 +52,9 @@ Each release makes it clear whether it is:
 
 That label matches the actual change set and the regression tests that support
 it. A breaking change is always explicit in GitHub Release notes,
-`CHANGELOG.md`, docs, and tests.
+docs, and tests.
 
 Before cutting a release or documenting a public break, review
 [release-process.md](release-process.md) and
 [maintenance-policy.md](maintenance-policy.md) so GitHub Release notes,
-`CHANGELOG.md`, validation, and support expectations stay aligned.
+validation, and support expectations stay aligned.

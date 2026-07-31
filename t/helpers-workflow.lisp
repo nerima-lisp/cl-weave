@@ -146,16 +146,11 @@ indented two columns less than workflow-job steps (`    - name:` vs `      - nam
                (search marker step))
              (action-step-blocks action))))
 
-(defun ci-templated-artifact-bundle (ci)
-  "The metadata artifact-bundle name with its concrete system replaced by the
-workflow matrix template, so the contract accepts the matrix-ready workflow while
-staying derived from the metadata (bundle name + declared system)."
-  (let* ((bundle (getf ci :artifact-bundle))
-         (system (first (getf ci :systems)))
-         (position (and system (search system bundle))))
-    (if position
-        (concatenate 'string
-                     (subseq bundle 0 position)
-                     "${{ matrix.system }}"
-                     (subseq bundle (+ position (length system))))
-        bundle)))
+(defun ci-declared-system (ci)
+  "The single platform the CI workflow checks, taken from the metadata.
+
+`ci.yml` used to carry a one-element matrix and spell the system as
+`${{ matrix.system }}`; the 2026-08-01 org revision reduced `flake.nix` to
+`[ \"x86_64-linux\" ]` and deleted the matrix, so the workflow now names the
+system literally and the contract compares literals on both sides."
+  (first (getf ci :systems)))

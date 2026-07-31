@@ -21,20 +21,17 @@ jobs:
   # scheduling and lose cache sharing between them.
   #
   # Add a second job ONLY for work the Nix sandbox cannot do: network access,
-  # a real PTY/TTY, artifact upload, or a different runner OS.
+  # a real PTY/TTY, or artifact upload. "A different runner OS" is no longer
+  # one of them: as of the 2026-08-01 revision flake.nix declares x86_64-linux
+  # alone, so no other runner has an output to check.
+  #
+  # The one-element matrix that used to sit here is deleted rather than left in
+  # place. A one-element matrix signals an intent to add a second platform, and
+  # there is none. See PACKAGE_STANDARD.md "CI の粒度".
   check:
-    name: nix flake check (${{ matrix.system }})
-    runs-on: ${{ matrix.runner }}
+    name: nix flake check
+    runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      # Single active entry today. The flake exposes checks for every system in
-      # `systems`, so covering another platform is a one-line addition here
-      # (e.g. `{ system: aarch64-darwin, runner: macos-14 }`).
-      matrix:
-        include:
-          - system: x86_64-linux
-            runner: ubuntu-latest
     steps:
       # persist-credentials: false — this job runs untrusted PR code via
       # `nix flake check`, and never needs the token, so don't leave it in
@@ -56,10 +53,10 @@ jobs:
       # Runs the SBCL self-test suite (checks.default), the treefmt formatting
       # gate (checks.formatting), the mkdocs --strict build (checks.docs), and
       # the reporter/artifact contract checks.
-      # No `--all-systems`. It realises derivations rather than merely
-      # evaluating them, so on this x86_64-linux runner the aarch64-darwin
-      # attributes fail with "platform mismatch" instead of being skipped.
-      # Each runner checks its own system; see ADR-0078.
+      # No `--all-systems`. `systems` is a single element, so it would not
+      # widen the check; and it realises derivations rather than merely
+      # evaluating them, which is how a foreign attribute fails with "platform
+      # mismatch" instead of being skipped.
       - name: Run flake checks
         timeout-minutes: 10
         # --max-jobs 2 tuned for the 16 GB GitHub-hosted runner: each SBCL check
@@ -74,15 +71,15 @@ jobs:
         run: |
           set -euo pipefail
           outputs="$(timeout 120s nix build --no-link --print-out-paths \
-            ".#checks.${{ matrix.system }}.json-results-artifact" \
-            ".#checks.${{ matrix.system }}.jsonl-events-artifact" \
-            ".#checks.${{ matrix.system }}.cli-json-results" \
-            ".#checks.${{ matrix.system }}.ai-metadata-artifact" \
-            ".#checks.${{ matrix.system }}.plan-artifact" \
-            ".#checks.${{ matrix.system }}.watch-once-artifact" \
-            ".#checks.${{ matrix.system }}.tap-artifact" \
-            ".#checks.${{ matrix.system }}.junit-artifact" \
-            ".#checks.${{ matrix.system }}.coverage-artifact")"
+            ".#checks.x86_64-linux.json-results-artifact" \
+            ".#checks.x86_64-linux.jsonl-events-artifact" \
+            ".#checks.x86_64-linux.cli-json-results" \
+            ".#checks.x86_64-linux.ai-metadata-artifact" \
+            ".#checks.x86_64-linux.plan-artifact" \
+            ".#checks.x86_64-linux.watch-once-artifact" \
+            ".#checks.x86_64-linux.tap-artifact" \
+            ".#checks.x86_64-linux.junit-artifact" \
+            ".#checks.x86_64-linux.coverage-artifact")"
           while IFS= read -r output; do
             test -d "$output"
             cp -R "$output"/. .
@@ -92,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cl-weave-test-reports-${{ matrix.system }}
+          name: cl-weave-test-reports-x86_64-linux
           path: |
             cl-weave-results.json
             cl-weave-events.jsonl

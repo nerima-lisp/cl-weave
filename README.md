@@ -99,7 +99,7 @@ Do not put exploit details in a public issue.
 
 Community conduct is defined by the org-wide
 [Code of Conduct](https://github.com/nerima-lisp/.github/blob/main/CODE_OF_CONDUCT.md),
-and release history is in [CHANGELOG.md](CHANGELOG.md) and
+and release history is in
 [GitHub Releases](https://github.com/nerima-lisp/cl-weave/releases).
 
 ## License

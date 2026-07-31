@@ -44,7 +44,7 @@
                             :job-name "nix"
                             :triggers '("pull_request")
                             :systems '("x86_64-linux")
-                            :artifact-bundle "cl-weave-test-reports-${{ matrix.system }}"
+                            :artifact-bundle "custom-test-reports-x86_64-linux"
                             :cache-provider "cachix"
                             :cache-modes '("pull-only")
                             :quality-gate-source "qualityGates")
@@ -230,13 +230,15 @@
       (expect workflow :to-contain "pull_request:")
       (expect workflow :to-contain "branches: [main]")
       (expect workflow :to-contain "workflow_dispatch:")
-      ;; The workflow is matrix-ready: each system is declared in the matrix and
-      ;; the artifact bundle is templated, so the concrete system resolves
-      ;; through ${{ matrix.system }}.
+      ;; One system, named literally. flake.nix declares x86_64-linux alone, so
+      ;; there is no matrix to resolve through and the workflow spells the
+      ;; system out wherever it needs it.
+      (expect workflow :to-contain "runs-on: ubuntu-latest")
+      (expect workflow :not :to-contain "matrix.system")
       (dolist (system (getf ci :systems))
-        (expect workflow :to-contain (format nil "system: ~A" system)))
+        (expect workflow :to-contain (format nil ".#checks.~A." system)))
       (expect workflow :to-contain
-              (format nil "name: ~A" (ci-templated-artifact-bundle ci)))
+              (format nil "name: ~A" (getf ci :artifact-bundle)))
       ;; Nix/Cachix setup is delegated to the shared composite action, so the
       ;; cachix-action pin and the cache modes live there rather than inline.
       (expect workflow :to-contain "uses: ./.github/actions/nix-setup")
@@ -366,6 +368,7 @@
   (it "keeps CI workflow quality gates synchronized with metadata"
     (let* ((metadata (cl-weave/metadata:framework-metadata))
            (gates (getf metadata :quality-gates))
+           (system (ci-declared-system (getf metadata :continuous-integration)))
            (workflow (read-text-file #P".github/workflows/ci.yml"))
            (flake-step (workflow-step-for-name workflow "Run flake checks"))
            (materialize-step
@@ -385,7 +388,7 @@
           (when artifacts
             (expect materialize-step
                     :to-contain
-                    (format nil ".#checks.${{ matrix.system }}.~A" name))
+                    (format nil ".#checks.~A.~A" system name))
             (dolist (artifact artifacts)
               (expect artifact-section :to-contain artifact)))))))
 
