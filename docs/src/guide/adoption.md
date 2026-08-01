@@ -17,7 +17,7 @@ Keep the integration surface small:
 ## Minimal ASDF Wiring
 
 Do not migrate a downstream project until `cl-weave` itself passes the ASDF load
-gate documented in [runtime-support.md](runtime-support.md). A targeted source
+gate documented in [runtime-support.md](../reference/runtime-support.md). A targeted source
 check is not enough evidence for adoption because downstream projects load the
 framework through ASDF.
 

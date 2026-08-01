@@ -2,7 +2,7 @@
 
 Everything here runs through Nix, which is the supported toolchain. The
 supported release target is SBCL on `x86_64-linux`; see
-[Runtime Support](runtime-support.md) for the capability and portability
+[Runtime Support](../reference/runtime-support.md) for the capability and portability
 boundaries.
 
 ## Commands
@@ -77,13 +77,13 @@ nix run . -- run cl-weave/test \
   --coverage-system cl-weave
 ```
 
-See [Reporters and CI](reporters-and-ci.md) for the reporter formats and the
+See [Reporters and CI](../guide/reporters-and-ci.md) for the reporter formats and the
 coverage gate options.
 
 ## Benchmarks
 
 `benchmarks/` holds the micro-benchmark harness for the runner hot paths. See
-[Benchmarking](benchmarking.md) for the `benchmark` and `measure` helpers and
+[Benchmarking](../guide/benchmarking.md) for the `benchmark` and `measure` helpers and
 the timing statistics they report.
 
 ## Structural edits

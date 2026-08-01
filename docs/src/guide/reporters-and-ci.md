@@ -51,7 +51,7 @@ The `:sexp` reporter is the stable Lisp-native AI interface. The `:json`
 reporter is the stable external-tool interface. The `:jsonl` reporter emits one
 JSON object per line for streaming CI logs and agent ingestion. These structured
 reporters include failed and errored path summaries for focused reruns. See
-[AI Contract](ai-contract.md). The metadata root also advertises this canonical
+[AI Contract](../reference/ai-contract.md). The metadata root also advertises this canonical
 non-policy path through `referenceDocuments`, plus support
 and lifecycle contracts through `supportChannels`, `securityContacts`,
 `lifecycle`, `runtimeSupport`, and `releaseProcess`.

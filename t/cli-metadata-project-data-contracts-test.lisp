@@ -3,13 +3,13 @@
 (describe "cli metadata contracts"
   (it "keeps README adoption and CI contracts synchronized with metadata"
     (let* ((adoption-document (read-text-file
-                                (merge-pathnames #P"docs/src/adoption.md"
+                                (merge-pathnames #P"docs/src/guide/adoption.md"
                                                  (uiop:getcwd))))
            (ai-discovery-document (read-text-file
-                                    (merge-pathnames #P"docs/src/ai-discovery.md"
+                                    (merge-pathnames #P"docs/src/guide/ai-discovery.md"
                                                      (uiop:getcwd))))
            (ci-document (read-text-file
-                         (merge-pathnames #P"docs/src/reporters-and-ci.md"
+                         (merge-pathnames #P"docs/src/guide/reporters-and-ci.md"
                                           (uiop:getcwd))))
            (normalized-ci-document (normalize-shell-text ci-document))
            (metadata (cl-weave/metadata:framework-metadata))

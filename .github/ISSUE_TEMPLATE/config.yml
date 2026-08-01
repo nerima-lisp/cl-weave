@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Support policy
-    url: https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md
+    url: https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/support-policy.md
     about: Check whether the request belongs in issue tracking and what detail is required.
   - name: Security reporting
     url: https://github.com/nerima-lisp/cl-weave/security/advisories/new
     about: Report vulnerabilities through the private security contact path.
   - name: Issue reporting guide
-    url: https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md
+    url: https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/issue-reporting.md
     about: Review the canonical reproduction format before filing a bug.

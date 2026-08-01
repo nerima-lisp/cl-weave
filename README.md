@@ -36,9 +36,8 @@ The source for that site lives in [docs/src/](docs/src/).
 nix run . -- run cl-weave/test
 ```
 
-See [Quick Start](https://nerima-lisp.github.io/cl-weave/quick-start/) for
-more CLI examples and [Installation](https://nerima-lisp.github.io/cl-weave/installation/)
-for every install path.
+See [Getting Started](https://nerima-lisp.github.io/cl-weave/getting-started/) for
+every install path and more CLI examples.
 
 ## Install
 
@@ -60,10 +59,9 @@ inputs.cl-weave = {
 
 ## Documentation
 
-- [Installation](https://nerima-lisp.github.io/cl-weave/installation/)
-- [Quick Start](https://nerima-lisp.github.io/cl-weave/quick-start/)
-- [DSL Guide](https://nerima-lisp.github.io/cl-weave/dsl-guide/)
-- [API Reference](https://nerima-lisp.github.io/cl-weave/api-reference/)
+- [Getting Started](https://nerima-lisp.github.io/cl-weave/getting-started/)
+- [DSL Guide](https://nerima-lisp.github.io/cl-weave/guide/dsl-guide/)
+- [API Reference](https://nerima-lisp.github.io/cl-weave/reference/api/)
 
 ## Development
 
@@ -77,7 +75,7 @@ nix fmt              # format Nix sources (treefmt)
 
 Tests live in `t/` under the `cl-weave/test` system, and `run-tests.lisp` at the
 repository root is the Lisp-level entry point. See
-[Development](https://nerima-lisp.github.io/cl-weave/development/) for the full
+[Development](https://nerima-lisp.github.io/cl-weave/project/development/) for the full
 workflow.
 
 ## Contributing
@@ -85,12 +83,12 @@ workflow.
 See the org-wide [CONTRIBUTING](https://github.com/nerima-lisp/.github/blob/main/CONTRIBUTING.md)
 guide, the [package standard](https://github.com/nerima-lisp/.github/blob/main/PACKAGE_STANDARD.md),
 and this project's
-[Development](https://nerima-lisp.github.io/cl-weave/development/) page.
+[Development](https://nerima-lisp.github.io/cl-weave/project/development/) page.
 
 ## Support
 
 See [SUPPORT](https://github.com/nerima-lisp/.github/blob/main/SUPPORT.md) and
-this project's [Support Policy](https://nerima-lisp.github.io/cl-weave/support-policy/)
+this project's [Support Policy](https://nerima-lisp.github.io/cl-weave/project/support-policy/)
 for the canonical support boundaries.
 
 Report vulnerabilities through

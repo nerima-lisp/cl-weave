@@ -37,7 +37,7 @@ table. Each entry exposes `name`, `kind`, `installCommand`, `runCommand`,
 `scope`, and `references`, so tooling should prefer it over scraping README
 examples when deciding how to install or invoke `cl-weave`. The human-facing
 verification and scope policy for those channels lives in
-`docs/src/distribution-policy.md`.
+`docs/src/project/distribution-policy.md`.
 
 ```json
 {
@@ -48,18 +48,18 @@ verification and scope policy for those channels lives in
   "bugTracker": "https://github.com/nerima-lisp/cl-weave/issues",
   "license": "MIT",
   "policyDocuments": [
-    "docs/src/community-health.md",
-    "docs/src/distribution-policy.md",
-    "docs/src/governance.md",
-    "docs/src/issue-reporting.md",
-    "docs/src/maintenance-policy.md",
-    "docs/src/project-scope.md",
-    "docs/src/pull-request-template.md",
-    "docs/src/release-process.md",
-    "docs/src/runtime-support.md",
-    "docs/src/support-policy.md",
-    "docs/src/triage-policy.md",
-    "docs/src/versioning-policy.md"
+    "docs/src/project/community-health.md",
+    "docs/src/project/distribution-policy.md",
+    "docs/src/project/governance.md",
+    "docs/src/project/issue-reporting.md",
+    "docs/src/project/maintenance-policy.md",
+    "docs/src/project/project-scope.md",
+    "docs/src/project/pull-request-template.md",
+    "docs/src/project/release-process.md",
+    "docs/src/reference/runtime-support.md",
+    "docs/src/project/support-policy.md",
+    "docs/src/project/triage-policy.md",
+    "docs/src/project/versioning-policy.md"
   ],
   "referenceDocuments": [
     {
@@ -69,12 +69,12 @@ verification and scope policy for those channels lives in
     },
     {
       "name": "ai-contract",
-      "path": "docs/src/ai-contract.md",
+      "path": "docs/src/reference/ai-contract.md",
       "description": "Machine-readable contract and metadata normalization guide."
     },
     {
       "name": "adoption-guide",
-      "path": "docs/src/adoption.md",
+      "path": "docs/src/guide/adoption.md",
       "description": "Native adoption guide and downstream integration plan."
     },
     {
@@ -90,7 +90,7 @@ verification and scope policy for those channels lives in
       "installCommand": [],
       "runCommand": ["nix", "run", ".", "--", "run", "cl-weave/test"],
       "scope": "Run the bundled ASDF test system through the packaged CLI.",
-      "references": ["README.md", "docs/src/distribution-policy.md"]
+      "references": ["README.md", "docs/src/project/distribution-policy.md"]
     },
     {
       "name": "nix-local-cli",
@@ -98,7 +98,7 @@ verification and scope policy for those channels lives in
       "installCommand": ["nix", "profile", "install", "."],
       "runCommand": ["nix", "run", ".", "--", "--help"],
       "scope": "Install and run the packaged CLI from the current checkout.",
-      "references": ["README.md", "docs/src/distribution-policy.md"]
+      "references": ["README.md", "docs/src/project/distribution-policy.md"]
     },
     {
       "name": "nix-remote-cli",
@@ -106,7 +106,7 @@ verification and scope policy for those channels lives in
       "installCommand": ["nix", "profile", "install", "github:nerima-lisp/cl-weave"],
       "runCommand": ["nix", "run", "github:nerima-lisp/cl-weave", "--", "--help"],
       "scope": "Install and run the packaged CLI without cloning the repository.",
-      "references": ["README.md", "docs/src/distribution-policy.md"]
+      "references": ["README.md", "docs/src/project/distribution-policy.md"]
     }
   ],
   "supportChannels": [
@@ -125,7 +125,7 @@ verification and scope policy for those channels lives in
     {
       "name": "support-policy",
       "kind": "document",
-      "target": "docs/src/support-policy.md",
+      "target": "docs/src/project/support-policy.md",
       "scope": "Canonical support boundaries, report contents, and escalation guidance."
     }
   ],
@@ -136,8 +136,8 @@ verification and scope policy for those channels lives in
       "path": ".github/ISSUE_TEMPLATE/bug_report.md",
       "purpose": "Structured bug intake that routes reporters to the canonical issue reporting guide.",
       "references": [
-        "docs/src/community-health.md",
-        "docs/src/issue-reporting.md"
+        "docs/src/project/community-health.md",
+        "docs/src/project/issue-reporting.md"
       ],
       "requiredSections": [
         "Summary",
@@ -155,9 +155,9 @@ verification and scope policy for those channels lives in
       "path": ".github/ISSUE_TEMPLATE/feature_request.md",
       "purpose": "Structured feature intake that reinforces project scope and validation expectations.",
       "references": [
-        "docs/src/community-health.md",
-        "docs/src/project-scope.md",
-        "docs/src/support-policy.md"
+        "docs/src/project/community-health.md",
+        "docs/src/project/project-scope.md",
+        "docs/src/project/support-policy.md"
       ],
       "requiredSections": [
         "Problem",
@@ -174,15 +174,15 @@ verification and scope policy for those channels lives in
       "path": ".github/ISSUE_TEMPLATE/config.yml",
       "purpose": "GitHub issue chooser configuration that redirects support and security traffic to canonical policies.",
       "references": [
-        "docs/src/community-health.md",
-        "docs/src/support-policy.md",
-        "docs/src/issue-reporting.md"
+        "docs/src/project/community-health.md",
+        "docs/src/project/support-policy.md",
+        "docs/src/project/issue-reporting.md"
       ],
       "requiredSections": [],
       "contactLinks": [
         {
           "name": "Support policy",
-          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md",
+          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/support-policy.md",
           "purpose": "Check whether the request belongs in issue tracking and what detail is required."
         },
         {
@@ -192,7 +192,7 @@ verification and scope policy for those channels lives in
         },
         {
           "name": "Issue reporting guide",
-          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md",
+          "target": "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/issue-reporting.md",
           "purpose": "Review the canonical reproduction format before filing a bug."
         }
       ]
@@ -203,8 +203,8 @@ verification and scope policy for those channels lives in
       "path": ".github/pull_request_template.md",
       "purpose": "Default PR body that mirrors the canonical review checklist and public-surface prompts.",
       "references": [
-        "docs/src/community-health.md",
-        "docs/src/pull-request-template.md"
+        "docs/src/project/community-health.md",
+        "docs/src/project/pull-request-template.md"
       ],
       "requiredSections": [
         "Summary",
@@ -220,8 +220,8 @@ verification and scope policy for those channels lives in
       "path": ".github/CODEOWNERS",
       "purpose": "Review ownership declaration for repository-wide changes.",
       "references": [
-        "docs/src/community-health.md",
-        "docs/src/governance.md"
+        "docs/src/project/community-health.md",
+        "docs/src/project/governance.md"
       ],
       "requiredSections": [],
       "contactLinks": []
@@ -239,11 +239,11 @@ verification and scope policy for those channels lives in
     "stage": "stable",
     "status": "active",
     "supportedLine": "main",
-    "supportDocument": "docs/src/support-policy.md",
-    "versioningDocument": "docs/src/versioning-policy.md"
+    "supportDocument": "docs/src/project/support-policy.md",
+    "versioningDocument": "docs/src/project/versioning-policy.md"
   },
   "governance": {
-    "policyDocument": "docs/src/governance.md",
+    "policyDocument": "docs/src/project/governance.md",
     "reviewOwnership": ".github/CODEOWNERS",
     "maintainerResponsibilities": [
       "Triaging issues and pull requests against the documented project scope and support boundaries.",
@@ -253,17 +253,17 @@ verification and scope policy for those channels lives in
       "Handling security-sensitive reports through private GitHub security advisories."
     ],
     "decisionDocuments": [
-      "docs/src/project-scope.md",
-      "docs/src/support-policy.md",
-      "docs/src/triage-policy.md",
-      "docs/src/versioning-policy.md",
-      "docs/src/release-process.md"
+      "docs/src/project/project-scope.md",
+      "docs/src/project/support-policy.md",
+      "docs/src/project/triage-policy.md",
+      "docs/src/project/versioning-policy.md",
+      "docs/src/project/release-process.md"
     ],
     "releaseAuthority": "Maintainers cut releases from the validated default branch state only.",
     "continuityExpectation": "When the maintainer set changes, update governance, linked policies, and machine-readable metadata in the same patch."
   },
   "runtimeSupport": {
-    "policyDocument": "docs/src/runtime-support.md",
+    "policyDocument": "docs/src/reference/runtime-support.md",
     "primaryImplementation": "SBCL",
     "supportedTargets": [
       {
@@ -287,26 +287,26 @@ verification and scope policy for those channels lives in
     ]
   },
   "releaseProcess": {
-    "policyDocument": "docs/src/release-process.md",
+    "policyDocument": "docs/src/project/release-process.md",
     "releaseStage": "stable",
     "checklist": [
       "Run the full test suite.",
       "Run nix flake check --print-build-logs when Nix is available.",
       "Summarize user-visible changes in the release notes.",
-      "Check that README.md and docs/src/maintenance-policy.md still match the current workflow.",
-      "Review docs/src/pull-request-template.md and .github/pull_request_template.md so release-bound changes still capture public-surface notes, validation commands, and follow-up risk in a consistent format.",
+      "Check that README.md and docs/src/project/maintenance-policy.md still match the current workflow.",
+      "Review docs/src/project/pull-request-template.md and .github/pull_request_template.md so release-bound changes still capture public-surface notes, validation commands, and follow-up risk in a consistent format.",
       "Verify that cl-weave metadata still advertises the expected package links, reporter list, and schema versions.",
-      "Verify that docs/src/distribution-policy.md still matches the documented source and Nix install paths.",
+      "Verify that docs/src/project/distribution-policy.md still matches the documented source and Nix install paths.",
       "Confirm the release notes mention any intentional public-surface breaks or migration steps."
     ],
     "contractSyncRequirements": [
       "Keep machine-readable metadata and human-facing documentation in sync.",
-      "Keep distributionChannels, README.md, and docs/src/distribution-policy.md synchronized when install paths change.",
-      "Update tests and docs/src/ai-contract.md when a machine-readable contract changes."
+      "Keep distributionChannels, README.md, and docs/src/project/distribution-policy.md synchronized when install paths change.",
+      "Update tests and docs/src/reference/ai-contract.md when a machine-readable contract changes."
     ]
   },
   "continuousIntegration": {
-    "policyDocument": "docs/src/release-process.md",
+    "policyDocument": "docs/src/project/release-process.md",
     "provider": "github-actions",
     "workflowPath": ".github/workflows/ci.yml",
     "jobName": "check",
@@ -432,7 +432,7 @@ verification and scope policy for those channels lives in
       "summary": "Hierarchical and table-driven test registration.",
       "publicApis": ["describe", "it", "describe-each", "it-each", "it-concurrent", "it-property", "it-isolated"],
       "qualityGates": ["flake-check", "filtered-smoke", "plan-artifact"],
-      "documentation": ["README.md", "docs/src/ai-contract.md"]
+      "documentation": ["README.md", "docs/src/reference/ai-contract.md"]
     }
   ],
   "environment": ["CL_WEAVE_REPORTER"],
@@ -734,7 +734,7 @@ is active — one object per frame with `index`, `kind` (`assertion`,
 `pass`, and `elapsedInternalTime` — and is `[]` otherwise. `replaySeed` is the
 per-test deterministic seed used when `--random-seed` (or `*test-random-seed*`)
 is set, or `null`. Both are nested inside each event, so schema v6 is unchanged.
-See [Time-Travel Debugging](time-travel-debugging.md).
+See [Time-Travel Debugging](../guide/time-travel-debugging.md).
 
 `location` is source metadata captured by the `it` family of macros. Portable
 Common Lisp does not expose reliable source line numbers across implementations,

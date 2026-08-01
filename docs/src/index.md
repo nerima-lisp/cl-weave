@@ -15,8 +15,8 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     nix run github:nerima-lisp/cl-weave -- --help   # run without installing
     ```
 
-    Continue with [Installation](installation.md) → [Quick Start](quick-start.md)
-    → [DSL Guide](dsl-guide.md).
+    Continue with [Installation](getting-started.md) → [Quick Start](getting-started.md)
+    → [DSL Guide](guide/dsl-guide.md).
 
 ## Explore the docs
 
@@ -29,9 +29,9 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     Every Nix install path, your first passing suite, and a step-by-step guide
     to adopting cl-weave in an existing ASDF project.
 
-    [:octicons-arrow-right-24: Installation](installation.md) ·
-    [Quick Start](quick-start.md) ·
-    [Adoption](adoption.md)
+    [:octicons-arrow-right-24: Installation](getting-started.md) ·
+    [Quick Start](getting-started.md) ·
+    [Adoption](guide/adoption.md)
 
 -   :material-book-open-variant:{ .lg .middle } &nbsp; **Writing Tests**
 
@@ -40,9 +40,9 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     Suites, cases, fixtures, focus/skip/todo, retry/timeout, concurrency, and
     compile-time table tests — the full `describe` / `it` / `expect` surface.
 
-    [:octicons-arrow-right-24: DSL Guide](dsl-guide.md) ·
-    [Assertions](assertions.md) ·
-    [Mocking](mocking.md)
+    [:octicons-arrow-right-24: DSL Guide](guide/dsl-guide.md) ·
+    [Assertions](guide/assertions.md) ·
+    [Mocking](guide/mocking.md)
 
 -   :material-flask-outline:{ .lg .middle } &nbsp; **Advanced Testing**
 
@@ -51,9 +51,9 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     Property-based testing with shrinking, form-level mutation testing, and
     time-travel debugging over a recorded execution journal.
 
-    [:octicons-arrow-right-24: Property Testing](property-testing.md) ·
-    [Mutation](mutation-testing.md) ·
-    [Time-Travel](time-travel-debugging.md)
+    [:octicons-arrow-right-24: Property Testing](guide/property-testing.md) ·
+    [Mutation](guide/mutation-testing.md) ·
+    [Time-Travel](guide/time-travel-debugging.md)
 
 -   :material-cog-outline:{ .lg .middle } &nbsp; **Running & CI**
 
@@ -62,18 +62,18 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     Filtering, sharding, sequencing, bail, and watch mode; spec/JSON/TAP/JUnit
     reporters; SBCL coverage artifacts; and the machine-readable AI contract.
 
-    [:octicons-arrow-right-24: Test Execution](test-execution.md) ·
-    [Reporters & CI](reporters-and-ci.md) ·
-    [AI Discovery](ai-discovery.md)
+    [:octicons-arrow-right-24: Test Execution](guide/test-execution.md) ·
+    [Reporters & CI](guide/reporters-and-ci.md) ·
+    [AI Discovery](guide/ai-discovery.md)
 
 </div>
 
 ## Status
 
 Stable (`1.0`). The capability list below is the committed public surface, and
-it is validated by the CI entrypoints documented in [Reporters and CI](reporters-and-ci.md)
+it is validated by the CI entrypoints documented in [Reporters and CI](guide/reporters-and-ci.md)
 on Linux. Within the `1.x` series, changes stay backward-compatible under
-[Semantic Versioning](versioning-policy.md); breaking changes ship only in a new
+[Semantic Versioning](project/versioning-policy.md); breaking changes ship only in a new
 major version:
 
 - `describe` / `it` hierarchical test DSL
@@ -118,36 +118,36 @@ major version:
 
 ## Guide Map
 
-- [DSL Guide](dsl-guide.md) — suites, cases, fixtures, skipping, focus/todo,
+- [DSL Guide](guide/dsl-guide.md) — suites, cases, fixtures, skipping, focus/todo,
   retry/timeout, concurrency, and table tests.
-- [Assertions and Matchers](assertions.md) — `expect`, built-in and custom
+- [Assertions and Matchers](guide/assertions.md) — `expect`, built-in and custom
   matchers, performance, and numeric assertions.
-- [Property Testing](property-testing.md) — `it-property` and the built-in
+- [Property Testing](guide/property-testing.md) — `it-property` and the built-in
   generator library.
-- [Mutation Testing](mutation-testing.md) — mutation operators and CI score
+- [Mutation Testing](guide/mutation-testing.md) — mutation operators and CI score
   gates.
-- [Mocking](mocking.md) — mock functions, spies, and call-history matchers.
-- [Benchmarking](benchmarking.md) — the `benchmark` / `measure` micro-benchmark
+- [Mocking](guide/mocking.md) — mock functions, spies, and call-history matchers.
+- [Benchmarking](guide/benchmarking.md) — the `benchmark` / `measure` micro-benchmark
   helper and its timing statistics.
-- [Time-Travel Debugging](time-travel-debugging.md) — the execution journal,
+- [Time-Travel Debugging](guide/time-travel-debugging.md) — the execution journal,
   deterministic replay, single-test replay, and interactive breakpoints.
-- [Test Execution](test-execution.md) — filtering, sharding, sequencing,
+- [Test Execution](guide/test-execution.md) — filtering, sharding, sequencing,
   listing, declarative plan queries, bail, subprocess isolation, and watch mode.
-- [Logic Programming](logic-programming.md) — the unification/backtracking
+- [Logic Programming](guide/logic-programming.md) — the unification/backtracking
   query engine behind declarative test-plan queries.
-- [Reporters and CI](reporters-and-ci.md) — reporter formats, coverage, and
+- [Reporters and CI](guide/reporters-and-ci.md) — reporter formats, coverage, and
   the GitHub Actions pipeline.
-- [AI Discovery](ai-discovery.md) — the machine-readable metadata contract
+- [AI Discovery](guide/ai-discovery.md) — the machine-readable metadata contract
   for agents and generators.
 
 ## Reference Map
 
-- [API Reference](api-reference.md) — every exported symbol, grouped by concept.
-- [AI Contract](ai-contract.md) — the frozen artifact and metadata schemas.
-- [Runtime Support](runtime-support.md) — supported implementations and
+- [API Reference](reference/api.md) — every exported symbol, grouped by concept.
+- [AI Contract](reference/ai-contract.md) — the frozen artifact and metadata schemas.
+- [Runtime Support](reference/runtime-support.md) — supported implementations and
   platforms.
-- [Doctor Report](doctor-report.md) — the `doctor` health checks.
-- [Development](development.md) — build, test, coverage and formatting commands.
+- [Doctor Report](reference/doctor-report.md) — the `doctor` health checks.
+- [Development](project/development.md) — build, test, coverage and formatting commands.
 - [GitHub Releases](https://github.com/nerima-lisp/cl-weave/releases) — the
   release history.
 
@@ -173,10 +173,10 @@ Running `direnv allow` loads the devShell automatically.
 
 ## Support
 
-Use [Support Policy](support-policy.md) for the canonical support
+Use [Support Policy](project/support-policy.md) for the canonical support
 boundaries.
 
-Use [Issue Reporting Guide](issue-reporting.md) for reproducible bugs
+Use [Issue Reporting Guide](project/issue-reporting.md) for reproducible bugs
 and behavior questions.
 
 Use [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new)
@@ -184,26 +184,26 @@ for vulnerability reporting. Do not put exploit details in a public issue.
 
 ## Project Operations
 
-- Adoption guide: [docs/src/adoption.md](adoption.md)
-- AI contract: [docs/src/ai-contract.md](ai-contract.md)
-- Issue reporting guide: [docs/src/issue-reporting.md](issue-reporting.md)
-- Pull request guidance: [docs/src/pull-request-template.md](pull-request-template.md)
+- Adoption guide: [docs/src/guide/adoption.md](guide/adoption.md)
+- AI contract: [docs/src/reference/ai-contract.md](reference/ai-contract.md)
+- Issue reporting guide: [docs/src/project/issue-reporting.md](project/issue-reporting.md)
+- Pull request guidance: [docs/src/project/pull-request-template.md](project/pull-request-template.md)
 - Pull request form: [.github/pull_request_template.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/pull_request_template.md)
 - Pull request queue: <https://github.com/nerima-lisp/cl-weave/pulls>
 - Bug report form: [.github/ISSUE_TEMPLATE/bug_report.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/bug_report.md)
 - Feature request form: [.github/ISSUE_TEMPLATE/feature_request.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/feature_request.md)
 - Issue template routing: [.github/ISSUE_TEMPLATE/config.yml](https://github.com/nerima-lisp/cl-weave/blob/main/.github/ISSUE_TEMPLATE/config.yml)
-- Community health contract: [docs/src/community-health.md](community-health.md)
+- Community health contract: [docs/src/project/community-health.md](project/community-health.md)
 - Code ownership: [.github/CODEOWNERS](https://github.com/nerima-lisp/cl-weave/blob/main/.github/CODEOWNERS)
-- Governance: [docs/src/governance.md](governance.md)
-- Maintenance policy: [docs/src/maintenance-policy.md](maintenance-policy.md)
-- Distribution policy: [docs/src/distribution-policy.md](distribution-policy.md)
-- Support policy: [docs/src/support-policy.md](support-policy.md)
-- Runtime support: [docs/src/runtime-support.md](runtime-support.md)
-- Release process: [docs/src/release-process.md](release-process.md)
-- Versioning policy: [docs/src/versioning-policy.md](versioning-policy.md)
-- Project scope: [docs/src/project-scope.md](project-scope.md)
-- Triage policy: [docs/src/triage-policy.md](triage-policy.md)
+- Governance: [docs/src/project/governance.md](project/governance.md)
+- Maintenance policy: [docs/src/project/maintenance-policy.md](project/maintenance-policy.md)
+- Distribution policy: [docs/src/project/distribution-policy.md](project/distribution-policy.md)
+- Support policy: [docs/src/project/support-policy.md](project/support-policy.md)
+- Runtime support: [docs/src/reference/runtime-support.md](reference/runtime-support.md)
+- Release process: [docs/src/project/release-process.md](project/release-process.md)
+- Versioning policy: [docs/src/project/versioning-policy.md](project/versioning-policy.md)
+- Project scope: [docs/src/project/project-scope.md](project/project-scope.md)
+- Triage policy: [docs/src/project/triage-policy.md](project/triage-policy.md)
 - Security reporting: <https://github.com/nerima-lisp/cl-weave/security/advisories/new>
 - Issue tracker: <https://github.com/nerima-lisp/cl-weave/issues>
 - Release notes: <https://github.com/nerima-lisp/cl-weave/releases>

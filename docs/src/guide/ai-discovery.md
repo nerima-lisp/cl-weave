@@ -35,7 +35,7 @@ checkout execution, local Nix packaging, and remote Nix packaging. Agents
 should prefer its `installCommand` and `runCommand` vectors over inferring
 entrypoints from surrounding prose examples. The maintainer-facing verification
 and scope boundary for those channels lives in
-[Distribution Policy](distribution-policy.md).
+[Distribution Policy](../project/distribution-policy.md).
 
 `capabilityMatrix` is the readiness table: each entry links a high-level
 feature to implemented status, representative public APIs, validation gates,
@@ -43,6 +43,6 @@ and canonical documentation. The complete artifact and capability lists are
 intentionally discovered from the command output; documentation examples are
 illustrative.
 
-See [AI Contract](ai-contract.md) for the full machine-readable normalization
-contract, and [Doctor Report](doctor-report.md) for the self-diagnostic
+See [AI Contract](../reference/ai-contract.md) for the full machine-readable normalization
+contract, and [Doctor Report](../reference/doctor-report.md) for the self-diagnostic
 artifact shape.

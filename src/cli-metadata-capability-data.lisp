@@ -45,14 +45,14 @@
      :public-apis ("describe" "it" "describe-each" "it-each"
                    "it-concurrent" "it-property" "it-isolated")
      :quality-gates ("flake-check" "filtered-smoke" "plan-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "describe-it-dsl"
      :status "implemented"
      :summary
      "Core describe/it forms and each-style variants define the primary suite authoring surface."
      :public-apis ("describe" "it" "describe-each" "it-each")
      :quality-gates ("flake-check" "filtered-smoke" "plan-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "expect-matchers"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -61,7 +61,7 @@
      :public-apis ("expect" "expect-not" "expect-resolves" "expect-rejects"
                    "expect-assertions" "expect-has-assertions" "matcher-metadata")
      :quality-gates ("flake-check" "cli-json-results")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "smart-s-expression-assertions"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -69,7 +69,7 @@
                             "multiple values, and type checks through matcher chains.")
      :public-apis ("expect" "expect-not" "signals" "finishes")
      :quality-gates ("flake-check" "cli-json-results")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "fixtures-and-restarts"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -78,7 +78,7 @@
      :public-apis ("before-all" "after-all" "before-each" "after-each"
                    "around-each")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "fixtures"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -86,7 +86,7 @@
                             "reusable fixture setup and teardown.")
      :public-apis ("before-all" "after-all" "before-each" "after-each")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "around-each-continuations"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -95,14 +95,14 @@
      :public-apis ("around-each" "with-continuation-result"
                    "with-continuation-values")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "mocks-and-spies"
      :status "implemented"
      :summary "Mock functions and spies with call/result metadata and restoration helpers."
      :public-apis ("make-mock-function" "spy-on" "dispose-mock"
                    "clear-all-mocks" "mock-calls" "mock-results")
      :quality-gates ("flake-check" "cli-json-results")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "mock-functions"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -112,7 +112,7 @@
                    "dispose-mock" "mock-restore" "mock-calls"
                    "mock-results")
      :quality-gates ("flake-check" "cli-json-results")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "snapshots"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -121,7 +121,7 @@
      :public-apis ("with-snapshot-updates" "snapshot-entries"
                    "snapshot-value")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "property-and-mutation"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -130,7 +130,7 @@
      :public-apis ("it-property" "gen-integer" "gen-string"
                    "run-mutations" "list-mutation-operators")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "property-tests"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -140,14 +140,14 @@
                    "gen-list" "gen-map" "gen-vector"
                    "gen-state-machine")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "mutation-testing"
      :status "implemented"
      :summary "Mutation-test APIs surface operator inventory, mutation runs, and score thresholds."
      :public-apis ("run-mutations" "list-mutation-operators"
                    "assert-mutation-score")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "structured-reporting"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -157,7 +157,7 @@
                    "framework-metadata")
      :quality-gates ("json-results-artifact" "jsonl-events-artifact"
                      "tap-artifact" "junit-artifact" "plan-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "subprocess-isolation"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -165,7 +165,7 @@
                             "failures, and process-boundary hazards.")
      :public-apis ("it-isolated" "run-isolated")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "coverage"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -175,7 +175,7 @@
      :public-apis ("run-all" "reset-coverage" "save-coverage"
                    "coverage-support-available-p")
      :quality-gates ("flake-check" "coverage-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "watch-and-parallelism"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -183,7 +183,7 @@
                             "controls, and bounded adjacent concurrent batches.")
      :public-apis ("run" "run-all" "list-tests")
      :quality-gates ("watch-once-artifact" "filtered-smoke" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "watch"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -191,7 +191,7 @@
                             "iteration loops for local development.")
      :public-apis ("watch-system" "run-system")
      :quality-gates ("watch-once-artifact" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "sharding"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -200,7 +200,7 @@
      :public-apis ("run" "run-all" "list-tests" "run-system"
                    "watch-system")
      :quality-gates ("plan-artifact" "watch-once-artifact" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "isolation-and-cps"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -208,7 +208,7 @@
                             "helpers for async-style test flows.")
      :public-apis ("it-isolated" "expect-poll")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "artifact-schemas"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -217,7 +217,7 @@
      :public-apis ("reporter-artifact-schemas" "framework-metadata")
      :quality-gates ("ai-metadata-artifact" "json-results-artifact"
                      "jsonl-events-artifact" "plan-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "sequence-ordering"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -225,7 +225,7 @@
                             "while allowing explicit run-order control.")
      :public-apis ("run" "run-all" "list-tests" "collect-test-plan")
      :quality-gates ("plan-artifact" "filtered-smoke" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "retry"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -233,7 +233,7 @@
                             "that preserve retry behavior in artifacts.")
      :public-apis ("retry-test" "run" "run-all" "list-tests")
      :quality-gates ("plan-artifact" "cli-json-results" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "timeout"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -242,7 +242,7 @@
      :public-apis ("test-timeout" "test-timeout-ms" "run" "run-all"
                    "list-tests")
      :quality-gates ("plan-artifact" "cli-json-results" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "mop-architecture-assertions"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -250,7 +250,7 @@
                             "slots and specialized methods.")
      :public-apis ("list-matchers" "matcher-metadata")
      :quality-gates ("flake-check" "ai-metadata-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "logic-test-plan"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -259,7 +259,7 @@
      :public-apis ("collect-test-plan" "query-test-plan" "test-plan-facts"
                    "test-plan-where")
      :quality-gates ("plan-artifact" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "ai-discovery-metadata"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -268,7 +268,7 @@
      :public-apis ("reporter-artifact-schemas" "framework-metadata"
                    "list-matchers" "list-mutation-operators")
      :quality-gates ("ai-metadata-artifact" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "public-package-exports"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -277,14 +277,14 @@
      :public-apis ("framework-metadata" "list-matchers"
                    "list-mutation-operators")
      :quality-gates ("ai-metadata-artifact" "flake-check")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "cps-continuation-helpers"
      :status "implemented"
      :summary "Continuation helpers bridge thunk-based CPS flows with polling assertions."
      :public-apis ("with-continuation-result" "with-continuation-values"
                    "expect-poll")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/ai-contract.md"))
+     :documentation ("README.md" "docs/src/reference/ai-contract.md"))
     (:name "time-travel-debugging"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -300,7 +300,7 @@
                    "record-journal-frame" "journal-frame-line-for-kind"
                    "journal-frame-from-plist" "journal-frames-from-plists")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+     :documentation ("README.md" "docs/src/guide/time-travel-debugging.md"))
     (:name "deterministic-replay"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -309,7 +309,7 @@
                             "for isolating failures.")
      :public-apis ("*test-random-seed*" "replay-test")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+     :documentation ("README.md" "docs/src/guide/time-travel-debugging.md"))
     (:name "soft-assertions"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -317,7 +317,7 @@
                             "all failures together instead of stopping at the first.")
      :public-apis ("with-soft-assertions")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/assertions.md"))
+     :documentation ("README.md" "docs/src/guide/assertions.md"))
     (:name "interactive-breakpoints"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -328,7 +328,7 @@
      :public-apis ("*journal-breakpoint*" "journal-breakpoint-hit"
                    "journal-breakpoint-hit-frame")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/time-travel-debugging.md"))
+     :documentation ("README.md" "docs/src/guide/time-travel-debugging.md"))
     (:name "journal-logic-queries"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -338,5 +338,5 @@
                             "same Prolog-style engine and rule composition as test-plan-where.")
      :public-apis ("journal-facts" "journal-where" "query-journal")
      :quality-gates ("flake-check" "json-results-artifact")
-     :documentation ("README.md" "docs/src/time-travel-debugging.md"
-                     "docs/src/logic-programming.md"))))
+     :documentation ("README.md" "docs/src/guide/time-travel-debugging.md"
+                     "docs/src/guide/logic-programming.md"))))

@@ -17,7 +17,7 @@ Maintainers are responsible for:
 - enforcing security handling through [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new)
 
 Repository-wide review ownership is declared in
-[../.github/CODEOWNERS](../../.github/CODEOWNERS). CODEOWNERS routing is the
+[`.github/CODEOWNERS`](https://github.com/nerima-lisp/cl-weave/blob/main/.github/CODEOWNERS). CODEOWNERS routing is the
 default review path, but maintainers may ask for additional review when a
 change affects public contracts, release process, or downstream adoption.
 

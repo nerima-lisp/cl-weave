@@ -10,7 +10,7 @@
                       :reporters '("custom-reporter")
                       :list-reporters '("custom-list-reporter")
                       :runtime-support
-                      (list :policy-document "docs/src/runtime-support.md"
+                      (list :policy-document "docs/src/reference/runtime-support.md"
                             :primary-implementation "SBCL"
                             :supported-targets
                             (list (list :implementation "SBCL"
@@ -23,22 +23,22 @@
                             :implementation-specific-features
                             '("custom runtime feature"))
                       :governance
-                      (list :policy-document "docs/src/governance.md"
+                      (list :policy-document "docs/src/project/governance.md"
                             :review-ownership ".github/CODEOWNERS"
                             :maintainer-responsibilities
                             '("custom maintainer responsibility")
                             :decision-documents
-                            '("docs/src/project-scope.md")
+                            '("docs/src/project/project-scope.md")
                             :release-authority "custom release authority"
                             :continuity-expectation "custom continuity expectation")
                       :release-process
-                      (list :policy-document "docs/src/release-process.md"
+                      (list :policy-document "docs/src/project/release-process.md"
                             :release-stage "stable"
                             :checklist '("custom release check")
                             :contract-sync-requirements
                             '("custom sync requirement"))
                       :continuous-integration
-                      (list :policy-document "docs/src/release-process.md"
+                      (list :policy-document "docs/src/project/release-process.md"
                             :provider "github-actions"
                             :workflow-path ".github/workflows/ci.yml"
                             :job-name "nix"
@@ -162,7 +162,7 @@
            (ci (getf metadata :continuous-integration)))
       (expect (getf metadata :schema-version) :to-be 23)
       (expect ci :not :to-be nil)
-      (expect (getf ci :policy-document) :to-equal "docs/src/release-process.md")
+      (expect (getf ci :policy-document) :to-equal "docs/src/project/release-process.md")
       (expect (getf ci :provider) :to-equal "github-actions")
       (expect (getf ci :workflow-path) :to-equal ".github/workflows/ci.yml")
       (expect (getf ci :job-name) :to-equal "check")
@@ -482,28 +482,28 @@
                                       (uiop:getcwd)))))
            (distribution-document-raw
              (read-text-file
-              (merge-pathnames #P"docs/src/distribution-policy.md"
+              (merge-pathnames #P"docs/src/project/distribution-policy.md"
                                (uiop:getcwd))))
            (distribution-document (normalize-markdown-text
                                    distribution-document-raw))
            (ai-contract (normalize-markdown-text
                          (read-text-file
-                          (merge-pathnames #P"docs/src/ai-contract.md"
+                          (merge-pathnames #P"docs/src/reference/ai-contract.md"
                                            (uiop:getcwd))))))
       (expect (getf metadata :policy-documents)
-              :to-contain "docs/src/distribution-policy.md")
-      (expect readme :to-contain "docs/src/distribution-policy.md")
+              :to-contain "docs/src/project/distribution-policy.md")
+      (expect readme :to-contain "docs/src/project/distribution-policy.md")
       (expect distribution-document :to-contain "# Distribution Policy")
       (expect distribution-document :to-contain "distributionChannels")
       (expect distribution-document :to-contain "README.md")
-      (expect distribution-document :to-contain "docs/src/ai-contract.md")
+      (expect distribution-document :to-contain "docs/src/reference/ai-contract.md")
       (expect distribution-document :to-contain "flake.nix")
       (expect distribution-document :to-contain "SBOMs")
       (expect distribution-document :to-contain "provenance attestations")
       (dolist (channel channels)
         (expect distribution-document :to-contain (getf channel :name))
         (dolist (reference (getf channel :references))
-          (unless (string= reference "docs/src/distribution-policy.md")
+          (unless (string= reference "docs/src/project/distribution-policy.md")
             (expect distribution-document :to-contain reference)))
         (unless (null (getf channel :install-command))
           (expect (markdown-contains-command-p distribution-document-raw
@@ -512,7 +512,7 @@
         (expect (markdown-contains-command-p distribution-document-raw
                                              (getf channel :run-command))
                 :to-be t))
-      (expect ai-contract :to-contain "docs/src/distribution-policy.md")))
+      (expect ai-contract :to-contain "docs/src/project/distribution-policy.md")))
 
   (it "keeps the packaged CLI safe for parallel ASDF loads"
     ;; `--coverage` recompiles the system under test, and the sources a

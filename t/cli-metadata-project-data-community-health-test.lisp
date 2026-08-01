@@ -63,16 +63,16 @@
                 ".github/ISSUE_TEMPLATE/feature_request.md"
                 ".github/ISSUE_TEMPLATE/config.yml"
                 ".github/pull_request_template.md" ".github/CODEOWNERS"
-                "docs/src/community-health.md")
+                "docs/src/project/community-health.md")
      :required ((readme ("LICENSE"
                          ".github/ISSUE_TEMPLATE/bug_report.md"
                          ".github/ISSUE_TEMPLATE/feature_request.md"
                          ".github/ISSUE_TEMPLATE/config.yml"
                          ".github/pull_request_template.md" ".github/CODEOWNERS"
-                         "docs/src/community-health.md" "docs/src/governance.md"))))
+                         "docs/src/project/community-health.md" "docs/src/project/governance.md"))))
     ("keeps maintenance and versioning policies aligned with release expectations"
-     :documents ((maintenance-document #P"docs/src/maintenance-policy.md" :normalize t)
-                 (versioning-document #P"docs/src/versioning-policy.md" :normalize t))
+     :documents ((maintenance-document #P"docs/src/project/maintenance-policy.md" :normalize t)
+                 (versioning-document #P"docs/src/project/versioning-policy.md" :normalize t))
      :required ((maintenance-document ("public-surface discipline"
                                        "migration steps" "user-visible changes"))
                 (versioning-document ("additive only" "behavior-preserving"
@@ -97,10 +97,10 @@
            (entries (getf metadata :community-health))
            (document (normalize-markdown-text
                       (read-text-file
-                       (merge-pathnames #P"docs/src/community-health.md"
+                       (merge-pathnames #P"docs/src/project/community-health.md"
                                         (uiop:getcwd))))))
       (expect (getf metadata :policy-documents)
-              :to-contain "docs/src/community-health.md")
+              :to-contain "docs/src/project/community-health.md")
       (expect document :to-contain "# Community Health")
       (dolist (entry entries)
         (expect (probe-file (merge-pathnames (getf entry :path) (uiop:getcwd)))
@@ -109,7 +109,7 @@
         (dolist (reference (getf entry :references))
           (expect (probe-file (merge-pathnames reference (uiop:getcwd)))
                   :not :to-be nil)
-          (unless (string= reference "docs/src/community-health.md")
+          (unless (string= reference "docs/src/project/community-health.md")
             (expect document :to-contain reference)))
         (let ((entry-text (normalize-markdown-text
                            (read-text-file
@@ -137,16 +137,16 @@
                                       (uiop:getcwd)))))
            (support-document (normalize-markdown-text
                               (read-text-file
-                               (merge-pathnames #P"docs/src/support-policy.md"
+                               (merge-pathnames #P"docs/src/project/support-policy.md"
                                                 (uiop:getcwd)))))
            (issue-guide (normalize-markdown-text
                          (read-text-file
-                          (merge-pathnames #P"docs/src/issue-reporting.md"
+                          (merge-pathnames #P"docs/src/project/issue-reporting.md"
                                            (uiop:getcwd)))))
            (issue-config (read-text-file
                           (merge-pathnames #P".github/ISSUE_TEMPLATE/config.yml"
                                            (uiop:getcwd))))
-           (support-policy-url (format nil "~A/blob/main/docs/src/support-policy.md"
+           (support-policy-url (format nil "~A/blob/main/docs/src/project/support-policy.md"
                                        homepage))
            (security-reporting-url (format nil "~A/security/advisories/new"
                                            homepage)))
@@ -200,15 +200,15 @@
              (find-metadata-entry :name "bug-report-form" community-health))
            (issue-guide (normalize-markdown-text
                          (read-text-file
-                          (merge-pathnames #P"docs/src/issue-reporting.md"
+                          (merge-pathnames #P"docs/src/project/issue-reporting.md"
                                            (uiop:getcwd)))))
            (support-document (normalize-markdown-text
                               (read-text-file
-                               (merge-pathnames #P"docs/src/support-policy.md"
+                               (merge-pathnames #P"docs/src/project/support-policy.md"
                                                 (uiop:getcwd)))))
            (community-document (normalize-markdown-text
                                 (read-text-file
-                                 (merge-pathnames #P"docs/src/community-health.md"
+                                 (merge-pathnames #P"docs/src/project/community-health.md"
                                                   (uiop:getcwd)))))
            (bug-template (normalize-markdown-text
                           (read-text-file
@@ -216,7 +216,7 @@
                                             (uiop:getcwd))))))
       (expect bug-report-entry :not :to-be nil)
       (expect (getf metadata :policy-documents)
-              :to-contain "docs/src/issue-reporting.md")
+              :to-contain "docs/src/project/issue-reporting.md")
       (expect issue-guide :to-contain "# Issue Reporting Guide")
       (expect issue-guide :to-contain "support-policy.md")
       (expect issue-guide :to-contain "security process")
@@ -239,13 +239,13 @@
                         "actual behavior"
                         "smallest reproduction you can provide"))
         (expect support-document :to-contain (normalize-markdown-text detail)))
-      (expect community-document :to-contain "docs/src/issue-reporting.md")
+      (expect community-document :to-contain "docs/src/project/issue-reporting.md")
       (dolist (section (getf bug-report-entry :required-sections))
         (expect bug-template
                 :to-contain
                 (normalize-markdown-text
                  (format nil "# ~A" section))))
-      (expect bug-template :to-contain "docs/src/issue-reporting.md")
+      (expect bug-template :to-contain "docs/src/project/issue-reporting.md")
       (expect bug-template :to-contain "canonical reproduction details")))
 
   (it "keeps pull request intake guidance synchronized with PR contracts"
@@ -255,33 +255,33 @@
              (find-metadata-entry :name "pull-request-template" community-health))
            (community-document (normalize-markdown-text
                                 (read-text-file
-                                 (merge-pathnames #P"docs/src/community-health.md"
+                                 (merge-pathnames #P"docs/src/project/community-health.md"
                                                   (uiop:getcwd)))))
            (triage-document (normalize-markdown-text
                              (read-text-file
-                              (merge-pathnames #P"docs/src/triage-policy.md"
+                              (merge-pathnames #P"docs/src/project/triage-policy.md"
                                                (uiop:getcwd)))))
            (release-document (normalize-markdown-text
                               (read-text-file
-                               (merge-pathnames #P"docs/src/release-process.md"
+                               (merge-pathnames #P"docs/src/project/release-process.md"
                                                 (uiop:getcwd)))))
            (pr-guidance (normalize-markdown-text
                          (read-text-file
-                          (merge-pathnames #P"docs/src/pull-request-template.md"
+                          (merge-pathnames #P"docs/src/project/pull-request-template.md"
                                            (uiop:getcwd)))))
            (pr-template (normalize-markdown-text
                          (read-text-file
                           (merge-pathnames #P".github/pull_request_template.md"
                                            (uiop:getcwd))))))
       (expect pr-entry :not :to-be nil)
-      (expect community-document :to-contain "docs/src/pull-request-template.md")
+      (expect community-document :to-contain "docs/src/project/pull-request-template.md")
       (expect triage-document :to-contain "Keep PRs narrowly scoped when possible.")
       (expect triage-document :to-contain "Include tests for any behavior change")
       (expect triage-document :to-contain "Call out compatibility impact explicitly")
       (expect triage-document
               :to-contain
               "Link to the relevant issue, policy, or contract document")
-      (expect release-document :to-contain "docs/src/pull-request-template.md")
+      (expect release-document :to-contain "docs/src/project/pull-request-template.md")
       (expect release-document :to-contain ".github/pull_request_template.md")
       (expect release-document :to-contain "follow-up risk")
       (dolist (section (getf pr-entry :required-sections))
@@ -291,19 +291,19 @@
           (expect pr-guidance :to-contain heading)))
       (expect pr-guidance :to-contain "## Related Issue Or Policy")
       (expect pr-guidance :to-contain "## Notes For Reviewers")
-      (expect pr-template :to-contain "docs/src/pull-request-template.md")))
+      (expect pr-template :to-contain "docs/src/project/pull-request-template.md")))
 
   (it "keeps runtime support metadata synchronized with published support docs"
     (let* ((metadata (cl-weave/metadata:framework-metadata))
            (runtime-support (getf metadata :runtime-support))
-           (readme (read-text-file #P"docs/src/installation.md"))
-           (runtime-document (read-text-file #P"docs/src/runtime-support.md")))
+           (readme (read-text-file #P"docs/src/getting-started.md"))
+           (runtime-document (read-text-file #P"docs/src/reference/runtime-support.md")))
       (expect (getf metadata :policy-documents)
-              :to-contain "docs/src/runtime-support.md")
+              :to-contain "docs/src/reference/runtime-support.md")
       (expect (getf runtime-support :policy-document)
-              :to-equal "docs/src/runtime-support.md")
+              :to-equal "docs/src/reference/runtime-support.md")
       (expect readme :to-contain "## Supported Runtime")
-      (expect readme :to-contain "[Runtime Support](runtime-support.md)")
+      (expect readme :to-contain "[Runtime Support](reference/runtime-support.md)")
       (expect readme :to-contain (getf runtime-support :primary-implementation))
       (expect readme :to-contain "Linux")
       (expect readme :to-contain "subprocess isolation")
@@ -342,13 +342,13 @@
            (governance (getf metadata :governance))
            (document (normalize-markdown-text
                       (read-text-file
-                       (merge-pathnames #P"docs/src/governance.md"
+                       (merge-pathnames #P"docs/src/project/governance.md"
                                         (uiop:getcwd)))))
            (codeowners (read-text-file
                         (merge-pathnames (getf governance :review-ownership)
                                          (uiop:getcwd)))))
-      (expect (getf metadata :policy-documents) :to-contain "docs/src/governance.md")
-      (expect (getf governance :policy-document) :to-equal "docs/src/governance.md")
+      (expect (getf metadata :policy-documents) :to-contain "docs/src/project/governance.md")
+      (expect (getf governance :policy-document) :to-equal "docs/src/project/governance.md")
       (expect (getf governance :review-ownership)
               :to-equal ".github/CODEOWNERS")
       (expect (probe-file (merge-pathnames (getf governance :review-ownership)
@@ -404,17 +404,17 @@
                                                    (uiop:getcwd)))))
            (maintenance-document (normalize-markdown-text
                                   (read-text-file
-                                   (merge-pathnames #P"docs/src/maintenance-policy.md"
+                                   (merge-pathnames #P"docs/src/project/maintenance-policy.md"
                                                     (uiop:getcwd)))))
            (ai-contract (read-text-file
-                         (merge-pathnames #P"docs/src/ai-contract.md"
+                         (merge-pathnames #P"docs/src/reference/ai-contract.md"
                                           (uiop:getcwd)))))
       (expect (getf metadata :policy-documents)
               :to-contain (getf lifecycle :support-document))
       (expect (getf metadata :policy-documents)
               :to-contain (getf lifecycle :versioning-document))
       (expect (getf metadata :policy-documents)
-              :to-contain "docs/src/maintenance-policy.md")
+              :to-contain "docs/src/project/maintenance-policy.md")
       (expect support-document :to-contain "release-process.md")
       (expect support-document :to-contain "versioning-policy.md")
       (expect support-document :to-contain "pull-request-template.md")

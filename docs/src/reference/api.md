@@ -6,18 +6,18 @@ how and why the symbols are used.
 
 `cl-weave` shadows `cl:describe`. Import it with
 `(:shadowing-import-from #:cl-weave #:describe)` or qualify it as
-`cl-weave:describe`; see [Quick Start](quick-start.md) for the usual
+`cl-weave:describe`; see [Quick Start](../getting-started.md) for the usual
 `defpackage` form.
 
 Two further packages are public. `cl-weave/metadata` exports
 `framework-metadata`, `*metadata-commands*`, `*metadata-cli-options*`,
 `metadata-cli-options`, `cli-option-usage-lines`, `cli-version` and
 `write-doctor-report-json`, which are the Lisp side of the contract described in
-[AI Discovery](ai-discovery.md) and [AI Contract](ai-contract.md).
+[AI Discovery](../guide/ai-discovery.md) and [AI Contract](ai-contract.md).
 `cl-weave/cli` exports `main`, the entry point of the packaged executable.
 
 Anything not listed on this page is internal and may change without a major
-version bump. See [Versioning Policy](versioning-policy.md).
+version bump. See [Versioning Policy](../project/versioning-policy.md).
 
 ## Suites and test cases
 
@@ -26,7 +26,7 @@ the suffixes compose orthogonally: `-only` focuses, `-skip` and `-todo` mark,
 `-each` drives a table, `-if` and `-run-if` gate on a runtime value,
 `-concurrent` and `-sequential` set the execution mode, `-fails` expects a
 failure, `-isolated` runs in a subprocess, `-property` and `-fuzz` generate
-inputs. See [DSL Guide](dsl-guide.md).
+inputs. See [DSL Guide](../guide/dsl-guide.md).
 
 `describe`, `describe-concurrent`, `describe-each`, `describe-only`,
 `describe-only-each`, `describe-run-if`, `describe-sequential`,
@@ -41,7 +41,7 @@ inputs. See [DSL Guide](dsl-guide.md).
 
 Setup and teardown around a suite or a case, plus the per-test context object.
 `after-each` and `after-all` run under `unwind-protect`, so they fire even when
-the body times out. See [DSL Guide](dsl-guide.md).
+the body times out. See [DSL Guide](../guide/dsl-guide.md).
 
 `before-all`, `before-each`, `around-each`, `after-each`, `after-all`,
 `*test-context*`
@@ -51,7 +51,7 @@ the body times out. See [DSL Guide](dsl-guide.md).
 `expect` and `expect-not` drive the matcher protocol; `signals` and `finishes`
 assert on conditions; `defmatcher` and `expect-extend`/`extend-expect` add
 custom matchers; `with-soft-assertions` aggregates failures instead of aborting
-on the first. See [Assertions and Matchers](assertions.md).
+on the first. See [Assertions and Matchers](../guide/assertions.md).
 
 `expect`, `expect-not`, `expect-assertions`, `expect-has-assertions`,
 `expect-poll`, `expect-rejects`, `expect-resolves`, `expect-extend`,
@@ -63,7 +63,7 @@ on the first. See [Assertions and Matchers](assertions.md).
 ## Snapshots
 
 Inline and external snapshot storage and the update switch. See
-[Assertions and Matchers](assertions.md).
+[Assertions and Matchers](../guide/assertions.md).
 
 `snapshot-value`, `snapshot-entries`, `with-snapshot-updates`,
 `*snapshot-directory*`, `*snapshot-file-name*`, `*update-snapshots*`
@@ -72,7 +72,7 @@ Inline and external snapshot storage and the update switch. See
 
 Mock function construction, call and result history, implementation and return
 value control, disposal and restoration, and the conditions raised when a
-disposed mock or an active spy is misused. See [Mocking](mocking.md).
+disposed mock or an active spy is misused. See [Mocking](../guide/mocking.md).
 
 `make-mock-function`, `mock-function-p`, `spy-on`, `with-mocked-functions`,
 `mock-calls`, `mock-results`, `mock-implementation`, `mock-return-value`,
@@ -85,7 +85,7 @@ disposed mock or an active spy is misused. See [Mocking](mocking.md).
 
 Generators, the shrinking protocol and its restarts, and the dynamic variables
 that control trial count, seed and shrink budget. Integer shrinking moves toward
-the in-range value closest to zero. See [Property Testing](property-testing.md).
+the in-range value closest to zero. See [Property Testing](../guide/property-testing.md).
 
 `gen-boolean`, `gen-character`, `gen-form`, `gen-integer`, `gen-keyword`,
 `gen-list`, `gen-map`, `gen-member`, `gen-one-of`, `gen-recursive`, `gen-sexp`,
@@ -102,7 +102,7 @@ the in-range value closest to zero. See [Property Testing](property-testing.md).
 
 Form-level mutation collection, the operator protocol, run results, the score
 gate, and the JSON and S-expression mutation reporters. See
-[Mutation Testing](mutation-testing.md).
+[Mutation Testing](../guide/mutation-testing.md).
 
 `collect-mutations`, `run-mutations`, `defmutation-operator`,
 `list-mutation-operators`, `mutation`, `mutation-id`, `mutation-form`,
@@ -118,7 +118,7 @@ gate, and the JSON and S-expression mutation reporters. See
 ## Benchmarking
 
 The micro-benchmark helper and the timing statistics it records. See
-[Benchmarking](benchmarking.md).
+[Benchmarking](../guide/benchmarking.md).
 
 `benchmark`, `measure`, `benchmark-result`, `benchmark-result-iterations`,
 `benchmark-result-samples`, `benchmark-result-warmup`, `mean-ms`, `median-ms`,
@@ -128,7 +128,7 @@ The micro-benchmark helper and the timing statistics it records. See
 
 Running a form in a separate SBCL process and inspecting its exit status,
 streams, on-disk artifacts and timeout state. See
-[Test Execution](test-execution.md).
+[Test Execution](../guide/test-execution.md).
 
 `run-isolated`, `isolated-result`, `isolated-result-status`,
 `isolated-result-exit-code`, `isolated-result-stdout`,
@@ -142,7 +142,7 @@ streams, on-disk artifacts and timeout state. See
 The opt-in timeline of assertions, mocks, hooks, notes and shrink steps; its
 frame accessors and plist round trip; the CLOS hook for custom frame kinds;
 interactive breakpoints; and deterministic replay. See
-[Time-Travel Debugging](time-travel-debugging.md).
+[Time-Travel Debugging](../guide/time-travel-debugging.md).
 
 `with-execution-journal`, `*journal-enabled*`, `record-journal-frame`,
 `journal-note`, `journal-frame`, `journal-frame-p`, `journal-frame-index`,
@@ -159,7 +159,7 @@ interactive breakpoints; and deterministic replay. See
 
 The unification and backtracking engine, its query macros, and the restarts
 offered when a search exhausts its step limit. See
-[Logic Programming](logic-programming.md).
+[Logic Programming](../guide/logic-programming.md).
 
 `logic-program`, `logic-query`, `logic-run`, `logic-where`,
 `logic-variable-p`, `logic-search-exhausted`, `logic-search-exhausted-limit`,
@@ -171,7 +171,7 @@ offered when a search exhausts its step limit. See
 
 Collecting the plan without running it, querying it declaratively, and the
 dynamic variables that filter and order selection. See
-[Test Execution](test-execution.md).
+[Test Execution](../guide/test-execution.md).
 
 `collect-test-plan`, `query-test-plan`, `list-tests`, `test-plan-where`,
 `test-plan-facts`, `test-plan-entry`, `test-plan-entry-path`,
@@ -186,7 +186,7 @@ dynamic variables that filter and order selection. See
 Entry points for running a suite, a system or a watch loop, the reporter
 inventory and artifact schemas, result status normalization, and the
 machine-readable framework metadata. See
-[Reporters and CI](reporters-and-ci.md) and [AI Discovery](ai-discovery.md).
+[Reporters and CI](../guide/reporters-and-ci.md) and [AI Discovery](../guide/ai-discovery.md).
 
 `run`, `run-all`, `run-system`, `watch-system`, `run-reporters`,
 `list-reporters`, `reporter-artifact-schemas`, `results-status`, `explain!`,
@@ -196,7 +196,7 @@ machine-readable framework metadata. See
 
 Retry and timeout defaults, the interactive restarts offered from a failing
 test, the conditions raised on timeout and hook failure, and the continuation
-helpers. See [DSL Guide](dsl-guide.md).
+helpers. See [DSL Guide](../guide/dsl-guide.md).
 
 `*default-retry*`, `*default-timeout-ms*`, `retry-test`, `continue-test`,
 `skip-test`, `test-timeout`, `test-timeout-ms`, `hook-failure`,
@@ -207,7 +207,7 @@ helpers. See [DSL Guide](dsl-guide.md).
 
 The `sb-cover` integration, its statistics, and the condition raised when
 coverage is unavailable on the running implementation. See
-[Reporters and CI](reporters-and-ci.md).
+[Reporters and CI](../guide/reporters-and-ci.md).
 
 `coverage-statistics`, `coverage-support-available-p`, `reset-coverage`,
 `save-coverage`, `coverage-unavailable`, `coverage-unavailable-reason`

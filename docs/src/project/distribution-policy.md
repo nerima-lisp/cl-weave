@@ -20,7 +20,7 @@ channels:
 
 ## Verification Expectations
 
-- Keep `README.md`, `docs/src/ai-contract.md`, and metadata `distributionChannels`
+- Keep `README.md`, `docs/src/reference/ai-contract.md`, and metadata `distributionChannels`
   synchronized when install or run commands change.
 - For a release or production deployment, consume an immutable Git revision
   rather than an unqualified branch reference. Record that revision alongside
@@ -42,7 +42,7 @@ channels:
   when Nix is available.
 - Do not describe a channel as release-ready while ASDF loading, source
   self-tests, or documented CLI entrypoints time out. Record the failing gate in
-  `README.md` or `docs/src/runtime-support.md` before publishing adoption guidance.
+  `README.md` or `docs/src/reference/runtime-support.md` before publishing adoption guidance.
 
 ## Integrity And Scope
 

@@ -19,11 +19,11 @@ Describe how the change should be tested or demonstrated.
 
 ## Scope Check
 
-Explain why this request fits [the project scope](../../docs/src/project-scope.md).
+Explain why this request fits [the project scope](../../docs/src/project/project-scope.md).
 
 ## Public Surface Notes
 
 Call out any public API, reporter, metadata, or platform impact.
 
-Before submitting, review [the support policy](../../docs/src/support-policy.md)
+Before submitting, review [the support policy](../../docs/src/project/support-policy.md)
 so the request matches the project's supported contribution and escalation paths.

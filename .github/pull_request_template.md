@@ -14,5 +14,5 @@ Describe any public API, metadata, reporter, or platform changes.
 
 Call out any remaining risk, unsupported edge case, or intentional follow-up.
 
-See [the pull request template guide](../docs/src/pull-request-template.md) for
+See [the pull request template guide](../docs/src/project/pull-request-template.md) for
 the canonical review checklist and release-alignment guidance.

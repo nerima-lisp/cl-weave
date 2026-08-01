@@ -28,14 +28,14 @@ entrypoints for bugs, feature proposals, and pull requests.
 
 ## Canonical References
 
-- Bug intake is anchored to [docs/src/issue-reporting.md](issue-reporting.md).
-- Feature intake is anchored to [docs/src/project-scope.md](project-scope.md) and
-  [docs/src/support-policy.md](support-policy.md).
+- Bug intake is anchored to [docs/src/project/issue-reporting.md](issue-reporting.md).
+- Feature intake is anchored to [docs/src/project/project-scope.md](project-scope.md) and
+  [docs/src/project/support-policy.md](support-policy.md).
 - Security-sensitive reports are anchored to [private GitHub security advisories](https://github.com/nerima-lisp/cl-weave/security/advisories/new).
 - Pull request intake is anchored to
-  [docs/src/pull-request-template.md](pull-request-template.md).
+  [docs/src/project/pull-request-template.md](pull-request-template.md).
 - Review ownership and process authority are anchored to
-  [docs/src/governance.md](governance.md).
+  [docs/src/project/governance.md](governance.md).
 
 Keep these files synchronized with `cl-weave metadata` so agents can discover
 the same intake contract without scraping GitHub UI state.

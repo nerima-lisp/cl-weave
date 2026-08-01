@@ -10,27 +10,27 @@
       (expect (getf metadata :license)
               :to-equal "MIT")
       (expect (getf metadata :policy-documents)
-              :to-equal '("docs/src/community-health.md"
-                          "docs/src/distribution-policy.md"
-                          "docs/src/governance.md"
-                          "docs/src/issue-reporting.md"
-                          "docs/src/maintenance-policy.md"
-                          "docs/src/project-scope.md"
-                          "docs/src/pull-request-template.md"
-                          "docs/src/release-process.md"
-                          "docs/src/runtime-support.md"
-                          "docs/src/support-policy.md"
-                          "docs/src/triage-policy.md"
-                          "docs/src/versioning-policy.md"))
+              :to-equal '("docs/src/project/community-health.md"
+                          "docs/src/project/distribution-policy.md"
+                          "docs/src/project/governance.md"
+                          "docs/src/project/issue-reporting.md"
+                          "docs/src/project/maintenance-policy.md"
+                          "docs/src/project/project-scope.md"
+                          "docs/src/project/pull-request-template.md"
+                          "docs/src/project/release-process.md"
+                          "docs/src/reference/runtime-support.md"
+                          "docs/src/project/support-policy.md"
+                          "docs/src/project/triage-policy.md"
+                          "docs/src/project/versioning-policy.md"))
       (expect (getf metadata :reference-documents)
               :to-equal '((:name "readme"
                            :path "README.md"
                            :description "Primary user-facing guide and CLI reference.")
                           (:name "ai-contract"
-                           :path "docs/src/ai-contract.md"
+                           :path "docs/src/reference/ai-contract.md"
                            :description "Machine-readable contract and metadata normalization guide.")
                           (:name "adoption-guide"
-                           :path "docs/src/adoption.md"
+                           :path "docs/src/guide/adoption.md"
                            :description "Native adoption guide and downstream integration plan.")
                           (:name "license"
                            :path "LICENSE"
@@ -42,21 +42,21 @@
                            :run-command ("nix" "run" "." "--" "run" "cl-weave/test")
                            :scope "Run the bundled ASDF test system through the packaged CLI."
                            :references ("README.md"
-                                        "docs/src/distribution-policy.md"))
+                                        "docs/src/project/distribution-policy.md"))
                           (:name "nix-local-cli"
                            :kind "nix"
                            :install-command ("nix" "profile" "install" ".")
                            :run-command ("nix" "run" "." "--" "--help")
                            :scope "Install and run the packaged CLI from the current checkout."
                            :references ("README.md"
-                                        "docs/src/distribution-policy.md"))
+                                        "docs/src/project/distribution-policy.md"))
                           (:name "nix-remote-cli"
                            :kind "nix"
                            :install-command ("nix" "profile" "install" "github:nerima-lisp/cl-weave")
                            :run-command ("nix" "run" "github:nerima-lisp/cl-weave" "--" "--help")
                            :scope "Install and run the packaged CLI without cloning the repository."
                            :references ("README.md"
-                                        "docs/src/distribution-policy.md"))))
+                                        "docs/src/project/distribution-policy.md"))))
       (expect (getf metadata :support-channels)
               :to-equal '((:name "issue-tracker"
                            :kind "github"
@@ -68,15 +68,15 @@
                            :scope "Validated fixes that are ready for review.")
                           (:name "support-policy"
                            :kind "document"
-                           :target "docs/src/support-policy.md"
+                           :target "docs/src/project/support-policy.md"
                            :scope "Canonical support boundaries, report contents, and escalation guidance.")))
       (expect (getf metadata :community-health)
               :to-equal '((:name "bug-report-form"
                            :kind "github-issue-template"
                            :path ".github/ISSUE_TEMPLATE/bug_report.md"
                            :purpose "Structured bug intake that routes reporters to the canonical issue reporting guide."
-                           :references ("docs/src/community-health.md"
-                                        "docs/src/issue-reporting.md")
+                           :references ("docs/src/project/community-health.md"
+                                        "docs/src/project/issue-reporting.md")
                            :required-sections ("Summary"
                                                "Reproduction"
                                                "Expected Behavior"
@@ -88,9 +88,9 @@
                            :kind "github-issue-template"
                            :path ".github/ISSUE_TEMPLATE/feature_request.md"
                            :purpose "Structured feature intake that reinforces project scope and validation expectations."
-                           :references ("docs/src/community-health.md"
-                                        "docs/src/project-scope.md"
-                                        "docs/src/support-policy.md")
+                           :references ("docs/src/project/community-health.md"
+                                        "docs/src/project/project-scope.md"
+                                        "docs/src/project/support-policy.md")
                            :required-sections ("Problem"
                                                "Proposed Change"
                                                "Validation Plan"
@@ -101,25 +101,25 @@
                            :kind "github-issue-template-config"
                            :path ".github/ISSUE_TEMPLATE/config.yml"
                            :purpose "GitHub issue chooser configuration that redirects support and security traffic to canonical policies."
-                           :references ("docs/src/community-health.md"
-                                        "docs/src/support-policy.md"
-                                        "docs/src/issue-reporting.md")
+                           :references ("docs/src/project/community-health.md"
+                                        "docs/src/project/support-policy.md"
+                                        "docs/src/project/issue-reporting.md")
                            :required-sections nil
                            :contact-links ((:name "Support policy"
-                                            :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/support-policy.md"
+                                            :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/support-policy.md"
                                             :purpose "Check whether the request belongs in issue tracking and what detail is required.")
                                            (:name "Security reporting"
                                             :target "https://github.com/nerima-lisp/cl-weave/security/advisories/new"
                                             :purpose "Report vulnerabilities through the private security contact path.")
                                            (:name "Issue reporting guide"
-                                            :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/issue-reporting.md"
+                                            :target "https://github.com/nerima-lisp/cl-weave/blob/main/docs/src/project/issue-reporting.md"
                                             :purpose "Review the canonical reproduction format before filing a bug.")))
                           (:name "pull-request-template"
                            :kind "github-pull-request-template"
                            :path ".github/pull_request_template.md"
                            :purpose "Default PR body that mirrors the canonical review checklist and public-surface prompts."
-                           :references ("docs/src/community-health.md"
-                                        "docs/src/pull-request-template.md")
+                           :references ("docs/src/project/community-health.md"
+                                        "docs/src/project/pull-request-template.md")
                            :required-sections ("Summary"
                                                "Validation"
                                                "Public Surface Impact"
@@ -129,8 +129,8 @@
                            :kind "github-codeowners"
                            :path ".github/CODEOWNERS"
                            :purpose "Review ownership declaration for repository-wide changes."
-                           :references ("docs/src/community-health.md"
-                                        "docs/src/governance.md")
+                           :references ("docs/src/project/community-health.md"
+                                        "docs/src/project/governance.md")
                            :required-sections nil
                            :contact-links nil)))
       (expect (getf metadata :security-contacts)
@@ -142,10 +142,10 @@
               :to-equal '(:stage "stable"
                           :status "active"
                           :supported-line "main"
-                          :support-document "docs/src/support-policy.md"
-                          :versioning-document "docs/src/versioning-policy.md"))
+                          :support-document "docs/src/project/support-policy.md"
+                          :versioning-document "docs/src/project/versioning-policy.md"))
       (expect (getf metadata :governance)
-              :to-equal '(:policy-document "docs/src/governance.md"
+              :to-equal '(:policy-document "docs/src/project/governance.md"
                           :review-ownership ".github/CODEOWNERS"
                           :maintainer-responsibilities
                           ("Triaging issues and pull requests against the documented project scope and support boundaries."
@@ -154,17 +154,17 @@
                            "Requiring regression coverage for public-surface changes when practical."
                            "Handling security-sensitive reports through private GitHub security advisories.")
                           :decision-documents
-                          ("docs/src/project-scope.md"
-                           "docs/src/support-policy.md"
-                           "docs/src/triage-policy.md"
-                           "docs/src/versioning-policy.md"
-                           "docs/src/release-process.md")
+                          ("docs/src/project/project-scope.md"
+                           "docs/src/project/support-policy.md"
+                           "docs/src/project/triage-policy.md"
+                           "docs/src/project/versioning-policy.md"
+                           "docs/src/project/release-process.md")
                           :release-authority
                           "Maintainers cut releases from the validated default branch state only."
                           :continuity-expectation
                           "When the maintainer set changes, update governance, linked policies, and machine-readable metadata in the same patch."))
       (expect (getf metadata :runtime-support)
-              :to-equal '(:policy-document "docs/src/runtime-support.md"
+              :to-equal '(:policy-document "docs/src/reference/runtime-support.md"
                           :primary-implementation "SBCL"
                           :supported-targets ((:implementation "SBCL"
                                                :platforms ("Linux")
@@ -179,23 +179,23 @@
                            "allocation assertions in CI-focused tests"
                            "MOP-dependent metadata and structural assertions")))
       (expect (getf metadata :release-process)
-              :to-equal '(:policy-document "docs/src/release-process.md"
+              :to-equal '(:policy-document "docs/src/project/release-process.md"
                           :release-stage "stable"
                           :checklist
                           ("Run the full test suite."
                            "Run nix flake check --print-build-logs when Nix is available."
                            "Summarize user-visible changes in the release notes."
-                           "Check that README.md and docs/src/maintenance-policy.md still match the current workflow."
-                           "Review docs/src/pull-request-template.md and .github/pull_request_template.md so release-bound changes still capture public-surface notes, validation commands, and follow-up risk in a consistent format."
+                           "Check that README.md and docs/src/project/maintenance-policy.md still match the current workflow."
+                           "Review docs/src/project/pull-request-template.md and .github/pull_request_template.md so release-bound changes still capture public-surface notes, validation commands, and follow-up risk in a consistent format."
                            "Verify that cl-weave metadata still advertises the expected package links, reporter list, and schema versions."
-                           "Verify that docs/src/distribution-policy.md still matches the documented source and Nix install paths."
+                           "Verify that docs/src/project/distribution-policy.md still matches the documented source and Nix install paths."
                            "Confirm the release notes mention any intentional public-surface breaks or migration steps.")
                           :contract-sync-requirements
                           ("Keep machine-readable metadata and human-facing documentation in sync."
-                           "Keep distributionChannels, README.md, and docs/src/distribution-policy.md synchronized when install paths change."
-                           "Update tests and docs/src/ai-contract.md when a machine-readable contract changes.")))
+                           "Keep distributionChannels, README.md, and docs/src/project/distribution-policy.md synchronized when install paths change."
+                           "Update tests and docs/src/reference/ai-contract.md when a machine-readable contract changes.")))
       (expect (getf metadata :continuous-integration)
-              :to-equal '(:policy-document "docs/src/release-process.md"
+              :to-equal '(:policy-document "docs/src/project/release-process.md"
                           :provider "github-actions"
                           :workflow-path ".github/workflows/ci.yml"
                           :job-name "check"

@@ -29,5 +29,5 @@ List the commands you ran and their results.
 
 Include runtime, platform, or environment details that materially affect the failure.
 
-Before submitting, review [the issue reporting guide](../../docs/src/issue-reporting.md)
+Before submitting, review [the issue reporting guide](../../docs/src/project/issue-reporting.md)
 to ensure the report includes the canonical reproduction details.

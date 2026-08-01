@@ -62,7 +62,7 @@ compose with canonical modifiers such as `it-only-each`,
 and `it-todo-each`, and with the suite-level table variants
 `describe-only-each`, `describe-skip-each`, and `describe-todo-each`. Fixture
 hooks use the canonical Lisp names.
-[ai-contract.md](ai-contract.md) is the machine-readable normalization
+[ai-contract.md](../reference/ai-contract.md) is the machine-readable normalization
 contract for agents. Runtime metadata also exposes `referenceDocuments`,
 `supportChannels`, `securityContacts`, `lifecycle`,
 `runtimeSupport`, and `releaseProcess` so external tools can discover
