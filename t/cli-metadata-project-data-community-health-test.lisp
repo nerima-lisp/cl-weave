@@ -360,7 +360,7 @@
                                       (subseq path (1+ (or (position #\/ path :from-end t)
                                                            -1))))
                                     (getf governance :decision-documents))
-                            '("../.github/CODEOWNERS")))
+                            (list (getf governance :review-ownership))))
         (expect document :to-contain path))
       (expect-document-fragments
        document
