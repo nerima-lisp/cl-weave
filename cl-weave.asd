@@ -19,7 +19,12 @@
   ;; produce the same binary, and a save-lisp-and-die chain written out in Nix
   ;; gives the two places to disagree about the entry point.
   :build-operation "program-op"
-  :build-pathname "cl-weave"
+  ;; `:build-pathname` is merged against this *system's own* :pathname, which
+  ;; is "src" below -- so a bare "cl-weave" here would land the executable at
+  ;; src/cl-weave, not at the project root where cl-nix-forge's packaging step
+  ;; (and a developer running `asdf:make` from this directory) expects it. The
+  ;; ".." walks back out of "src" to the .asd's own directory.
+  :build-pathname "../cl-weave"
   :entry-point "cl-weave/cli::image-entry-point"
   ;; sb-cover ships with SBCL, so this is not an external dependency; it is
   ;; declared because `cl-weave run --coverage` needs it *inside* a dumped
