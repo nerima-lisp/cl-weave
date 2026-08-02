@@ -19,12 +19,18 @@
     # follows that repository's default branch and would change this build
     # without warning.
     cl-nix-forge = {
-      url = "github:nerima-lisp/cl-nix-forge/v0.3.0";
+      url = "github:nerima-lisp/cl-nix-forge/v0.4.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Pinned to a release TAG for the same reason as cl-nix-forge above: a
+    # floating `github:nerima-lisp/paredit-cli` would silently change what
+    # `nix develop`'s devShell and the `paredit-lint` check run on every
+    # `nix flake update`. The repository itself moved from takeokunn to
+    # nerima-lisp (the old owner now only 302-redirects here); this URL points
+    # at its current home directly rather than through that redirect.
     paredit-cli = {
-      url = "github:takeokunn/paredit-cli";
+      url = "github:nerima-lisp/paredit-cli/v1.3.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
