@@ -188,23 +188,24 @@
         (error 'cli-error
                :message (format nil "~A: ~A" name condition)))))
 
-  (defun parse-retry-option (value name)
-    (normalize-runner-option
-     (parse-non-negative-integer value name)
-     name
-     #'cl-weave::normalize-retry-count))
+  (defmacro define-runner-option-parser (name integer-parser normalizer)
+    "Define NAME as a CLI option parser (VALUE OPTION-NAME) that parses VALUE
+via INTEGER-PARSER, then runs the result through NORMALIZER -- wrapping any
+error NORMALIZER signals as a CLI-ERROR naming OPTION-NAME."
+    `(defun ,name (value option-name)
+       (normalize-runner-option
+        (,integer-parser value option-name)
+        option-name
+        #',normalizer)))
 
-  (defun parse-timeout-ms-option (value name)
-    (normalize-runner-option
-     (parse-positive-integer value name)
-     name
-     #'cl-weave::normalize-timeout-ms))
+  (define-runner-option-parser parse-retry-option
+      parse-non-negative-integer cl-weave::normalize-retry-count)
 
-  (defun parse-max-workers-option (value name)
-    (normalize-runner-option
-     (parse-positive-integer value name)
-     name
-     #'cl-weave::normalize-max-workers))
+  (define-runner-option-parser parse-timeout-ms-option
+      parse-positive-integer cl-weave::normalize-timeout-ms)
+
+  (define-runner-option-parser parse-max-workers-option
+      parse-positive-integer cl-weave::normalize-max-workers)
 
 (defun parse-positive-number (value name)
   (ensure-numeric-token-length value name)
@@ -310,29 +311,19 @@
      "--shard"
      #'cl-weave::normalize-shard)))
 
-(defun parse-reporter-option (value ignore)
-  (declare (ignore ignore))
-  (parse-reporter value))
+(defmacro define-passthrough-option-parser (name transform)
+  "Define NAME as a CLI option parser (VALUE IGNORE) that ignores its second
+argument and returns (TRANSFORM VALUE)."
+  `(defun ,name (value ignore)
+     (declare (ignore ignore))
+     (,transform value)))
 
-(defun parse-bail-option (value ignore)
-  (declare (ignore ignore))
-  (parse-bail value))
-
-(defun parse-shard-option (value ignore)
-  (declare (ignore ignore))
-  (parse-shard value))
-
-(defun parse-sequence-order-option (value ignore)
-  (declare (ignore ignore))
-  (parse-sequence-order value))
-
-(defun parse-pathname-option (value ignore)
-  (declare (ignore ignore))
-  (pathname value))
-
-(defun parse-system-list-option (value ignore)
-  (declare (ignore ignore))
-  (list value))
+(define-passthrough-option-parser parse-reporter-option parse-reporter)
+(define-passthrough-option-parser parse-bail-option parse-bail)
+(define-passthrough-option-parser parse-shard-option parse-shard)
+(define-passthrough-option-parser parse-sequence-order-option parse-sequence-order)
+(define-passthrough-option-parser parse-pathname-option pathname)
+(define-passthrough-option-parser parse-system-list-option list)
 
 (defun require-option-argument (flag rest &optional inline-p)
   ;; When INLINE-P, the value was given explicitly as `--flag=VALUE`, so it is
