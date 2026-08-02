@@ -31,7 +31,21 @@
   ;; image, where REQUIRE can no longer reach SBCL's contrib directory.
   ;; Saying it here rather than in the build makes the image, a plain
   ;; `sbcl --script`, and a REPL all agree on what the system needs.
-  :depends-on ((:require "sb-cover"))
+  ;;
+  ;; Guarded `#+sbcl`: src/runner-coverage.lisp (this system's one consumer
+  ;; of SB-COVER) already handles its absence gracefully at runtime --
+  ;; every reference is a dynamic FIND-PACKAGE/FIND-SYSTEM lookup or sits
+  ;; inside its own `#+sbcl`/`#-sbcl` split in REQUIRE-COVERAGE-SUPPORT,
+  ;; which signals COVERAGE-UNAVAILABLE on a non-SBCL implementation rather
+  ;; than assuming SB-COVER exists. An unconditional `:depends-on` here
+  ;; overrode that portable design and made the whole system, needed just to
+  ;; use the test DSL, fail to load on any non-SBCL implementation at all --
+  ;; found when a downstream consumer (cl-cli) tried bumping past v1.0.0 and
+  ;; hit "Module error: Don't know how to REQUIRE sb-cover" building for
+  ;; ECL. `#+sbcl` here reproduces the exact same dependency on SBCL (so the
+  ;; dumped-image behavior above is unchanged) while producing an empty
+  ;; `:depends-on ()` everywhere else.
+  :depends-on (#+sbcl (:require "sb-cover"))
   ;; :pathname, not a (:module "src" ...) wrapper. The module added no nesting
   ;; -- it named the same one directory :pathname names -- and cost every
   ;; component an extra indent level. PACKAGE_STANDARD.md normalises that shape
