@@ -58,11 +58,18 @@ jobs:
       # evaluating them, which is how a foreign attribute fails with "platform
       # mismatch" instead of being skipped.
       - name: Run flake checks
-        timeout-minutes: 10
+        timeout-minutes: 15
         # --max-jobs 2 tuned for the 16 GB GitHub-hosted runner: each SBCL check
         # caps at a 4 GB dynamic space, so two in parallel stay well within RAM.
         # Lower to 1 if OOM appears on a smaller runner.
-        run: timeout 600s nix flake check --print-build-logs --max-jobs 2
+        #
+        # 900s, not 600s: pull_request runs never push to Cachix (see the
+        # cachix-auth-token gating above), so every PR compiles paredit-cli's
+        # Rust workspace from scratch. That release-profile LTO build alone
+        # can take 6+ minutes on a cold cache, which pushed total step time
+        # past 600s and timed out two consecutive PR runs after the v1.3.0
+        # bump in PR #34.
+        run: timeout 900s nix flake check --print-build-logs --max-jobs 2
 
       # Artifact upload is the one thing the Nix sandbox cannot do, so the
       # reporter outputs are realised here and handed to upload-artifact.

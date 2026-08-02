@@ -4,7 +4,7 @@
   '((:name "flake-check"
      :kind "nix"
      :command ("nix" "flake" "check" "--print-build-logs")
-     :timeout-seconds 600
+     :timeout-seconds 900
      :artifacts nil
      :description "Run the complete Nix flake validation suite.")
     (:name "cli-json-results"

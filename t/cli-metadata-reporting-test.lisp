@@ -22,7 +22,7 @@
            "\"decisionDocuments\"" "\"name\":\"vitest-dsl\"" "\"publicApis\""
            "\"qualityGates\":[\"flake-check\",\"filtered-smoke\",\"plan-artifact\"]"
            "\"documentation\":[\"README.md\",\"docs\\/src\\/reference\\/ai-contract.md\"]" "\"name\":\"flake-check\""
-           "\"command\":[\"nix\",\"flake\",\"check\",\"--print-build-logs\"]" "\"timeoutSeconds\":600"
+           "\"command\":[\"nix\",\"flake\",\"check\",\"--print-build-logs\"]" "\"timeoutSeconds\":900"
            "\"name\":\"ai-metadata-artifact\"" "\"cl-weave-metadata.json\"" "\"name\":\"tap-artifact\""
            "\"Verify TAP output for line-oriented CI logs.\"" "\"name\":\"filtered-smoke\""
            "\"nix\",\"run\",\".\",\"--\",\"run\",\"cl-weave\\/test\",\"--filter\",\"filtering > runs only tests matching a path substring\",\"--fail-with-no-tests\""

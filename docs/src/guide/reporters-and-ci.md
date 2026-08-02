@@ -84,7 +84,7 @@ CLI entrypoints you can run locally (shown below), and then materializes their
 artifacts with `nix build .#checks.x86_64-linux.<name>-artifact`:
 
 ```sh
-timeout 600s nix flake check --print-build-logs --max-jobs 1
+timeout 900s nix flake check --print-build-logs --max-jobs 1
 timeout 360s nix run . -- run cl-weave/test --coverage --coverage-output cl-weave.coverage --coverage-report-directory cl-weave-coverage-report/
 timeout 360s nix run . -- run cl-weave/test --reporter json --output cl-weave-results.json
 timeout 360s nix run . -- run cl-weave/test --reporter jsonl --output cl-weave-events.jsonl
