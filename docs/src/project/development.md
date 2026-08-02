@@ -89,10 +89,45 @@ the timing statistics they report.
 ## Structural edits
 
 The devShell provides
-[`paredit-cli`](https://github.com/takeokunn/paredit-cli) for structural
+[`paredit-cli`](https://github.com/nerima-lisp/paredit-cli) for structural
 S-expression edits. The `paredit-lint` flake check parses every source file, so
 an unbalanced form fails `nix flake check` rather than surfacing as a confusing
 compile error.
+
+`paredit inspect duplicates` and `paredit inspect unused-definitions` are
+worth running over `src/*.lisp` (add `t/*.lisp` to the latter to rule out
+symbols a test file references but no `src/` file does) before merging a
+change that touches more than one file: they catch copy-pasted definitions
+and internal helpers nothing calls anymore. Neither tool understands a
+symbol's package export status or usage in a downstream consumer, so treat
+their output as candidates, not a worklist -- check `src/package.lisp`'s
+`:export` list and grep the whole tree before removing or merging anything
+they flag.
+
+## Source organization
+
+Two conventions keep individual files from growing into an unreadable mix of
+constants and control flow as the codebase grows:
+
+- **`*-data.lisp` companion files.** When a file's `defvar`/`defparameter`/
+  `defconstant`/plain `defstruct` forms outgrow a handful of lines, move them
+  to a same-named `*-data.lisp` file loaded immediately before it in
+  `cl-weave.asd` (`runner-control-data.lisp` before `runner-control.lisp`,
+  `mocks-data.lisp` before `mocks.lisp`, and so on for the `cli-metadata-*`
+  and `cli-options-data`/`reporter-schema-data` pairs). Apply this only where
+  it genuinely separates unrelated concerns -- a single small `defstruct`
+  tightly coupled to the one function that uses it, or a file with no
+  top-level data forms at all, is better left alone.
+- **`define-X-macro` consolidation.** When the same defmacro or defun shape
+  recurs with only a name and a couple of symbols differing (see
+  `define-conditional-lock-macro` in `platform-sbcl.lisp`, or
+  `define-runner-option-parser`/`define-passthrough-option-parser` in
+  `cli-options.lisp`), extract a macro-generating macro rather than hand-copy
+  the pattern again. Verify a macro-generating macro at the value it actually
+  produces, not just that it compiles: a `sublis`/nested-backquote mistake
+  can macroexpand cleanly to code that never substitutes the caller's
+  argument, and that only shows up in a runtime check that exercises the
+  generated macro's actual effect.
 
 ## Contributing
 

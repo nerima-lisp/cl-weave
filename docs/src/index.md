@@ -157,7 +157,7 @@ The [flake.nix](https://github.com/nerima-lisp/cl-weave/blob/main/flake.nix) at
 the repository root packages `cl-weave` as a Nix flake:
 
 - `nix develop` — a devShell with SBCL and GNU coreutils, and
-  [`paredit-cli`](https://github.com/takeokunn/paredit-cli) for structural
+  [`paredit-cli`](https://github.com/nerima-lisp/paredit-cli) for structural
   S-expression edits.
 - `nix run . -- <command>` — the packaged CLI (`run`, `list`, `watch`,
   `doctor`, `metadata`, `version`, `help`).
