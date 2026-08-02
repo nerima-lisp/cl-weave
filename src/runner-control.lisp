@@ -1,76 +1,30 @@
 (in-package #:cl-weave)
 
-(defvar *test-name-filter* nil)
-(defvar *test-sequence-order* :defined)
-(defvar *test-sequence-seed* 0)
-(defvar *default-retry* 0)
-(defvar *default-timeout-ms* nil)
-(defconstant +default-max-workers-cap+ 32)
-  (defconstant +maximum-retry-count+ 1000)
-  (defconstant +maximum-timeout-ms+ 86400000)
-  (defconstant +maximum-worker-count+ 4096)
-  (defconstant +maximum-bail-limit+ 1000000)
-  (defconstant +maximum-shard-count+ 1000000)
+#+(and sbcl unix)
+(defun online-processor-count ()
+  (let ((count
+          (sb-alien:alien-funcall
+           (sb-alien:extern-alien "sysconf"
+             (function sb-alien:long sb-alien:int))
+           sb-unix:sc-nprocessors-onln)))
+    (and (integerp count)
+         (plusp count)
+         count)))
 
-  (progn
-  #+(and sbcl unix)
-  (defun online-processor-count ()
-    (let ((count
-            (sb-alien:alien-funcall
-             (sb-alien:extern-alien "sysconf"
-               (function sb-alien:long sb-alien:int))
-             sb-unix:sc-nprocessors-onln)))
-      (and (integerp count)
-           (plusp count)
-           count)))
+#-(and sbcl unix)
+(defun online-processor-count ()
+  nil)
 
-  #-(and sbcl unix)
-  (defun online-processor-count ()
-    nil)
+(defun detect-default-max-workers ()
+  (let ((detected (ignore-errors (online-processor-count))))
+    (min +default-max-workers-cap+
+         (max 2
+              (if (and (integerp detected)
+                       (plusp detected))
+                  detected
+                  2)))))
 
-  (defun detect-default-max-workers ()
-    (let ((detected (ignore-errors (online-processor-count))))
-      (min +default-max-workers-cap+
-           (max 2
-                (if (and (integerp detected)
-                         (plusp detected))
-                    detected
-                    2))))))
-
-  (defparameter *default-max-workers* (detect-default-max-workers))
-  (defvar *max-workers* nil)
-(defvar *retry-budget-remaining* 0)
-(defvar *runner-default-condition-handler-disabled* nil)
-(defvar *runner-propagate-conditions* t)
-(defvar *attempt-secondary-conditions* nil)
-
-(defparameter *runner-dynamic-environment-variables*
-  '(*root-suite*
-    *current-suite*
-    *test-context*
-    *test-name-filter*
-    *test-sequence-order*
-    *test-sequence-seed*
-    *default-retry*
-    *retry-budget-remaining*
-    *runner-propagate-conditions*
-    *default-timeout-ms*
-    *max-workers*
-    *default-max-workers*
-    *isolated-timeout-seconds*
-    *snapshot-directory*
-    *snapshot-file-name*
-    *update-snapshots*
-    *snapshot-session*
-    *property-test-count*
-    *property-seed*
-    *recursive-generator-depth*
-    *journal-enabled*
-    *test-random-seed*))
-
-(defconstant +stable-hash-modulus+ 4294967296)
-(defconstant +stable-hash-offset+ 2166136261)
-(defconstant +stable-hash-prime+ 16777619)
+(defparameter *default-max-workers* (detect-default-max-workers))
 
 (defstruct execution-control
   bail-limit

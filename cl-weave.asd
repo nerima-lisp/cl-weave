@@ -83,6 +83,7 @@
    (:file "reporter-plan")
    (:file "reporter-mutation")
    (:file "reporter-junit")
+   (:file "runner-control-data")
    (:file "runner-control")
    (:file "runner-hooks")
    (:file "runner-attempts")

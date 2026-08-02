@@ -34,6 +34,14 @@
                  (funcall (property-shrink-bounce-thunk step)))
         finally (return step)))
 
+(defmacro bounce-property-shrink ((state-var) &body body)
+  "Build a shrink continuation that defers BODY as a trampoline bounce
+instead of calling it directly, so TRAMPOLINE-PROPERTY-SHRINK can drive
+arbitrarily deep shrink recursion in a flat loop rather than the Lisp
+call stack. STATE-VAR is bound to the argument the continuation receives."
+  `(lambda (,state-var)
+     (make-property-shrink-bounce (lambda () ,@body))))
+
 (defun property-shrink-state-with-attempt (state steps)
   (make-property-shrink-state
    :original (property-shrink-state-original state)
@@ -121,12 +129,10 @@ first failing case down to the minimal one."
                     (property-shrink-state-with-attempt state next-steps)))
               (call-property-shrink-candidate/k
                attempted-state index (first candidates) accept
-               (lambda (rejected-state)
-                 (make-property-shrink-bounce
-                  (lambda ()
-                    (try-property-shrink-candidates/k
-                     rejected-state index (rest candidates)
-                     accept reject complete))))))))))
+               (bounce-property-shrink (rejected-state)
+                 (try-property-shrink-candidates/k
+                  rejected-state index (rest candidates)
+                  accept reject complete))))))))
 
 (defun advance-property-shrink/k
     (state generators index accept complete)
@@ -137,21 +143,17 @@ first failing case down to the minimal one."
              (candidates (property-shrink-candidates generator value)))
         (try-property-shrink-candidates/k
          state index candidates accept
-         (lambda (rejected-state)
-           (make-property-shrink-bounce
-            (lambda ()
-              (advance-property-shrink/k
-               rejected-state (rest generators) (1+ index)
-               accept complete))))
+         (bounce-property-shrink (rejected-state)
+           (advance-property-shrink/k
+            rejected-state (rest generators) (1+ index)
+            accept complete))
          complete))))
 
 (defun shrink-property-state/k (state generators complete)
   (advance-property-shrink/k
    state generators 0
-   (lambda (accepted-state)
-     (make-property-shrink-bounce
-      (lambda ()
-        (shrink-property-state/k accepted-state generators complete))))
+   (bounce-property-shrink (accepted-state)
+     (shrink-property-state/k accepted-state generators complete))
    complete))
 
 (defun shrink-property-values (generators values function &optional original-condition)

@@ -42,11 +42,6 @@
 (defun json-write-string-list (values stream)
   (json-write-sequence values #'write-json-string stream))
 
-(defun event-path-strings-with-status (events status)
-  (loop for event in events
-        when (eq (test-event-status event) status)
-          collect (path-string (test-event-path event))))
-
 (defun json-write-summary-count-fields (summary field-specs stream)
   (loop for spec in field-specs
         do (format stream ",\"~A\":~D"

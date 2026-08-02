@@ -6,33 +6,17 @@
         collect current into suites
         finally (return (nreverse suites))))
 
-(progn
-  (defun effective-before-hooks/from-lineage (lineage)
-    (loop for current in lineage
-          append (suite-hook current before-each)))
+(defun effective-before-hooks/from-lineage (lineage)
+  (loop for current in lineage
+        append (suite-hook current before-each)))
 
-  (defun effective-around-hooks/from-lineage (lineage)
-    (loop for current in lineage
-          append (suite-hook current around-each)))
+(defun effective-around-hooks/from-lineage (lineage)
+  (loop for current in lineage
+        append (suite-hook current around-each)))
 
-  (defun effective-after-hooks/from-lineage (lineage)
-    (loop for current in (reverse lineage)
-          append (reverse (suite-hook current after-each))))
-
-  (defun effective-test-hooks (suite)
-    (let ((lineage (suite-lineage suite)))
-      (values (effective-before-hooks/from-lineage lineage)
-              (effective-around-hooks/from-lineage lineage)
-              (effective-after-hooks/from-lineage lineage))))
-
-  (defun effective-before-hooks (suite)
-    (effective-before-hooks/from-lineage (suite-lineage suite))))
-
-(defun effective-around-hooks (suite)
-  (effective-around-hooks/from-lineage (suite-lineage suite)))
-
-(defun effective-after-hooks (suite)
-  (effective-after-hooks/from-lineage (suite-lineage suite)))
+(defun effective-after-hooks/from-lineage (lineage)
+  (loop for current in (reverse lineage)
+        append (reverse (suite-hook current after-each))))
 
 (defun call-hooks/collect-errors (hooks &optional phase)
   "Run each hook, collecting the conditions any of them signal. When PHASE is
