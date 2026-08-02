@@ -51,20 +51,14 @@
     let
       lib = nixpkgs.lib;
 
-      # x86_64-linux is the only system CI gates: ci.yml runs on
-      # ubuntu-latest, does not pass --all-systems to `nix flake check`, and
-      # its "Materialize check artifacts" step names `checks.x86_64-linux.*`
-      # explicitly, so nothing here ever builds aarch64-darwin outputs on CI.
-      #
-      # aarch64-darwin is declared anyway, for `nix develop`/`nix build` on
-      # Apple Silicon: mkPackageFlake derives packages/checks/apps/devShells
-      # from this one list, so without it every one of those is absent for
-      # that platform and `nix-direnv` fails outright on a macOS checkout.
-      # This does NOT reinstate a macOS CI runner -- see
-      # cl-weave-ci-scope-decisions: that stays a separate, still-declined
-      # decision. aarch64-linux and x86_64-darwin remain absent; add them the
-      # same way, for the same local-development reason, if that need arises.
-      # See PACKAGE_STANDARD.md "systems".
+      # x86_64-linux is what CI gates; aarch64-darwin is the development
+      # machine. Every per-system output -- packages, checks, apps AND devShells
+      # -- comes from this one list, so leaving aarch64-darwin out takes `nix
+      # build` and `nix develop` off the development machine as well. That trade
+      # was made on 2026-08-01 and reverted on 2026-08-02; aarch64-darwin carries
+      # no CI gate, which PACKAGE_STANDARD.md's "systems" section accepts
+      # explicitly. aarch64-linux and x86_64-darwin are nobody's verification and
+      # are not declared.
       systems = [
         "x86_64-linux"
         "aarch64-darwin"
