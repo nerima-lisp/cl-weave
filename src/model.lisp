@@ -84,23 +84,22 @@ assertion is collected there and execution continues instead of unwinding.")
   (status path condition secondary-conditions assertion reason location
    elapsed-internal-time journal replay-seed))
 
-(progn
-  (define-record-class test-plan-entry
-    (path status reason focused retry timeout-ms concurrent location tags))
+(define-record-class test-plan-entry
+  (path status reason focused retry timeout-ms concurrent location tags))
 
-  (defun make-test-plan-entry-record
-      (path status reason focused retry timeout-ms concurrent location tags)
-    (make-instance
-     (load-time-value (find-class (quote test-plan-entry)))
-     :path path
-     :status status
-     :reason reason
-     :focused focused
-     :retry retry
-     :timeout-ms timeout-ms
-     :concurrent concurrent
-     :location location
-     :tags tags)))
+(defun make-test-plan-entry-record
+    (path status reason focused retry timeout-ms concurrent location tags)
+  (make-instance
+   (load-time-value (find-class (quote test-plan-entry)))
+   :path path
+   :status status
+   :reason reason
+   :focused focused
+   :retry retry
+   :timeout-ms timeout-ms
+   :concurrent concurrent
+   :location location
+   :tags tags))
 
 (define-record-class benchmark-result
   (samples iterations warmup))

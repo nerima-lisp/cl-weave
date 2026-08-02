@@ -165,6 +165,16 @@
 
 (declaim (ftype function match-object-value/k match-object-sequence/k))
 
+(defun match-recursion-succeeded ()
+  "The SUCCEED continuation for a recursive MATCH-OBJECT-VALUE/K call:
+report the nested match back to the caller as (values matched failure)."
+  (values t nil))
+
+(defun match-recursion-failed (failure)
+  "The FAIL continuation for a recursive MATCH-OBJECT-VALUE/K call: report
+FAILURE back to the caller as (values matched failure)."
+  (values nil failure))
+
 (defun match-object-entries/k (actual entries path succeed fail)
   (dolist (entry entries (funcall succeed))
     (destructuring-bind (key expected-value) entry
@@ -181,8 +191,8 @@
               (match-object-value/k actual-value
                                     expected-value
                                     property-path
-                                    (lambda () (values t nil))
-                                    (lambda (reason) (values nil reason)))
+                                    #'match-recursion-succeeded
+                                    #'match-recursion-failed)
             (unless matched
               (return (funcall fail failure)))))))))
 
@@ -219,8 +229,8 @@
                    (elt actual position)
                    (elt expected position)
                    (append path (list position))
-                   (lambda () (values t nil))
-                   (lambda (reason) (values nil reason)))
+                   #'match-recursion-succeeded
+                   #'match-recursion-failed)
                 (unless matched
                   (return (funcall fail failure))))
            finally (return (funcall succeed))))))

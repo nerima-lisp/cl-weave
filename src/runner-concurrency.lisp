@@ -1,14 +1,13 @@
 (in-package #:cl-weave)
 
-(progn
-  (defconstant +maximum-physical-worker-count+ 64)
+(defconstant +maximum-physical-worker-count+ 64)
 
-  (defun worker-batch-size (tests &optional test-count)
-    (let* ((requested-limit (normalize-max-workers *max-workers*))
-           (limit (or requested-limit *default-max-workers*)))
-      (min limit
-           +maximum-physical-worker-count+
-           (or test-count (length tests))))))
+(defun worker-batch-size (tests &optional test-count)
+  (let* ((requested-limit (normalize-max-workers *max-workers*))
+         (limit (or requested-limit *default-max-workers*)))
+    (min limit
+         +maximum-physical-worker-count+
+         (or test-count (length tests)))))
 
 #+sb-thread
 (progn

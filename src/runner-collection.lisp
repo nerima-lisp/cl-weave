@@ -239,102 +239,98 @@
               (*max-workers* (collection-options-max-workers options)))
           (funcall continue filter))))))
 
+(defun default-strict-empty-collection-options-p (options)
+  (and (null (collection-options-name-filter options))
+       (null (collection-options-location-filter options))
+       (null (collection-options-test-path-filter options))
+       (null (collection-options-include-tags options))
+       (null (collection-options-exclude-tags options))
+       (null (collection-options-bail options))
+       (null (collection-options-shard options))
+       (eq (collection-options-order options) :defined)
+       (eql (collection-options-seed options) 0)
+       (eql (collection-options-retry options) 0)
+       (null (collection-options-timeout-ms options))
+       (null (collection-options-max-workers options))))
 
+(defun strict-empty-lineage-eligible-p (lineage)
+  (every
+   (lambda (current)
+     (and (null (suite-focus current))
+          (null (suite-skip-reason current))
+          (null (suite-todo-reason current))
+          (null (suite-execution-mode current))
+          (null (suite-before-each current))
+          (null (suite-around-each current))
+          (null (suite-after-each current))))
+   lineage))
 
+(defun strict-empty-test-eligible-p (test)
+  (and (test-case-p test)
+       (null (test-case-focus test))
+       (null (test-case-skip-reason test))
+       (null (test-case-todo-reason test))
+       (null (test-case-retry test))
+       (null (test-case-timeout-ms test))
+       (null (test-case-execution-mode test))
+       (null (test-case-expected-failure-reason test))
+       (null (test-case-watch-dependencies test))
+       (let ((marker (test-case-trusted-empty-function test)))
+         (and marker
+              (eq marker (test-case-function test))))))
 
-(progn
-  (defun default-strict-empty-collection-options-p (options)
-    (and (null (collection-options-name-filter options))
-         (null (collection-options-location-filter options))
-         (null (collection-options-test-path-filter options))
-         (null (collection-options-include-tags options))
-         (null (collection-options-exclude-tags options))
-         (null (collection-options-bail options))
-         (null (collection-options-shard options))
-         (eq (collection-options-order options) :defined)
-         (eql (collection-options-seed options) 0)
-         (eql (collection-options-retry options) 0)
-         (null (collection-options-timeout-ms options))
-         (null (collection-options-max-workers options))))
+(defun strict-empty-batch-eligible-p
+    (suite &optional (lineage (suite-lineage suite)))
+  (and (null (suite-before-all suite))
+       (null (suite-after-all suite))
+       (strict-empty-lineage-eligible-p lineage)
+       (every #'strict-empty-test-eligible-p
+              (suite-children suite))))
 
-  (defun strict-empty-lineage-eligible-p (lineage)
-    (every
-     (lambda (current)
-       (and (null (suite-focus current))
-            (null (suite-skip-reason current))
-            (null (suite-todo-reason current))
-            (null (suite-execution-mode current))
-            (null (suite-before-each current))
-            (null (suite-around-each current))
-            (null (suite-after-each current))))
-     lineage))
+(defun collect-strict-empty-batch-events
+    (suite &optional (lineage (suite-lineage suite)))
+  (let ((path-prefix
+          (mapcar #'suite-name (rest lineage))))
+    (loop for test in (suite-children suite)
+          collect
+          (make-pass-event-with-path
+           test
+           (append path-prefix
+                   (list (test-case-name test)))
+           (get-internal-real-time)))))
 
-  (defun strict-empty-test-eligible-p (test)
-    (and (test-case-p test)
-         (null (test-case-focus test))
-         (null (test-case-skip-reason test))
-         (null (test-case-todo-reason test))
-         (null (test-case-retry test))
-         (null (test-case-timeout-ms test))
-         (null (test-case-execution-mode test))
-         (null (test-case-expected-failure-reason test))
-         (null (test-case-watch-dependencies test))
-         (let ((marker (test-case-trusted-empty-function test)))
-           (and marker
-                (eq marker (test-case-function test))))))
+(defun try-collect-strict-empty-batch-events (suite options)
+  (if (default-strict-empty-collection-options-p options)
+      (let ((lineage (suite-lineage suite)))
+        (if (strict-empty-batch-eligible-p suite lineage)
+            (values
+             (collect-strict-empty-batch-events suite lineage)
+             t)
+            (values nil nil)))
+      (values nil nil)))
 
-  (defun strict-empty-batch-eligible-p
-      (suite &optional (lineage (suite-lineage suite)))
-    (and (null (suite-before-all suite))
-         (null (suite-after-all suite))
-         (strict-empty-lineage-eligible-p lineage)
-         (every #'strict-empty-test-eligible-p
-                (suite-children suite))))
-
-  (defun collect-strict-empty-batch-events
-      (suite &optional (lineage (suite-lineage suite)))
-    (let ((path-prefix
-            (mapcar #'suite-name (rest lineage))))
-      (loop for test in (suite-children suite)
-            collect
-            (make-pass-event-with-path
-             test
-             (append path-prefix
-                     (list (test-case-name test)))
-             (get-internal-real-time)))))
-
-  (defun try-collect-strict-empty-batch-events (suite options)
-    (if (default-strict-empty-collection-options-p options)
-        (let ((lineage (suite-lineage suite)))
-          (if (strict-empty-batch-eligible-p suite lineage)
-              (values
-               (collect-strict-empty-batch-events suite lineage)
-               t)
-              (values nil nil)))
-        (values nil nil)))
-
-  (defun collect-events-with-options (suite options)
-    (let ((suite (snapshot-suite suite)))
-      (with-runner-condition-propagation (nil)
-        (multiple-value-bind (events collected-p)
-            (try-collect-strict-empty-batch-events suite options)
-          (if collected-p
-              events
-              (call-with-collection-context
-               suite
-               options
-               (lambda (filter)
-                 (collect-suite-events/k
-                  suite
-                  (make-execution-control
-                   :bail-limit
-                   (if (eq (collection-options-bail options) t)
-                       1
-                       (collection-options-bail options)))
-                  (lambda (events events-last)
-                    (declare (ignore events-last))
-                    events)
-                  filter)))))))))
+(defun collect-events-with-options (suite options)
+  (let ((suite (snapshot-suite suite)))
+    (with-runner-condition-propagation (nil)
+      (multiple-value-bind (events collected-p)
+          (try-collect-strict-empty-batch-events suite options)
+        (if collected-p
+            events
+            (call-with-collection-context
+             suite
+             options
+             (lambda (filter)
+               (collect-suite-events/k
+                suite
+                (make-execution-control
+                 :bail-limit
+                 (if (eq (collection-options-bail options) t)
+                     1
+                     (collection-options-bail options)))
+                (lambda (events events-last)
+                  (declare (ignore events-last))
+                  events)
+                filter))))))))
 
 (defun collect-events
     (suite &key name-filter location-filter test-path-filter

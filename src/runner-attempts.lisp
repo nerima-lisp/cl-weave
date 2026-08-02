@@ -1,47 +1,45 @@
 (in-package #:cl-weave)
 
-(progn
-  (defvar *collection-test-paths* nil)
+(defvar *collection-test-paths* nil)
 
-  (defun test-path (suite test)
-    (append (mapcar #'suite-name (rest (suite-lineage suite)))
-            (list (test-case-name test)))))
+(defun test-path (suite test)
+  (append (mapcar #'suite-name (rest (suite-lineage suite)))
+          (list (test-case-name test))))
 
 (defun filter-path-string (path)
   (format nil "~{~A~^ > ~}" path))
 
-(progn
-  (defun make-event (status suite test start
-                     &key condition secondary-conditions assertion reason)
-    (make-instance
-     (load-time-value (find-class 'test-event))
-     :status status
-     :path (or (and *collection-test-paths*
-                    (gethash test *collection-test-paths*))
-               (test-path suite test))
-     :condition condition
-     :secondary-conditions (or secondary-conditions
-                               *attempt-secondary-conditions*)
-     :assertion assertion
-     :reason reason
-     :location (test-case-location test)
-     :elapsed-internal-time (- (get-internal-real-time) start)
-     :journal (current-journal-frames)
-     :replay-seed *attempt-replay-seed*))
+(defun make-event (status suite test start
+                   &key condition secondary-conditions assertion reason)
+  (make-instance
+   (load-time-value (find-class 'test-event))
+   :status status
+   :path (or (and *collection-test-paths*
+                  (gethash test *collection-test-paths*))
+             (test-path suite test))
+   :condition condition
+   :secondary-conditions (or secondary-conditions
+                             *attempt-secondary-conditions*)
+   :assertion assertion
+   :reason reason
+   :location (test-case-location test)
+   :elapsed-internal-time (- (get-internal-real-time) start)
+   :journal (current-journal-frames)
+   :replay-seed *attempt-replay-seed*))
 
-  (defun make-pass-event-with-path (test path start)
-    (make-instance
-     (load-time-value (find-class 'test-event))
-     :status :pass
-     :path path
-     :condition nil
-     :secondary-conditions *attempt-secondary-conditions*
-     :assertion nil
-     :reason nil
-     :location (test-case-location test)
-     :elapsed-internal-time (- (get-internal-real-time) start)
-     :journal (current-journal-frames)
-     :replay-seed *attempt-replay-seed*)))
+(defun make-pass-event-with-path (test path start)
+  (make-instance
+   (load-time-value (find-class 'test-event))
+   :status :pass
+   :path path
+   :condition nil
+   :secondary-conditions *attempt-secondary-conditions*
+   :assertion nil
+   :reason nil
+   :location (test-case-location test)
+   :elapsed-internal-time (- (get-internal-real-time) start)
+   :journal (current-journal-frames)
+   :replay-seed *attempt-replay-seed*))
 
 (defun normalize-retry-count (retry)
   (cond
@@ -83,11 +81,6 @@
   (normalize-timeout-ms
    (or (test-case-timeout-ms test)
        *default-timeout-ms*)))
-
-(defun timeout-seconds (test)
-  (let ((timeout-ms (effective-timeout-ms test)))
-    (when timeout-ms
-      (/ timeout-ms 1000.0))))
 
 (defun call-test-case-with-timeout/k (suite test timeout continue)
   (if timeout

@@ -45,28 +45,27 @@
       (:github (report-github events stream))
       (:junit (report-junit events stream)))))
 
-(progn
-  (defun find-suite-by-designator-unlocked (suite-designator suite)
-    (let ((target (named-suite-key suite-designator))
-          (stack (list suite)))
-      (loop while stack
-            for node = (pop stack)
-            do (when (suite-p node)
-                 (when (equal (named-suite-key (suite-name node)) target)
-                   (return node))
-                 (let ((children nil))
-                   (dolist (child (suite-children node))
-                     (when (suite-p child)
-                       (push child children)))
-                   (dolist (child children)
-                     (push child stack)))))))
+(defun find-suite-by-designator-unlocked (suite-designator suite)
+  (let ((target (named-suite-key suite-designator))
+        (stack (list suite)))
+    (loop while stack
+          for node = (pop stack)
+          do (when (suite-p node)
+               (when (equal (named-suite-key (suite-name node)) target)
+                 (return node))
+               (let ((children nil))
+                 (dolist (child (suite-children node))
+                   (when (suite-p child)
+                     (push child children)))
+                 (dolist (child children)
+                   (push child stack)))))))
 
-  (defun find-suite-by-designator
-      (suite-designator &optional (suite nil suite-supplied-p))
-    (with-test-registry-lock
-      (find-suite-by-designator-unlocked
-       suite-designator
-       (if suite-supplied-p suite *root-suite*)))))
+(defun find-suite-by-designator
+    (suite-designator &optional (suite nil suite-supplied-p))
+  (with-test-registry-lock
+    (find-suite-by-designator-unlocked
+     suite-designator
+     (if suite-supplied-p suite *root-suite*))))
 
 (defun resolve-suite-designator (suite-designator)
   (cond
