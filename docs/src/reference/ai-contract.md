@@ -453,7 +453,7 @@ verification and scope policy for those channels lives in
       "name": "flake-check",
       "kind": "nix",
       "command": ["nix", "flake", "check", "--print-build-logs"],
-      "timeoutSeconds": 600,
+      "timeoutSeconds": 900,
       "artifacts": [],
       "description": "Run the complete Nix flake validation suite."
     }
