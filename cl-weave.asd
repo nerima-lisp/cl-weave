@@ -53,6 +53,7 @@
    (:file "logic")
    (:file "isolation")
    (:file "snapshots")
+   (:file "mocks-data")
    (:file "mocks")
    (:file "matcher-core")
    (:file "matcher-structural")
