@@ -10,7 +10,7 @@
   :license "MIT"
   ;; Single source of truth for the version. flake.nix reads this form, and
   ;; release.yml refuses to publish a tag that disagrees with it.
-  :version "1.1.0"
+  :version "1.1.1"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
@@ -122,7 +122,7 @@
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "1.1.0"
+  :version "1.1.1"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
