@@ -9,81 +9,74 @@
 (defvar *current-suite* nil)
 (defvar *named-suites* (make-hash-table :test #'equal))
 (defvar *registration-owners* (make-hash-table :test (function eq)))
-(progn
-  (defvar *test-registry-generation* 0)
-  #+sb-thread
-  (defvar *test-registry-lock*
-    (sb-thread:make-mutex :name "cl-weave test registry"))
-  (defmacro with-test-registry-lock (&body body)
-    #+sb-thread
-    `(sb-thread:with-mutex (*test-registry-lock*) ,@body)
-    #-sb-thread
-    `(progn ,@body)))
 
-(progn
-  (defun note-test-registry-change-unlocked ()
-    (incf *test-registry-generation*))
-  (defun note-test-registry-change ()
-    (with-test-registry-lock
-      (note-test-registry-change-unlocked))))
+(defvar *test-registry-generation* 0)
+#+sb-thread
+(defvar *test-registry-lock*
+  (sb-thread:make-mutex :name "cl-weave test registry"))
+(define-conditional-lock-macro with-test-registry-lock () *test-registry-lock*)
+
+(defun note-test-registry-change-unlocked ()
+  (incf *test-registry-generation*))
+(defun note-test-registry-change ()
+  (with-test-registry-lock
+    (note-test-registry-change-unlocked)))
 
 (defun registration-location-pathname (location)
   (let ((file (and location (getf location :file))))
     (and file (uiop:ensure-absolute-pathname file))))
 
-(progn
-  (defun record-registration-owner-unlocked (registration pathname)
-    (when pathname
-      (setf (gethash registration *registration-owners*) pathname))
-    registration)
-  (defun record-registration-owner (registration location)
+(defun record-registration-owner-unlocked (registration pathname)
+  (when pathname
+    (setf (gethash registration *registration-owners*) pathname))
+  registration)
+(defun record-registration-owner (registration location)
   (let ((pathname (registration-location-pathname location)))
     (with-test-registry-lock
       (record-registration-owner-unlocked registration pathname)
       (note-test-registry-change-unlocked)
-      registration))))
+      registration)))
 
-(progn
-  (defun root-suite-unlocked ()
+(defun root-suite-unlocked ()
   (if *root-suite*
       (values *root-suite* nil)
       (values (setf *root-suite* (make-suite :name "root")) t)))
-  (defun root-suite ()
+(defun root-suite ()
   (with-test-registry-lock
     (multiple-value-bind (root created-p)
         (root-suite-unlocked)
       (when created-p
         (note-test-registry-change-unlocked))
       root)))
-  (progn
-  (defun copy-list-with-tail (values)
-    (loop with head = nil
-          with tail = nil
-          for value in values
-          for cell = (list value)
-          do (if tail
-                 (setf (cdr tail) cell
-                       tail cell)
-                 (setf head cell
-                       tail cell))
-          finally (return (values head tail))))
 
-  (defun copy-suite-children-with-tail (children suite-map)
-    (loop with head = nil
-          with tail = nil
-          for child in children
-          for value = (if (suite-p child)
-                          (gethash child suite-map)
-                          child)
-          for cell = (list value)
-          do (if tail
-                 (setf (cdr tail) cell
-                       tail cell)
-                 (setf head cell
-                       tail cell))
-          finally (return (values head tail))))
+(defun copy-list-with-tail (values)
+  (loop with head = nil
+        with tail = nil
+        for value in values
+        for cell = (list value)
+        do (if tail
+               (setf (cdr tail) cell
+                     tail cell)
+               (setf head cell
+                     tail cell))
+        finally (return (values head tail))))
 
-  (defun clone-suite-tree-unlocked (root)
+(defun copy-suite-children-with-tail (children suite-map)
+  (loop with head = nil
+        with tail = nil
+        for child in children
+        for value = (if (suite-p child)
+                        (gethash child suite-map)
+                        child)
+        for cell = (list value)
+        do (if tail
+               (setf (cdr tail) cell
+                     tail cell)
+               (setf head cell
+                     tail cell))
+        finally (return (values head tail))))
+
+(defun clone-suite-tree-unlocked (root)
   (let ((suite-map (make-hash-table :test (function eq)))
         (pending (and root (list (cons root nil)))))
     ;; Allocate suite shells before rebuilding child and hook list spines.
@@ -128,28 +121,19 @@
          (setf (suite-around-each clone) around-each
                (suite-around-each-tail clone) around-each-tail)))
      suite-map)
-    (values (and root (gethash root suite-map)) suite-map))))
-  (defun snapshot-suite (suite)
+    (values (and root (gethash root suite-map)) suite-map)))
+(defun snapshot-suite (suite)
   (with-test-registry-lock
     (let ((tree-root suite))
       (loop while (and tree-root (suite-parent tree-root))
             do (setf tree-root (suite-parent tree-root)))
       (multiple-value-bind (clone suite-map)
           (clone-suite-tree-unlocked tree-root)
-        (or (gethash suite suite-map) clone))))))
+        (or (gethash suite suite-map) clone)))))
 
-(progn
-  (defun current-or-root-suite-unlocked ()
-    (or *current-suite*
-        (root-suite-unlocked)))
-  (defun current-or-root-suite ()
-  (with-test-registry-lock
-    (multiple-value-bind (suite created-p)
-        (current-or-root-suite-unlocked)
-      (when created-p
-        (note-test-registry-change-unlocked))
-      suite))))
-
+(defun current-or-root-suite-unlocked ()
+  (or *current-suite*
+      (root-suite-unlocked)))
 (defun clear-tests ()
   (with-test-registry-lock
     (setf *root-suite* nil
@@ -202,15 +186,14 @@
            (note-test-registry-change-unlocked)
            registration)))))
 
-(progn
-  (defun add-owned-child-unlocked (parent child pathname)
-    (append-to-tail-list parent
-                         suite-children
-                         suite-children-tail
-                         child)
-    (record-registration-owner-unlocked child pathname)
-    (note-test-registry-change-unlocked)
-    child)
-  (defun add-child (parent child)
-    (with-test-registry-lock
-      (add-owned-child-unlocked parent child nil))))
+(defun add-owned-child-unlocked (parent child pathname)
+  (append-to-tail-list parent
+                       suite-children
+                       suite-children-tail
+                       child)
+  (record-registration-owner-unlocked child pathname)
+  (note-test-registry-change-unlocked)
+  child)
+(defun add-child (parent child)
+  (with-test-registry-lock
+    (add-owned-child-unlocked parent child nil)))

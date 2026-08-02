@@ -8,39 +8,35 @@
     ((test-case-p child)
      (test-case-focus child))))
 
-(progn
-  (defun build-focus-index (suite)
-    (let ((index (make-hash-table :test (function eq)))
-          (stack (list (list* suite nil (suite-children suite)))))
-      (loop while stack
-            for frame = (car stack)
-            for node = (car frame)
-            for ancestor-focused = (cadr frame)
-            for remaining = (cddr frame)
-            do (if remaining
-                   (let ((child (car remaining)))
-                     (setf (cddr frame) (cdr remaining))
-                     (cond
-                       ((suite-p child)
-                        (let ((focused (or ancestor-focused
-                                           (suite-focus child))))
-                          (push (list* child focused (suite-children child))
-                                stack)))
-                       ((test-case-p child)
-                        (when (or ancestor-focused
-                                  (test-case-focus child))
-                          (setf (gethash child index) t)))))
-                   (progn
-                     (pop stack)
-                     (when (or ancestor-focused
-                               (some (lambda (child)
-                                       (gethash child index))
-                                     (suite-children node)))
-                       (setf (gethash node index) t)))))
-      (values (not (null (gethash suite index))) index)))
-
-  (defun focused-suite-p (suite)
-    (nth-value 0 (build-focus-index suite))))
+(defun build-focus-index (suite)
+  (let ((index (make-hash-table :test (function eq)))
+        (stack (list (list* suite nil (suite-children suite)))))
+    (loop while stack
+          for frame = (car stack)
+          for node = (car frame)
+          for ancestor-focused = (cadr frame)
+          for remaining = (cddr frame)
+          do (if remaining
+                 (let ((child (car remaining)))
+                   (setf (cddr frame) (cdr remaining))
+                   (cond
+                     ((suite-p child)
+                      (let ((focused (or ancestor-focused
+                                         (suite-focus child))))
+                        (push (list* child focused (suite-children child))
+                              stack)))
+                     ((test-case-p child)
+                      (when (or ancestor-focused
+                                (test-case-focus child))
+                        (setf (gethash child index) t)))))
+                 (progn
+                   (pop stack)
+                   (when (or ancestor-focused
+                             (some (lambda (child)
+                                     (gethash child index))
+                                   (suite-children node)))
+                     (setf (gethash node index) t)))))
+    (values (not (null (gethash suite index))) index)))
 
 (defstruct selection-filter
   "Per-run selection criteria and identity indexes threaded through traversal."
@@ -58,7 +54,6 @@
   test-paths
   selected-tests
   selected-suites)
-
 
 (defconstant +maximum-selection-filter-count+ 100000)
 
@@ -88,7 +83,6 @@
       (error "cl-weave: name-filter must be a string or NIL."))
     (unless (string= filter "")
       (string-downcase filter))))
-
 
 (defun test-path-matches-filter-p (path filter)
   (or (null filter)
@@ -124,7 +118,6 @@
      (string
       (uiop:ensure-absolute-pathname designator (uiop:getcwd))))))
 
-
 (defun normalize-location-filter (location-filter)
   (normalize-bounded-proper-list
    location-filter
@@ -145,7 +138,6 @@
       "each test-path-filter path"
       #'normalize-test-path-component))))
 
-
 (defun test-location-pathname (test)
   (let ((file (getf (test-case-location test) :file)))
     (when file
@@ -161,27 +153,26 @@
   (or (null path-index)
       (gethash path path-index)))
 
-(progn
-  (defun tag-membership-index (tags)
-    (when tags
-      (let ((index (make-hash-table :test (function equal)
-                                    :size (length tags))))
-        (dolist (tag tags index)
-          (setf (gethash tag index) t)))))
+(defun tag-membership-index (tags)
+  (when tags
+    (let ((index (make-hash-table :test (function equal)
+                                  :size (length tags))))
+      (dolist (tag tags index)
+        (setf (gethash tag index) t)))))
 
-  (defun tag-index-member-p (tag index)
-    (and index (gethash tag index)))
+(defun tag-index-member-p (tag index)
+  (and index (gethash tag index)))
 
-  (defun test-tags-match-filter-p
-      (test include-tag-index exclude-tag-index)
-    (let ((include-match (null include-tag-index)))
-      (dolist (tag (test-case-tags test) include-match)
-        (when (and exclude-tag-index
-                   (tag-index-member-p tag exclude-tag-index))
-          (return nil))
-        (when (and include-tag-index
-                   (tag-index-member-p tag include-tag-index))
-          (setf include-match t))))))
+(defun test-tags-match-filter-p
+    (test include-tag-index exclude-tag-index)
+  (let ((include-match (null include-tag-index)))
+    (dolist (tag (test-case-tags test) include-match)
+      (when (and exclude-tag-index
+                 (tag-index-member-p tag exclude-tag-index))
+        (return nil))
+      (when (and include-tag-index
+                 (tag-index-member-p tag include-tag-index))
+        (setf include-match t)))))
 
 (defun base-selected-test-case-p (test path filter ancestor-focused)
   (declare (ignore ancestor-focused))
@@ -251,19 +242,18 @@
     ((integerp seed) seed)
     (t (error "Sequence seed must be an integer: ~S" seed))))
 
-(progn
-  (defun update-stable-string-hash (hash string)
-    (loop for char across string
-          do (setf hash
-                   (mod (* (logxor hash (char-code char))
-                           +stable-hash-prime+)
-                        +stable-hash-modulus+))
-          finally (return hash)))
+(defun update-stable-string-hash (hash string)
+  (loop for char across string
+        do (setf hash
+                 (mod (* (logxor hash (char-code char))
+                         +stable-hash-prime+)
+                      +stable-hash-modulus+))
+        finally (return hash)))
 
-  (defun stable-string-hash (string seed)
-    (update-stable-string-hash
-     (mod (+ +stable-hash-offset+ seed) +stable-hash-modulus+)
-     string)))
+(defun stable-string-hash (string seed)
+  (update-stable-string-hash
+   (mod (+ +stable-hash-offset+ seed) +stable-hash-modulus+)
+   string))
 
 (defun sequence-suite-prefix (suite)
   (format nil "~{~A~^ > ~}" (mapcar #'suite-name (rest (suite-lineage suite)))))
@@ -280,45 +270,44 @@
             ((test-case-p child) (test-case-name child))
             (t child))))
 
-(progn
-  (defun sequence-child-hash (suite child prefix prefix-hash)
-    (let ((kind (cond
-                  ((suite-p child) "suite")
-                  ((test-case-p child) "test")))
-          (name (cond
-                  ((suite-p child) (suite-name child))
-                  ((test-case-p child) (test-case-name child)))))
-      (if (and kind (stringp name))
+(defun sequence-child-hash (suite child prefix prefix-hash)
+  (let ((kind (cond
+                ((suite-p child) "suite")
+                ((test-case-p child) "test")))
+        (name (cond
+                ((suite-p child) (suite-name child))
+                ((test-case-p child) (test-case-name child)))))
+    (if (and kind (stringp name))
+        (update-stable-string-hash
+         (update-stable-string-hash
           (update-stable-string-hash
-           (update-stable-string-hash
-            (update-stable-string-hash
-             (update-stable-string-hash prefix-hash " :: ")
-             kind)
-            ":")
-           name)
-          (stable-string-hash
-           (sequence-child-label suite child prefix)
-           *test-sequence-seed*))))
+           (update-stable-string-hash prefix-hash " :: ")
+           kind)
+          ":")
+         name)
+        (stable-string-hash
+         (sequence-child-label suite child prefix)
+         *test-sequence-seed*))))
 
-  (defun ordered-children (suite children)
-    (if (eq *test-sequence-order* :random)
-        (let* ((prefix (sequence-suite-prefix suite))
-               (prefix-hash
-                (stable-string-hash prefix *test-sequence-seed*))
-               (decorated
-                (stable-sort
-                 (mapcar
-                  (lambda (child)
-                    (cons (sequence-child-hash
-                           suite child prefix prefix-hash)
-                          child))
-                  children)
-                 (function <)
-                 :key (function car))))
-          (loop for cell on decorated
-                do (setf (car cell) (cdar cell)))
-          decorated)
-        children)))
+(defun ordered-children (suite children)
+  (if (eq *test-sequence-order* :random)
+      (let* ((prefix (sequence-suite-prefix suite))
+             (prefix-hash
+              (stable-string-hash prefix *test-sequence-seed*))
+             (decorated
+              (stable-sort
+               (mapcar
+                (lambda (child)
+                  (cons (sequence-child-hash
+                         suite child prefix prefix-hash)
+                        child))
+                children)
+               (function <)
+               :key (function car))))
+        (loop for cell on decorated
+              do (setf (car cell) (cdar cell)))
+        decorated)
+      children))
 
 (defun selected-test-case-p (suite test filter ancestor-focused)
   (declare (ignore suite ancestor-focused))

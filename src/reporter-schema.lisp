@@ -100,14 +100,6 @@
   "Return structured reporter artifact schema metadata."
   (copy-tree *reporter-artifact-schemas*))
 
-(defun summary-count (items status accessor)
-  (count status items :key accessor))
-
-(defun collect-summary-fields (items accessor field-specs)
-  (loop for spec in field-specs
-        append (list (getf spec :plist-key)
-                     (summary-count items (getf spec :status) accessor))))
-
 (defun result-summary (events)
   (let ((total 0)
         (passed 0)
