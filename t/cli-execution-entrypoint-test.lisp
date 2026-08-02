@@ -298,7 +298,7 @@
          (bootstrapped nil)
          (probed-pathnames (quote ()))
          (events (quote ())))
-    (sb-ext:without-package-locks
+    (with-relaxed-package-locks
       (with-mocked-functions
         (((symbol-function (quote uiop:getcwd))
             (lambda ()
@@ -475,7 +475,7 @@
          (loaded-files (quote ()))
          (searched-pathnames (quote ()))
          (message nil))
-    (sb-ext:without-package-locks
+    (with-relaxed-package-locks
       (with-mocked-functions
         (((symbol-function (quote cl-weave/cli::system-bootstrap-directories))
             (lambda (ignored-options)

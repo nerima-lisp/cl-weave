@@ -1,5 +1,18 @@
 (in-package #:cl-weave/test)
 
+;; This entire file is SBCL-only: it exercises src/cli-image.lisp, which
+;; implements the delivered `cl-weave` executable's dumped-image entry point
+;; (SB-EXT:*RUNTIME-PATHNAME*/*CORE-PATHNAME* discovery, ASDF re-registration
+;; on a moved image, etc.) -- a facility that has no non-SBCL analogue, since
+;; save-lisp-and-die delivery is itself an SBCL-only mechanism. Each DESCRIBE
+;; below is individually #+sbcl-guarded, not just this comment, because on
+;; ECL these forms reference SB-EXT:*RUNTIME-PATHNAME*, CALL-WITH-IMAGE-
+;; ANCHORS (which is itself #+sbcl-guarded in helpers-support.lisp) with a
+;; meaningless #-sbcl no-op, and SB-EXT:WITHOUT-PACKAGE-LOCKS directly rather
+;; than through WITH-RELAXED-PACKAGE-LOCKS -- so simply loading this file
+;; without the guards would still fail the ECL reader even though the tests
+;; would never actually run.
+#+sbcl
 (describe "delivered image installation prefix"
   (it "reads the prefix out of a bin or lib pathname alike"
     (expect (cl-weave/cli::anchor-prefix-pathname #P"/opt/cl-weave/bin/cl-weave")
@@ -27,6 +40,7 @@
                :to-equal (list #P"/opt/sbcl/bin/sbcl"
                                #P"/opt/cl-weave/lib/cl-weave.core"))))))
 
+#+sbcl
 (describe "installed source root"
   (it "prefers an explicitly configured root over any discovery"
     (let ((cl-weave/cli::*installed-source-root* #P"/configured/source/"))
@@ -64,6 +78,7 @@
                       :to-equal (asdf:system-source-directory "cl-weave"))))
         (uiop:delete-directory-tree prefix :validate t :if-does-not-exist :ignore)))))
 
+#+sbcl
 (describe "delivered image entry point"
   (it "re-reads the environment the image was dumped away from before running"
     (let ((root #P"/opt/cl-weave/share/common-lisp/source/")
