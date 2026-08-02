@@ -106,11 +106,36 @@ a recognized XML entity reference."
              (return directory)
         finally (error "Failed to allocate test temporary directory for ~A." prefix)))
 
+(defmacro with-relaxed-package-locks (&body body)
+  "Run BODY with SBCL's package-lock enforcement relaxed. Several tests here
+mock (SETF SYMBOL-FUNCTION) on symbols owned by locked packages (ASDF, UIOP,
+CL itself), which SBCL refuses without this. Guarded #+sbcl/#-sbcl rather than
+left as a bare call to SB-EXT:WITHOUT-PACKAGE-LOCKS because SB-EXT does not
+exist on other implementations -- and, unlike a mere runtime failure, even a
+skipped reference to it would fail the ECL reader outright, since the reader
+has to resolve package-qualified symbols to read a form at all, guarded or
+not. Other implementations either do not lock those packages by default or
+have no portable equivalent to relax with, so BODY just runs directly there;
+the mocking these tests do is unaffected either way."
+  #+sbcl
+  `(sb-ext:without-package-locks ,@body)
+  #-sbcl
+  `(progn ,@body))
+
 (defun call-with-image-anchors (runtime core callable)
   "Call CALLABLE with SB-EXT:*RUNTIME-PATHNAME* set to RUNTIME and
 SB-EXT:*CORE-PATHNAME* to CORE, restoring both afterwards. They are assigned
 rather than bound because SB-EXT is a locked package, which permits assignment
-to a special variable but not LET."
+to a special variable but not LET.
+
+Guarded #+sbcl/#-sbcl, not left bare, for the same reader-level reason as
+WITH-RELAXED-PACKAGE-LOCKS above: SB-EXT does not exist outside SBCL, and the
+reader must resolve it to read this form at all. There is nothing for the
+#-sbcl branch to substitute -- no other implementation this codebase supports
+has a dumped-image runtime/core pair to fake -- so it just calls CALLABLE
+directly; callers that assert on IMAGE-ANCHOR-PATHNAMES's result already
+expect NIL there (see src/cli-image.lisp's own #-sbcl branch)."
+  #+sbcl
   (let ((saved-runtime sb-ext:*runtime-pathname*)
         (saved-core sb-ext:*core-pathname*))
     (unwind-protect
@@ -119,7 +144,20 @@ to a special variable but not LET."
                  sb-ext:*core-pathname* core)
            (funcall callable))
       (setf sb-ext:*runtime-pathname* saved-runtime
-            sb-ext:*core-pathname* saved-core))))
+            sb-ext:*core-pathname* saved-core)))
+  ;; Two separate #-sbcl forms, not one #-sbcl (progn (declare ...) ...): a
+  ;; DECLARE is only recognized specially as a leading form of a body that
+  ;; itself accepts declarations (DEFUN's own body does; a nested PROGN's does
+  ;; not), so it has to land directly in DEFUN's body to mean anything. On
+  ;; SBCL neither of these two forms is read at all (the #+sbcl branch above
+  ;; is), so DEFUN's body is just the LET, which is the only place RUNTIME and
+  ;; CORE are used; on every other implementation the LET is skipped instead
+  ;; and these two become the entire body, in the right order for the
+  ;; DECLARE to be legal.
+  #-sbcl
+  (declare (ignore runtime core))
+  #-sbcl
+  (funcall callable))
 
 (defun read-text-file (pathname)
   (with-open-file (stream pathname :direction :input)

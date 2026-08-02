@@ -198,6 +198,7 @@ subsystems, which load after this file."
                             (package (package-name *package*))
                             (timeout *isolated-timeout-seconds*)
                             keep-files)
+  (require-platform-capability :isolation)
   (unless (and (numberp timeout) (plusp timeout))
     (error "cl-weave: isolated timeout must be a positive number, got ~S." timeout))
   (let* ((keep-files (normalize-isolated-keep-files keep-files))
@@ -258,7 +259,7 @@ subsystems, which load after this file."
 #-sbcl
 (defun run-isolated (form &key systems package timeout keep-files)
   (declare (ignore form systems package timeout keep-files))
-  (error "cl-weave: run-isolated currently requires SBCL."))
+  (require-platform-capability :isolation))
 
 (defun signal-isolated-failure (result form)
   (signal-assertion-failure

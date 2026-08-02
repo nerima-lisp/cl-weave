@@ -13,17 +13,33 @@ that $prefix/bin/cl-weave and $prefix/lib/cl-weave.core both yield $prefix/."
    (uiop:pathname-directory-pathname anchor)))
 
 (defun image-anchor-pathnames ()
-  "The files this image is running out of, most specific first.
+  "The files this image is running out of, most specific first, or NIL on an
+implementation with no notion of a dumped-image runtime/core pair distinct
+from the compiler that read this file -- i.e. every non-SBCL implementation
+cl-weave supports. INSTALLED-SOURCE-ROOT already treats an empty list here
+the same as \"nothing found\" and falls through to the ASDF-source-directory
+heuristic below it, so returning NIL degrades this to that heuristic rather
+than to a load-time error.
 
 SB-EXT:*RUNTIME-PATHNAME* is the executable itself when the image was dumped
 with :EXECUTABLE T, and the SBCL binary when the image is a bare core started
 with --core; SB-EXT:*CORE-PATHNAME* names the core in that second shape. SBCL
 resolves both to an absolute pathname at startup, even when the command was
 found on PATH, and both follow the file if it is moved -- which is what makes
-a root derived from them survive relocation."
+a root derived from them survive relocation.
+
+Guarded #+sbcl/#-sbcl (rather than left bare) because SB-EXT is an SBCL-only
+package: on any implementation without it, even a form that never runs still
+has to be READ, and the reader resolves package-qualified symbols eagerly --
+so an unguarded reference here would fail ECL's load of this file with
+\"There is no package with the name SB-EXT\" before cl-cli's ECL portable-core
+gate could get anywhere near running a test."
+  #+sbcl
   (remove-duplicates (remove nil (list sb-ext:*runtime-pathname*
                                        sb-ext:*core-pathname*))
-                     :test #'equal))
+                     :test #'equal)
+  #-sbcl
+  nil)
 
 (defun installed-source-root ()
   "The ASDF source tree installed alongside this image, or NIL when there is

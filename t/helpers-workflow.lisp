@@ -39,7 +39,7 @@ The rest of the startup sequence is stubbed, because calling it for real would
 replace the running suite's own ASDF configuration and then hand control to
 the CLI."
   (let ((observed :not-called))
-    (sb-ext:without-package-locks
+    (with-relaxed-package-locks
       (with-mocked-functions
           (((symbol-function 'uiop:setup-temporary-directory)
             (lambda () nil))

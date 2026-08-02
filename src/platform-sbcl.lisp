@@ -31,3 +31,21 @@ becomes (mock-state-lock (spy-frame-state frame))."
                 (funcall continue (funcall callable)))
             (sb-ext:timeout ()
               (error 'platform-timeout))))))
+
+;; :ISOLATION (SB-EXT:RUN-PROGRAM-backed subprocess isolation, src/isolation.
+;; lisp's RUN-ISOLATED) and :CONCURRENCY (SB-THREAD-backed parallel test
+;; execution, src/runner-concurrency.lisp's RUN-CONCURRENT-TEST-CASES) are
+;; each genuinely SBCL/OS-specific -- process spawning and native threads have
+;; no portable ANSI CL equivalent -- so, like :TIMEOUT above, they are
+;; capabilities to check for and degrade from gracefully, not things to fake
+;; on another implementation. :CONCURRENCY specifically needs SB-THREAD, not
+;; merely SBCL: an SBCL built without thread support has :SBCL but not
+;; SB-THREAD, and RUN-CONCURRENT-TEST-CASES's own #+sb-thread/#-sb-thread
+;; split already reads that condition directly rather than through this list,
+;; so this mirrors it here for callers (tests, in particular) that want to
+;; ask via PLATFORM-CAPABILITY-AVAILABLE-P instead of duplicating a reader
+;; conditional of their own.
+#+sbcl
+(pushnew :isolation *platform-capabilities* :test #'eq)
+#+sb-thread
+(pushnew :concurrency *platform-capabilities* :test #'eq)
