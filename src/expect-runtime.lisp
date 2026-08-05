@@ -6,7 +6,10 @@
 (defun smart-assertion-operator-p (operator)
   (member operator *smart-assertion-operators* :test #'eq))
 
-(defun signal-smart-assertion-failure (form matcher actual expected)
+(defun signal-runtime-assertion-failure (form matcher actual expected)
+  "Signal an ASSERTION-FAILURE for an unconditional runtime check (thunk
+validation, poll timeout, or a resolve/reject state), where NEGATED and PASS
+are always NIL."
   (signal-assertion-failure
    (make-assertion-detail
     :form form
@@ -15,6 +18,9 @@
     :expected expected
     :negated nil
     :pass nil)))
+
+(defun signal-smart-assertion-failure (form matcher actual expected)
+  (signal-runtime-assertion-failure form matcher actual expected))
 
 (defun operand-report-form (source value)
   (list :form source :value value))
@@ -95,14 +101,11 @@
 
 (defun ensure-expect-thunk (thunk matcher form)
   (unless (functionp thunk)
-    (signal-assertion-failure
-     (make-assertion-detail
-      :form form
-      :matcher matcher
-      :actual (list :callable nil :value thunk)
-      :expected '(:callable t)
-      :negated nil
-      :pass nil)))
+    (signal-runtime-assertion-failure
+     form
+     matcher
+     (list :callable nil :value thunk)
+     '(:callable t)))
   thunk)
 
 (defparameter *expect-poll-default-timeout-ms* 1000)
@@ -113,34 +116,47 @@
         unless (member key allowed-keys :test #'eq)
           collect key))
 
-(defun normalize-expect-poll-options (options form)
-  (let ((raw-options options))
-    (unless (or (null raw-options)
-                (option-plist-form-p raw-options))
-      (error "cl-weave: EXPECT-POLL options in ~S must be a property list, got ~S."
+(defun validate-expect-poll-options-shape (options form)
+  (unless (or (null options) (option-plist-form-p options))
+    (error "cl-weave: EXPECT-POLL options in ~S must be a property list, got ~S."
+           form
+           options)))
+
+(defun validate-expect-poll-options-keys (options form)
+  (let ((unknown-keys (unknown-plist-keys options '(:timeout-ms :interval-ms))))
+    (when unknown-keys
+      (error "cl-weave: EXPECT-POLL options in ~S contain unsupported keys ~S."
              form
-             raw-options))
-    (let ((unknown-keys (unknown-plist-keys raw-options '(:timeout-ms :interval-ms))))
-      (when unknown-keys
-        (error "cl-weave: EXPECT-POLL options in ~S contain unsupported keys ~S."
-               form
-               unknown-keys))
-      (let ((timeout-ms (if (plist-key-present-p raw-options :timeout-ms)
-                            (getf raw-options :timeout-ms)
-                            *expect-poll-default-timeout-ms*))
-            (interval-ms (if (plist-key-present-p raw-options :interval-ms)
-                             (getf raw-options :interval-ms)
-                             *expect-poll-default-interval-ms*)))
-        (unless (and (realp timeout-ms) (not (minusp timeout-ms)))
-          (error "cl-weave: EXPECT-POLL :timeout-ms in ~S must be a non-negative real, got ~S."
-                 form
-                 timeout-ms))
-        (unless (and (realp interval-ms) (not (minusp interval-ms)))
-          (error "cl-weave: EXPECT-POLL :interval-ms in ~S must be a non-negative real, got ~S."
-                 form
-                 interval-ms))
-        (list :timeout-ms timeout-ms
-              :interval-ms interval-ms)))))
+             unknown-keys))))
+
+(defun expect-poll-option-value (options key default)
+  (if (plist-key-present-p options key)
+      (getf options key)
+      default))
+
+(defun validate-expect-poll-non-negative-real (value option-key form)
+  (unless (and (realp value) (not (minusp value)))
+    (error "cl-weave: EXPECT-POLL ~A in ~S must be a non-negative real, got ~S."
+           option-key
+           form
+           value))
+  value)
+
+(defun normalize-expect-poll-options (options form)
+  (validate-expect-poll-options-shape options form)
+  (validate-expect-poll-options-keys options form)
+  (let ((timeout-ms
+          (validate-expect-poll-non-negative-real
+           (expect-poll-option-value options :timeout-ms *expect-poll-default-timeout-ms*)
+           ":timeout-ms"
+           form))
+        (interval-ms
+          (validate-expect-poll-non-negative-real
+           (expect-poll-option-value options :interval-ms *expect-poll-default-interval-ms*)
+           ":interval-ms"
+           form)))
+    (list :timeout-ms timeout-ms
+          :interval-ms interval-ms)))
 
 (define-record-class poll-state
   (deadline timeout-ms interval-ms attempts last-value last-condition last-detail))
@@ -167,24 +183,21 @@
         :pass (assertion-detail-pass detail)))
 
 (defun signal-expect-poll-timeout (form state)
-  (signal-assertion-failure
-   (make-assertion-detail
-    :form form
-    :matcher :poll
-    :actual (append
-             (list :attempts (poll-state-attempts state)
-                   :timeout-ms (poll-state-timeout-ms state)
-                   :interval-ms (poll-state-interval-ms state)
-                   :last-value (poll-state-last-value state))
-             (when (poll-state-last-condition state)
-               (list :last-condition
-                     (rejected-thunk-report (poll-state-last-condition state))))
-             (when (poll-state-last-detail state)
-               (list :last-assertion
-                     (poll-last-assertion-report (poll-state-last-detail state)))))
-    :expected '(:state :pass)
-    :negated nil
-    :pass nil)))
+  (signal-runtime-assertion-failure
+   form
+   :poll
+   (append
+    (list :attempts (poll-state-attempts state)
+          :timeout-ms (poll-state-timeout-ms state)
+          :interval-ms (poll-state-interval-ms state)
+          :last-value (poll-state-last-value state))
+    (when (poll-state-last-condition state)
+      (list :last-condition
+            (rejected-thunk-report (poll-state-last-condition state))))
+    (when (poll-state-last-detail state)
+      (list :last-assertion
+            (poll-last-assertion-report (poll-state-last-detail state)))))
+   '(:state :pass)))
 
 (defun call-poll-thunk/k (callable pass-k reject-k)
   (multiple-value-bind (accepted-p result)
@@ -259,14 +272,11 @@
     (handler-case
         (funcall callable)
       (condition (condition)
-        (signal-assertion-failure
-         (make-assertion-detail
-          :form form
-          :matcher :resolves
-          :actual (rejected-thunk-report condition)
-          :expected '(:state :resolved)
-          :negated nil
-          :pass nil))))))
+        (signal-runtime-assertion-failure
+         form
+         :resolves
+         (rejected-thunk-report condition)
+         '(:state :resolved))))))
 
 (defun call-rejecting-expectation-thunk (thunk form)
   (let ((callable (ensure-expect-thunk thunk :rejects form)))
@@ -277,11 +287,8 @@
             (values t condition)))
       (if rejected-p
           result
-          (signal-assertion-failure
-           (make-assertion-detail
-            :form form
-            :matcher :rejects
-            :actual (resolved-thunk-report result)
-            :expected '(:state :rejected)
-            :negated nil
-            :pass nil))))))
+          (signal-runtime-assertion-failure
+           form
+           :rejects
+           (resolved-thunk-report result)
+           '(:state :rejected))))))
