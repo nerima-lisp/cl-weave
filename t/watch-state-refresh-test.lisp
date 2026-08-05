@@ -430,3 +430,64 @@
           :to-be-greater-than
           11))))
 ))
+(it
+  "excludes module-containment and self-referential ASDF plan edges from the reload set"
+  (let* ((directory
+           (make-test-temporary-directory "watch-ancestor-self-dependency"))
+         (system-name
+           (string-downcase
+            (symbol-name (gensym "CL-WEAVE-WATCH-ANCESTOR-")))))
+    (unwind-protect
+         (progn
+           (dolist (source-name (list "inner-a" "inner-b" "leaf"))
+             (with-open-file (stream
+                 (merge-pathnames
+                  (make-pathname :name source-name :type "lisp")
+                  directory)
+                 :direction :output
+                 :if-exists :supersede
+                 :if-does-not-exist :create)
+               (format stream "(in-package #:cl-user)~%")))
+           (eval
+             (list
+               (quote asdf:defsystem)
+               system-name
+               :pathname directory
+               :components
+               (quote
+                 ((:module "inner"
+                   :pathname ""
+                   :serial t
+                   :components ((:file "inner-a") (:file "inner-b")))
+                  (:file "leaf" :depends-on ("inner"))))))
+           (let* ((system (asdf:find-system system-name))
+                  (module (asdf:find-component system "inner"))
+                  (inner-a (asdf:find-component module "inner-a")))
+             ;; MODULE is its own component with children INNER-A/INNER-B, and
+             ;; the system itself both appear in REQUIRED-COMPONENTS. ASDF's
+             ;; own plan graph reports containment edges between a module and
+             ;; its children (e.g. INNER's COMPILE-OP depends on INNER-A) and
+             ;; self edges (e.g. the system's COMPILE-OP "depends on" itself)
+             ;; alongside the real cross-file dependency edges. Without the
+             ;; ANCESTOR-P and self-dependency guards in
+             ;; INCREMENTAL-SYSTEM-RELOAD-PLAN, changing INNER-A would ripple
+             ;; through the MODULE containment edge up to LEAF (which only
+             ;; really depends on the MODULE component, not on INNER-A
+             ;; directly) and spuriously reload it too.
+             (multiple-value-bind (components pathnames)
+                 (cl-weave::incremental-system-reload-plan
+                   system
+                   (list (asdf:component-pathname inner-a)))
+               (expect
+                 (mapcar (function asdf:component-name) components)
+                 :to-equal
+                 (list "inner-a" "inner-b"))
+               (expect
+                 pathnames
+                 :to-equal
+                 (mapcar (function asdf:component-pathname) components)))))
+      (when (asdf:find-system system-name nil)
+        (asdf:clear-system system-name))
+      (uiop:delete-directory-tree directory
+                                  :validate t
+                                  :if-does-not-exist :ignore))))
