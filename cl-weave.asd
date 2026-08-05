@@ -118,6 +118,7 @@
    (:file "watch-scope")
    (:file "watch-suite-diff")
    (:file "watch-registry-compaction")
+   (:file "watch-reload")
    (:file "watch")
    (:file "cli-options")
    (:file "cli-options-parsers")
