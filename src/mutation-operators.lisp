@@ -31,17 +31,16 @@
   (or (gethash name *mutation-operators*)
       (error "Unknown mutation operator: ~S" name)))
 
+(defun resolve-mutation-operator (operator)
+  (cond ((keywordp operator) (mutation-operator-named operator))
+        ((mutation-operator-p operator) operator)
+        (t (error "Invalid mutation operator designator: ~S" operator))))
+
 (defun mutation-operator-list (operators)
-  (mapcar (lambda (operator)
-            (cond ((keywordp operator) (mutation-operator-named operator))
-                  ((mutation-operator-p operator) operator)
-                  (t (error "Invalid mutation operator designator: ~S" operator))))
-          operators))
+  (mapcar #'resolve-mutation-operator operators))
 
 (defun mutation-operator-metadata (operator)
-  (let ((operator (cond ((keywordp operator) (mutation-operator-named operator))
-                        ((mutation-operator-p operator) operator)
-                        (t (error "Invalid mutation operator designator: ~S" operator)))))
+  (let ((operator (resolve-mutation-operator operator)))
     (list :name (mutation-operator-name operator)
           :description (mutation-operator-description operator))))
 
