@@ -42,16 +42,32 @@ call stack. STATE-VAR is bound to the argument the continuation receives."
   `(lambda (,state-var)
      (make-property-shrink-bounce (lambda () ,@body))))
 
-(defun property-shrink-state-with-attempt (state steps)
+(defun property-shrink-state-with
+    (state &key
+                (original (property-shrink-state-original state))
+                (function (property-shrink-state-function state))
+                (current (property-shrink-state-current state))
+                (visited (property-shrink-state-visited state))
+                (cyclic-visited (property-shrink-state-cyclic-visited state))
+                (current-cyclic-p (property-shrink-state-current-cyclic-p state))
+                (steps (property-shrink-state-steps state))
+                (max-steps (property-shrink-state-max-steps state)))
+  "Return a new PROPERTY-SHRINK-STATE copied from STATE, overriding only the
+supplied keyword fields. PROPERTY-SHRINK-STATE is read-only, so every field
+transition goes through here instead of re-listing all eight slots at each
+call site."
   (make-property-shrink-state
-   :original (property-shrink-state-original state)
-   :function (property-shrink-state-function state)
-   :current (property-shrink-state-current state)
-   :visited (property-shrink-state-visited state)
-   :cyclic-visited (property-shrink-state-cyclic-visited state)
-   :current-cyclic-p (property-shrink-state-current-cyclic-p state)
+   :original original
+   :function function
+   :current current
+   :visited visited
+   :cyclic-visited cyclic-visited
+   :current-cyclic-p current-cyclic-p
    :steps steps
-   :max-steps (property-shrink-state-max-steps state)))
+   :max-steps max-steps))
+
+(defun property-shrink-state-with-attempt (state steps)
+  (property-shrink-state-with state :steps steps))
 
 (defun property-shrink-state-with-current (state current current-cyclic-p)
   (let ((visited (property-shrink-state-visited state))
@@ -59,15 +75,11 @@ call stack. STATE-VAR is bound to the argument the continuation receives."
     (if current-cyclic-p
         (push current cyclic-visited)
         (setf (gethash current visited) t))
-    (make-property-shrink-state
-     :original (property-shrink-state-original state)
-     :function (property-shrink-state-function state)
-     :current current
-     :visited visited
-     :cyclic-visited cyclic-visited
-     :current-cyclic-p current-cyclic-p
-     :steps (property-shrink-state-steps state)
-     :max-steps (property-shrink-state-max-steps state))))
+    (property-shrink-state-with state
+                                 :current current
+                                 :visited visited
+                                 :cyclic-visited cyclic-visited
+                                 :current-cyclic-p current-cyclic-p)))
 
 (defun record-shrink-step-frame (index candidate accepted-p)
   "Record a :SHRINK-STEP journal frame for a shrink candidate attempt, a no-op
@@ -78,6 +90,27 @@ Chronologically interleaving these with assertion frames turns a property
 test's timeline into a visible record of how PROPERTY-RUNNER walked from the
 first failing case down to the minimal one."
   (record-journal-frame :shrink-step :form candidate :expected index :pass accepted-p))
+
+(defun property-shrink-candidate-changed-p
+    (next current next-cyclic-p current-cyclic-p)
+  "True when NEXT differs from CURRENT, using cycle-safe equality whenever
+either side may be a circular structure."
+  (not
+   (if (or next-cyclic-p current-cyclic-p)
+       (cycle-safe-candidate-equal-p next current #'equal)
+       (equal next current))))
+
+(defun property-shrink-candidate-unvisited-p (next next-cyclic-p state)
+  "True when NEXT has not already been tried during this shrink, checking the
+cyclic-visited list for circular candidates and the VISITED hash table
+otherwise."
+  (not
+   (if next-cyclic-p
+       (find-if
+        (lambda (visited)
+          (cycle-safe-candidate-equal-p next visited #'equal))
+        (property-shrink-state-cyclic-visited state))
+       (nth-value 1 (gethash next (property-shrink-state-visited state))))))
 
 (defun call-property-shrink-candidate/k (state index candidate accept reject)
   (let* ((current (property-shrink-state-current state))
@@ -90,20 +123,10 @@ first failing case down to the minimal one."
               (property-shrink-state-function state) next))
            (accepted-p
              (and
-              (not
-               (if (or next-cyclic-p
-                       (property-shrink-state-current-cyclic-p state))
-                   (cycle-safe-candidate-equal-p next current #'equal)
-                   (equal next current)))
-              (not
-               (if next-cyclic-p
-                   (find-if
-                    (lambda (visited)
-                      (cycle-safe-candidate-equal-p next visited #'equal))
-                    (property-shrink-state-cyclic-visited state))
-                   (nth-value
-                    1
-                    (gethash next (property-shrink-state-visited state)))))
+              (property-shrink-candidate-changed-p
+               next current next-cyclic-p
+               (property-shrink-state-current-cyclic-p state))
+              (property-shrink-candidate-unvisited-p next next-cyclic-p state)
               candidate-condition
               (same-property-failure-p
                (property-shrink-state-original state) candidate-condition))))
