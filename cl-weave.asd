@@ -66,6 +66,8 @@
    (:file "benchmark")
    (:file "logic")
    (:file "isolation")
+   (:file "snapshots-storage")
+   (:file "snapshots-session")
    (:file "snapshots")
    (:file "mocks-data")
    (:file "mocks")
