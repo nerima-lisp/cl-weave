@@ -102,6 +102,23 @@
             (error 'coverage-unavailable
                    :reason (format nil "SB-COVER internal ~A is not available." name)))))))
 
+(defparameter *coverage-count-kinds*
+  (list (list :expression :expression-covered :expression-total)
+        (list :branch :branch-covered :branch-total))
+  "Each entry is (KIND COVERED-KEY TOTAL-KEY): KIND indexes the SB-COVER
+per-source counts plist (see COVERAGE-STATISTICS), and COVERED-KEY/TOTAL-KEY
+are the matching keys in both the accumulated statistics plist and the
+threshold-check plist (see CHECK-COVERAGE-THRESHOLDS).")
+
+(defun coverage-info-hash-table (coverage-info)
+  "Validate and return the per-source coverage hash table bound to the
+SB-COVER symbol COVERAGE-INFO."
+  (let ((value (and (boundp coverage-info) (symbol-value coverage-info))))
+    (unless (and (consp value) (hash-table-p (car value)))
+      (error 'coverage-unavailable
+             :reason "SB-COVER coverage data has an unsupported representation."))
+    (car value)))
+
 (defun coverage-statistics (&key include-pathnames exclude-pathnames)
   (let ((refresh (coverage-internal-symbol "REFRESH-COVERAGE-BITS" t))
         (coverage-info (coverage-internal-symbol "*CODE-COVERAGE-INFO*" t))
@@ -109,44 +126,35 @@
         (ok-of (coverage-internal-symbol "OK-OF" t))
         (all-of (coverage-internal-symbol "ALL-OF" t))
         (matcher (coverage-source-matcher include-pathnames exclude-pathnames))
-        (expression-covered 0)
-        (expression-total 0)
-        (branch-covered 0)
-        (branch-total 0))
+        (totals (list :expression-covered 0 :expression-total 0
+                       :branch-covered 0 :branch-total 0)))
     (funcall refresh)
     (maphash
      (lambda (source ignored)
        (declare (ignore ignored))
        (when (and (funcall matcher source) (probe-file source))
-         (multiple-value-bind (counts)
-             (funcall compute source :default)
-           (incf expression-covered (funcall ok-of (getf counts :expression)))
-           (incf expression-total (funcall all-of (getf counts :expression)))
-           (incf branch-covered (funcall ok-of (getf counts :branch)))
-           (incf branch-total (funcall all-of (getf counts :branch))))))
-     (let ((value (and (boundp coverage-info) (symbol-value coverage-info))))
-       (unless (and (consp value) (hash-table-p (car value)))
-         (error 'coverage-unavailable
-                :reason "SB-COVER coverage data has an unsupported representation."))
-       (car value)))
-    (list :expression-covered expression-covered
-          :expression-total expression-total
-          :branch-covered branch-covered
-          :branch-total branch-total)))
+         (let ((counts (funcall compute source :default)))
+           (loop for (kind covered-key total-key) in *coverage-count-kinds*
+                 do (incf (getf totals covered-key)
+                          (funcall ok-of (getf counts kind)))
+                    (incf (getf totals total-key)
+                          (funcall all-of (getf counts kind)))))))
+     (coverage-info-hash-table coverage-info))
+    totals))
 
 (defun coverage-percentage (covered total)
   (if (zerop total) 100.0 (* 100.0 (/ covered total))))
 
 (defun check-coverage-thresholds (statistics minimum-expression minimum-branch)
-  (loop for (kind minimum covered-key total-key)
-          in `((:expression ,minimum-expression :expression-covered :expression-total)
-               (:branch ,minimum-branch :branch-covered :branch-total))
-        when minimum
-          do (let ((actual (coverage-percentage (getf statistics covered-key)
-                                                (getf statistics total-key))))
-               (when (< actual minimum)
-                 (error "Coverage threshold failed for ~A: ~,2F% is below ~,2F%."
-                        kind actual minimum))))
+  (let ((minimums (list :expression minimum-expression :branch minimum-branch)))
+    (loop for (kind covered-key total-key) in *coverage-count-kinds*
+          for minimum = (getf minimums kind)
+          when minimum
+            do (let ((actual (coverage-percentage (getf statistics covered-key)
+                                                  (getf statistics total-key))))
+                 (when (< actual minimum)
+                   (error "Coverage threshold failed for ~A: ~,2F% is below ~,2F%."
+                          kind actual minimum)))))
   statistics)
 
 (defun save-coverage-report (pathname &key include-pathnames exclude-pathnames)
@@ -290,38 +298,54 @@
      :minimum-expression minimum-expression
      :minimum-branch minimum-branch)))
 
+(defun prepare-coverage-run (coverage-output coverage-report-directory coverage-reset
+                              include-pathnames exclude-pathnames
+                              minimum-expression minimum-branch)
+  "Normalize the coverage arguments into a COVERAGE-OPTIONS struct, require
+SB-COVER support, and reset its counters when requested. Must run before the
+covered THUNK in CALL-WITH-COVERAGE so a missing sb-cover or an invalid
+option is signaled before any test executes."
+  (let ((options
+          (normalize-coverage-options
+           coverage-output coverage-report-directory coverage-reset
+           include-pathnames exclude-pathnames minimum-expression minimum-branch)))
+    (require-coverage-support)
+    (when (coverage-options-reset options)
+      (reset-coverage))
+    options))
+
+(defun call-with-coverage-cleanup (options thunk)
+  "Run THUNK under OPTIONS, then always attempt to save the coverage sidecar,
+render the HTML report, and check the thresholds, even when THUNK signals an
+error. Re-signals a primary error from THUNK after cleanup runs; see
+HANDLE-COVERAGE-CLEANUP-FAILURES for how a cleanup failure interacts with
+that primary error."
+  (let ((completed-p nil)
+        (primary-error nil))
+    (unwind-protect
+         (handler-case
+             (multiple-value-prog1 (funcall thunk)
+               (setf completed-p t))
+           (error (condition)
+             (setf primary-error condition)
+             (error condition)))
+      (handle-coverage-cleanup-failures
+       (collect-coverage-cleanup-failures
+        (coverage-options-report-directory options)
+        (coverage-options-output options)
+        (coverage-options-include-pathnames options)
+        (coverage-options-exclude-pathnames options)
+        (coverage-options-minimum-expression options)
+        (coverage-options-minimum-branch options))
+       (or primary-error (not completed-p))))))
+
 (defun call-with-coverage (coverage coverage-output coverage-report-directory coverage-reset thunk
                           &key include-pathnames exclude-pathnames
                             minimum-expression minimum-branch)
   (if coverage
-      (let ((options
-              (normalize-coverage-options
-               coverage-output
-               coverage-report-directory
-               coverage-reset
-               include-pathnames
-               exclude-pathnames
-               minimum-expression
-               minimum-branch)))
-        (require-coverage-support)
-        (when (coverage-options-reset options)
-          (reset-coverage))
-        (let ((completed-p nil)
-              (primary-error nil))
-          (unwind-protect
-               (handler-case
-                   (multiple-value-prog1 (funcall thunk)
-                     (setf completed-p t))
-                 (error (condition)
-                   (setf primary-error condition)
-                   (error condition)))
-            (handle-coverage-cleanup-failures
-             (collect-coverage-cleanup-failures
-              (coverage-options-report-directory options)
-              (coverage-options-output options)
-              (coverage-options-include-pathnames options)
-              (coverage-options-exclude-pathnames options)
-              (coverage-options-minimum-expression options)
-              (coverage-options-minimum-branch options))
-             (or primary-error (not completed-p))))))
+      (call-with-coverage-cleanup
+       (prepare-coverage-run
+        coverage-output coverage-report-directory coverage-reset
+        include-pathnames exclude-pathnames minimum-expression minimum-branch)
+       thunk)
       (funcall thunk)))

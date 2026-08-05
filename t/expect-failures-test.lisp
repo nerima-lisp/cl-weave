@@ -254,72 +254,60 @@
             (expect (getf expected :reason) :to-be :missing-snapshot))))))
 
   (it "reports external snapshot mismatches with first-difference data"
-    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "mismatch-structured"))
-           (cl-weave::*snapshot-directory* snapshot-root)
-           (cl-weave::*snapshot-file-name* "mismatch-structured.snapshots")
-           (key "mismatch-structured-snapshot"))
-      (unwind-protect
+    (with-test-snapshot-directory
+     (:prefix "mismatch-structured" :file-name "mismatch-structured.snapshots")
+     (let ((key "mismatch-structured-snapshot"))
+       (cl-weave:with-snapshot-updates
+        (expect '(:ok 42) :to-match-snapshot key))
+       (handler-case
            (progn
-             (cl-weave:with-snapshot-updates
-               (expect '(:ok 42) :to-match-snapshot key))
-             (handler-case
-                 (progn
-                   (expect '(:ok 43) :to-match-snapshot key)
-                   (expect nil :to-be-truthy))
-               (cl-weave:assertion-failure (condition)
-                 (with-assertion-detail (detail condition actual expected)
-                   (let ((difference (getf actual :difference)))
-                     (expect (cl-weave::assertion-detail-matcher detail) :to-be :to-match-snapshot)
-                     (expect (getf actual :snapshot-key) :to-equal key)
-                     (expect (getf actual :reason) :to-be :snapshot-mismatch)
-                     (expect (getf actual :value) :to-equal "(:ok 43)")
-                     (expect (getf expected :present) :to-be-truthy)
-                     (expect (getf expected :value) :to-equal "(:ok 42)")
-                     (expect difference :to-equal (getf expected :difference))
-                     (expect (getf difference :line) :to-be 1)
-                     (expect (getf difference :expected) :to-equal "(:ok 42)")
-                     (expect (getf difference :actual) :to-equal "(:ok 43)"))))))
-        (uiop:delete-directory-tree snapshot-root
-                                    :validate t
-                                    :if-does-not-exist :ignore)))))
+             (expect '(:ok 43) :to-match-snapshot key)
+             (expect nil :to-be-truthy))
+         (cl-weave:assertion-failure (condition)
+           (with-assertion-detail (detail condition actual expected)
+             (let ((difference (getf actual :difference)))
+               (expect (cl-weave::assertion-detail-matcher detail) :to-be :to-match-snapshot)
+               (expect (getf actual :snapshot-key) :to-equal key)
+               (expect (getf actual :reason) :to-be :snapshot-mismatch)
+               (expect (getf actual :value) :to-equal "(:ok 43)")
+               (expect (getf expected :present) :to-be-truthy)
+               (expect (getf expected :value) :to-equal "(:ok 42)")
+               (expect difference :to-equal (getf expected :difference))
+               (expect (getf difference :line) :to-be 1)
+               (expect (getf difference :expected) :to-equal "(:ok 42)")
+               (expect (getf difference :actual) :to-equal "(:ok 43)"))))))))
 
   (it "reports external snapshot sequence mismatches with state context"
-    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "sequence-mismatch"))
-           (cl-weave::*snapshot-directory* snapshot-root)
-           (cl-weave::*snapshot-file-name* "sequence-mismatch.snapshots")
-           (prefix "vm/mismatch"))
-      (unwind-protect
+    (with-test-snapshot-directory
+     (:prefix "sequence-mismatch" :file-name "sequence-mismatch.snapshots")
+     (let ((prefix "vm/mismatch"))
+       (cl-weave:with-snapshot-updates
+        (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
+                :to-match-snapshot-sequence
+                prefix))
+       (handler-case
            (progn
-             (cl-weave:with-snapshot-updates
-               (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
-                       :to-match-snapshot-sequence
-                       prefix))
-             (handler-case
-                 (progn
-                   (expect '((:pc 0 :acc 0) (:pc 1 :acc 99))
-                           :to-match-snapshot-sequence
-                           prefix)
-                   (expect nil :to-be-truthy))
-               (cl-weave:assertion-failure (condition)
-                 (with-assertion-detail (detail condition actual expected)
-                   (let ((difference (getf actual :difference)))
-                     (expect (cl-weave::assertion-detail-matcher detail)
-                             :to-be
-                             :to-match-snapshot-sequence)
-                     (expect (getf actual :snapshot-prefix) :to-equal prefix)
-                     (expect (getf actual :snapshot-key) :to-equal "vm/mismatch[1]")
-                     (expect (getf actual :snapshot-index) :to-be 1)
-                     (expect (getf actual :snapshot-count) :to-be 2)
-                     (expect (getf actual :reason) :to-be :snapshot-mismatch)
-                     (expect (getf actual :value) :to-equal "(:pc 1 :acc 99)")
-                     (expect (getf expected :value) :to-equal "(:pc 1 :acc 1)")
-                     (expect difference :to-equal (getf expected :difference))
-                     (expect (getf difference :line) :to-be 1)
-                     (expect (getf difference :expected) :to-equal "(:pc 1 :acc 1)")
-                     (expect (getf difference :actual) :to-equal "(:pc 1 :acc 99)"))))))
-        (uiop:delete-directory-tree snapshot-root
-                                    :validate t
-                                    :if-does-not-exist :ignore)))))
+             (expect '((:pc 0 :acc 0) (:pc 1 :acc 99))
+                     :to-match-snapshot-sequence
+                     prefix)
+             (expect nil :to-be-truthy))
+         (cl-weave:assertion-failure (condition)
+           (with-assertion-detail (detail condition actual expected)
+             (let ((difference (getf actual :difference)))
+               (expect (cl-weave::assertion-detail-matcher detail)
+                       :to-be
+                       :to-match-snapshot-sequence)
+               (expect (getf actual :snapshot-prefix) :to-equal prefix)
+               (expect (getf actual :snapshot-key) :to-equal "vm/mismatch[1]")
+               (expect (getf actual :snapshot-index) :to-be 1)
+               (expect (getf actual :snapshot-count) :to-be 2)
+               (expect (getf actual :reason) :to-be :snapshot-mismatch)
+               (expect (getf actual :value) :to-equal "(:pc 1 :acc 99)")
+               (expect (getf expected :value) :to-equal "(:pc 1 :acc 1)")
+               (expect difference :to-equal (getf expected :difference))
+               (expect (getf difference :line) :to-be 1)
+               (expect (getf difference :expected) :to-equal "(:pc 1 :acc 1)")
+               (expect (getf difference :actual) :to-equal "(:pc 1 :acc 99)"))))))))
 
   (it "compares large snapshot sequences through exactly one continuation"
     (let* ((count 20000)
@@ -340,41 +328,64 @@
 
   (progn
 (it "reports external snapshot sequence length drift"
-    (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "sequence-extra"))
-           (cl-weave::*snapshot-directory* snapshot-root)
-           (cl-weave::*snapshot-file-name* "sequence-extra.snapshots")
-           (prefix "vm/extra"))
-      (unwind-protect
+    (with-test-snapshot-directory
+     (:prefix "sequence-extra" :file-name "sequence-extra.snapshots")
+     (let ((prefix "vm/extra"))
+       (cl-weave:with-snapshot-updates
+        (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
+                :to-match-snapshot-sequence
+                prefix))
+       (handler-case
            (progn
-             (cl-weave:with-snapshot-updates
-               (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
-                       :to-match-snapshot-sequence
-                       prefix))
-             (handler-case
-                 (progn
-                   (expect '((:pc 0 :acc 0))
-                           :to-match-snapshot-sequence
-                           prefix)
-                   (expect nil :to-be-truthy))
-               (cl-weave:assertion-failure (condition)
-(with-assertion-detail (detail condition actual expected)
-                   (expect (cl-weave::assertion-detail-matcher detail)
-                           :to-be
-                           :to-match-snapshot-sequence)
-                   (expect (getf actual :snapshot-prefix) :to-equal prefix)
-                   (expect (getf actual :snapshot-key) :to-equal "vm/extra[1]")
-                   (expect (getf actual :snapshot-index) :to-be 1)
-                   (expect (getf actual :snapshot-count) :to-be 1)
-                   (expect (getf actual :reason) :to-be :unexpected-snapshot)
-                   (expect (getf actual :present) :to-be-falsy)
-                   (expect (getf expected :present) :to-be-truthy)
-                   (expect (getf expected :value) :to-equal "(:pc 1 :acc 1)")))))
-        (uiop:delete-directory-tree snapshot-root
-                                    :validate t
-                                    :if-does-not-exist :ignore)))))
+             (expect '((:pc 0 :acc 0))
+                     :to-match-snapshot-sequence
+                     prefix)
+             (expect nil :to-be-truthy))
+         (cl-weave:assertion-failure (condition)
+           (with-assertion-detail (detail condition actual expected)
+             (expect (cl-weave::assertion-detail-matcher detail)
+                     :to-be
+                     :to-match-snapshot-sequence)
+             (expect (getf actual :snapshot-prefix) :to-equal prefix)
+             (expect (getf actual :snapshot-key) :to-equal "vm/extra[1]")
+             (expect (getf actual :snapshot-index) :to-be 1)
+             (expect (getf actual :snapshot-count) :to-be 1)
+             (expect (getf actual :reason) :to-be :unexpected-snapshot)
+             (expect (getf actual :present) :to-be-falsy)
+             (expect (getf expected :present) :to-be-truthy)
+             (expect (getf expected :value) :to-equal "(:pc 1 :acc 1)")))))))
   (it "evaluates dynamic matcher designators"
     (let ((matcher :to-be))
       (expect 1 matcher 1)
       (expect-not 1 matcher 2))))
 
 )
+
+(describe "expect-poll option validation"
+  (it "rejects EXPECT-POLL options that are not a property list"
+    (expect (lambda ()
+              (cl-weave::call-polling-expectation-thunk
+               (lambda () :ok)
+               (list :to-be :ok)
+               '(:timeout-ms)
+               '(expect-poll (lambda () :ok) (:timeout-ms) :to-be :ok)))
+            :to-throw
+            "must be a property list"))
+
+  (it "rejects a non-real or negative EXPECT-POLL timeout-ms"
+    (dolist (bad-timeout (list "1000" -1))
+      (expect (lambda ()
+                (eval `(expect-poll (lambda () :ok)
+                         (:timeout-ms ,bad-timeout :interval-ms 0)
+                         :to-be :ok)))
+              :to-throw
+              "timeout-ms")))
+
+  (it "rejects a non-real or negative EXPECT-POLL interval-ms"
+    (dolist (bad-interval (list "10" -1))
+      (expect (lambda ()
+                (eval `(expect-poll (lambda () :ok)
+                         (:timeout-ms 0 :interval-ms ,bad-interval)
+                         :to-be :ok)))
+              :to-throw
+              "interval-ms"))))

@@ -3,19 +3,28 @@
 (defun command-token-p (token)
   (member token *metadata-commands* :test #'string=))
 
+(defparameter *cli-command-token-effects*
+  ;; Fields SET-CLI-OPTION-FIELD applies for each token in *METADATA-COMMANDS*.
+  ;; RUN/DOCTOR/METADATA set only :COMMAND; LIST/WATCH also flip their own
+  ;; boolean flag; VERSION/HELP set only their own flag, leaving :COMMAND alone.
+  '(("run" (:command . :run))
+    ("list" (:command . :list) (:list . t))
+    ("watch" (:command . :watch) (:watch . t))
+    ("doctor" (:command . :doctor))
+    ("metadata" (:command . :metadata))
+    ("version" (:version . t))
+    ("help" (:help . t))))
+
+(defparameter *cli-command-token-effect-table*
+  ;; O(1) index over *CLI-COMMAND-TOKEN-EFFECTS*, built once at load time so
+  ;; APPLY-COMMAND-TOKEN does not linearly rescan the table on every CLI token.
+  (let ((table (make-hash-table :test 'equal)))
+    (dolist (entry *cli-command-token-effects* table)
+      (setf (gethash (first entry) table) (rest entry)))))
+
 (defun apply-command-token (options token)
-  (cond
-    ((string= token "run") (setf (cli-options-command options) :run))
-    ((string= token "list")
-     (setf (cli-options-command options) :list
-           (cli-options-list options) t))
-    ((string= token "watch")
-     (setf (cli-options-command options) :watch
-           (cli-options-watch options) t))
-    ((string= token "doctor") (setf (cli-options-command options) :doctor))
-    ((string= token "metadata") (setf (cli-options-command options) :metadata))
-    ((string= token "version") (setf (cli-options-version options) t))
-    ((string= token "help") (setf (cli-options-help options) t))))
+  (dolist (field.value (gethash token *cli-command-token-effect-table*))
+    (set-cli-option-field options (car field.value) (cdr field.value))))
 
 (defun handle-option-token (options token rest)
   (multiple-value-bind (flag inline-value inline-p)

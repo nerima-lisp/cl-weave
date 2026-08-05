@@ -144,15 +144,21 @@
 (defun property-seed ()
   (environment-integer "CL_WEAVE_PROPERTY_SEED" *property-seed*))
 
+(defconstant +property-rng-modulus+ 2147483648)
+
 (defun make-property-rng-from-seed (seed)
-  (make-property-rng :state (mod (abs seed) 2147483648)))
+  (make-property-rng :state (mod (abs seed) +property-rng-modulus+)))
+
+(defconstant +property-rng-multiplier+ 1103515245)
+
+(defconstant +property-rng-increment+ 12345)
 
 (defun property-random-below (rng limit)
   (when (<= limit 0)
     (error "cl-weave: random limit must be positive, got ~S." limit))
   (setf (property-rng-state rng)
-        (mod (+ (* (property-rng-state rng) 1103515245) 12345)
-             2147483648))
+        (mod (+ (* (property-rng-state rng) +property-rng-multiplier+) +property-rng-increment+)
+             +property-rng-modulus+))
   (mod (property-rng-state rng) limit))
 
 (defun integer-shrink-candidates (value min max)

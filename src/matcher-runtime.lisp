@@ -6,7 +6,7 @@
   (first expected))
 
 (defun expected-none (expected matcher)
-  (unless (null expected)
+  (when expected
     (error "Matcher ~S expects no expected values, got ~D." matcher (length expected))))
 
 (defconstant +maximum-one-of-candidate-count+ 100000)
@@ -19,33 +19,33 @@
            count))
   count)
 
+(defun one-of-candidate-list-and-raw-count (candidates matcher)
+  "Return CANDIDATES coerced to a list, and its element count before the
+maximum-candidate-count check. Signals an error via MATCHER when CANDIDATES
+is not a finite proper list, non-string vector, or hash table."
+  (cond
+    ((and (listp candidates)
+          (finite-proper-list-p candidates))
+     (values candidates (length candidates)))
+    ((and (vectorp candidates)
+          (not (stringp candidates)))
+     (values (coerce candidates 'list) (length candidates)))
+    ((hash-table-p candidates)
+     (values (loop for value being the hash-values of candidates
+                    collect value)
+             (hash-table-count candidates)))
+    (t
+     (error "Matcher ~S expects a finite proper list, non-string vector, ~
+             or hash table of candidates."
+            matcher))))
+
 (defun one-of-candidates (expected matcher)
   (let ((candidates (expected-one expected matcher)))
-    (cond
-      ((and (listp candidates)
-            (finite-proper-list-p candidates))
-       (let ((count (ensure-one-of-candidate-count
-                     (length candidates)
-                     matcher)))
-         (values candidates candidates count)))
-      ((and (vectorp candidates)
-            (not (stringp candidates)))
-       (let ((count (ensure-one-of-candidate-count
-                     (length candidates)
-                     matcher)))
-         (values candidates (coerce candidates 'list) count)))
-      ((hash-table-p candidates)
-       (let ((count (ensure-one-of-candidate-count
-                     (hash-table-count candidates)
-                     matcher)))
-         (values candidates
-                 (loop for value being the hash-values of candidates
-                       collect value)
-                 count)))
-      (t
-       (error "Matcher ~S expects a finite proper list, non-string vector, ~
-               or hash table of candidates."
-              matcher)))))
+    (multiple-value-bind (candidate-list raw-count)
+        (one-of-candidate-list-and-raw-count candidates matcher)
+      (values candidates
+              candidate-list
+              (ensure-one-of-candidate-count raw-count matcher)))))
 
 (defun one-of-report (actual raw-candidates candidate-count matched-index)
   (list :value actual
@@ -72,8 +72,10 @@
         :float (floatp actual)
         :nan (nan-value-p actual)))
 
+(defparameter *nan-expected-report* '(:predicate :nan :test :float-nan-p))
+
 (defun nan-expected-report ()
-  '(:predicate :nan :test :float-nan-p))
+  *nan-expected-report*)
 
 (defun non-negative-real-expected (expected matcher label)
   (let ((value (expected-one expected matcher)))
@@ -128,7 +130,7 @@
            matcher +maximum-close-to-precision+))
   digits)
 
-  (defun normalize-close-to-expected (expected matcher)
+(defun normalize-close-to-expected (expected matcher)
   (unless (member (length expected) (quote (1 2)))
     (error "Matcher ~S expects one or two expected values, got ~D."
            matcher (length expected)))
@@ -173,8 +175,10 @@
           :condition-type (class-name (class-of condition))
           :message (princ-to-string condition))))
 
+(defparameter *no-condition-report* '(:threw nil :condition-type nil :message nil))
+
 (defun no-condition-report ()
-  '(:threw nil :condition-type nil :message nil))
+  *no-condition-report*)
 
 (defun normalize-throw-expected (expected matcher)
   (cond

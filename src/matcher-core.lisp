@@ -84,13 +84,20 @@ have been a matcher body form."
       ((and (consp body) (matcher-description-fragments-p (first body)))
        (values (apply (function concatenate) 'string (rest (first body)))
                (rest body)))
-      (t (values nil body)))))
+      (t (values nil body))))
+
+  (defun matcher-definition-body (name actual expected body operator)
+    "Validate the NAME/ACTUAL/EXPECTED bindings of a matcher definition
+introduced by OPERATOR (defmatcher or expect-extend), then split BODY into
+its description and forms via SPLIT-MATCHER-BODY."
+    (unless (symbolp name)
+      (error "cl-weave: ~A matcher name must be a symbol, got ~S." operator name))
+    (validate-matcher-lambda-list actual expected operator)
+    (split-matcher-body body)))
 
 (defmacro defmatcher (name (actual expected) &body body)
-  (unless (symbolp name)
-    (error "cl-weave: defmatcher name must be a symbol, got ~S." name))
-  (validate-matcher-lambda-list actual expected 'defmatcher)
-  (multiple-value-bind (description forms) (split-matcher-body body)
+  (multiple-value-bind (description forms)
+      (matcher-definition-body name actual expected body 'defmatcher)
     `(register-matcher ',name
                        (lambda (,actual ,expected)
                          ,@forms)
@@ -102,10 +109,8 @@ have been a matcher body form."
      ,@(loop for definition in definitions
              collect
              (destructuring-bind (name (actual expected) &body body) definition
-               (unless (symbolp name)
-                 (error "cl-weave: expect-extend matcher name must be a symbol, got ~S." name))
-               (validate-matcher-lambda-list actual expected 'expect-extend)
-               (multiple-value-bind (description forms) (split-matcher-body body)
+               (multiple-value-bind (description forms)
+                   (matcher-definition-body name actual expected body 'expect-extend)
                  `(list ',name
                         (lambda (,actual ,expected)
                           ,@forms)

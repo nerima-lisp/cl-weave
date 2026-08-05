@@ -45,6 +45,20 @@ subsystems, which load after this file."
     (t (error "cl-weave: isolated systems must be a string, symbol, or list, got ~S."
               systems))))
 
+(defconstant +isolated-temp-allocation-attempts+ 100)
+
+(defun retry-temp-allocation (candidate-fn claim-fn failure-control &rest failure-args)
+  "Call CANDIDATE-FN to build a candidate path and CLAIM-FN to attempt to
+claim it, retrying up to +ISOLATED-TEMP-ALLOCATION-ATTEMPTS+ times. Returns
+the first candidate CLAIM-FN accepts (returns non-NIL for), or signals an
+error built from FAILURE-CONTROL and FAILURE-ARGS once attempts are
+exhausted."
+  (loop repeat +isolated-temp-allocation-attempts+
+        for candidate = (funcall candidate-fn)
+        when (funcall claim-fn candidate)
+          return candidate
+        finally (apply #'error failure-control failure-args)))
+
 (defun isolated-temp-name (prefix)
   (format nil "~A-~36R-~36R-~36R"
           prefix
@@ -53,33 +67,30 @@ subsystems, which load after this file."
           (random (expt 36 8))))
 
 (defun isolated-temp-pathname (prefix type)
-  (loop repeat 100
-        for pathname = (merge-pathnames
-                        (make-pathname :name (isolated-temp-name prefix)
-                                       :type type)
-                        (uiop:temporary-directory))
-        for stream = (open pathname
-                           :direction :output
-                           :if-exists nil
-                           :if-does-not-exist :create)
-        when stream
-          do (close stream)
-             (return pathname)
-        finally (error "cl-weave: failed to allocate isolated temp file for ~A.~A"
-                       prefix
-                       type)))
+  (retry-temp-allocation
+   (lambda ()
+     (merge-pathnames
+      (make-pathname :name (isolated-temp-name prefix) :type type)
+      (uiop:temporary-directory)))
+   (lambda (candidate)
+     (with-open-file (stream candidate
+                             :direction :output
+                             :if-exists nil
+                             :if-does-not-exist :create)
+       (and stream t)))
+   "cl-weave: failed to allocate isolated temp file for ~A.~A"
+   prefix
+   type))
 
 (defun isolated-temp-directory (prefix)
-  (loop repeat 100
-        for pathname = (merge-pathnames
-                        (make-pathname :directory (list :relative
-                                                        (isolated-temp-name prefix)))
-                        (uiop:temporary-directory))
-        when (isolated-create-temp-directory pathname)
-          do
-             (return pathname)
-        finally (error "cl-weave: failed to allocate isolated temp directory for ~A"
-                       prefix)))
+  (retry-temp-allocation
+   (lambda ()
+     (merge-pathnames
+      (make-pathname :directory (list :relative (isolated-temp-name prefix)))
+      (uiop:temporary-directory)))
+   #'isolated-create-temp-directory
+   "cl-weave: failed to allocate isolated temp directory for ~A"
+   prefix))
 
 (defun isolated-create-temp-directory (pathname)
   (unless (probe-file pathname)
@@ -193,6 +204,33 @@ subsystems, which load after this file."
                     (return :finished)))))
 
 #+sbcl
+(defun call-with-isolated-process-result/k (script stdout stderr home timeout continue)
+  "Spawn the isolated child described by SCRIPT/STDOUT/STDERR/HOME, wait up to
+TIMEOUT seconds for it to exit, and invoke CONTINUE with STATUS, EXIT-CODE,
+FINISHED-AT (an internal-real-time value taken right after the child's exit
+code becomes available), and TIMED-OUT-P, in that order. Returns whatever
+CONTINUE returns."
+  (let* ((process
+           (sb-ext:run-program
+            (isolated-sbcl-program)
+            (list "--script" (namestring script))
+            :search t
+            :wait nil
+            :output stdout
+            :error stderr
+            :environment (isolated-process-environment home)
+            :if-output-exists :supersede
+            :if-error-exists :supersede))
+         (wait-status (wait-isolated-process process timeout))
+         (exit-code (sb-ext:process-exit-code process))
+         (finished-at (get-internal-real-time))
+         (status (cond
+                   ((eq wait-status :timeout) :timeout)
+                   ((eql exit-code 0) :pass)
+                   (t :fail))))
+    (funcall continue status exit-code finished-at (eq wait-status :timeout))))
+
+#+sbcl
 (defun run-isolated (form &key
                             (systems '("cl-weave"))
                             (package (package-name *package*))
@@ -216,39 +254,24 @@ subsystems, which load after this file."
                  stderr (isolated-temp-pathname "cl-weave-isolated" "err")
                  home (isolated-temp-directory "cl-weave-isolated-home"))
            (write-isolated-script script form systems package)
-           (let* ((process
-                     (sb-ext:run-program
-                      (isolated-sbcl-program)
-                      (list "--script" (namestring script))
-                      :search t
-                      :wait nil
-                      :output stdout
-                      :error stderr
-                      :environment (isolated-process-environment home)
-                      :if-output-exists :supersede
-                      :if-error-exists :supersede))
-                  (wait-status (wait-isolated-process process timeout))
-                  (exit-code (sb-ext:process-exit-code process))
-                  (elapsed-ms (/ (* 1000
-                                    (- (get-internal-real-time) started))
-                                 internal-time-units-per-second))
-                  (status (cond
-                            ((eq wait-status :timeout) :timeout)
-                            ((eql exit-code 0) :pass)
-                            (t :fail))))
-             (setf retain-files (isolated-retain-files-p keep-files status)
-                   result (make-isolated-result
-                           :status status
-                           :exit-code exit-code
-                           :stdout (read-file-string-or-empty stdout)
-                           :stderr (read-file-string-or-empty stderr)
-                           :timed-out-p (eq wait-status :timeout)
-                           :elapsed-ms elapsed-ms
-                           :script-path (maybe-path-namestring script retain-files)
-                           :stdout-path (maybe-path-namestring stdout retain-files)
-                           :stderr-path (maybe-path-namestring stderr retain-files)
-                           :home-path (maybe-path-namestring home retain-files)))
-             result))
+           (call-with-isolated-process-result/k
+            script stdout stderr home timeout
+            (lambda (status exit-code finished-at timed-out-p)
+              (let ((elapsed-ms (/ (* 1000 (- finished-at started))
+                                   internal-time-units-per-second)))
+                (setf retain-files (isolated-retain-files-p keep-files status)
+                      result (make-isolated-result
+                              :status status
+                              :exit-code exit-code
+                              :stdout (read-file-string-or-empty stdout)
+                              :stderr (read-file-string-or-empty stderr)
+                              :timed-out-p timed-out-p
+                              :elapsed-ms elapsed-ms
+                              :script-path (maybe-path-namestring script retain-files)
+                              :stdout-path (maybe-path-namestring stdout retain-files)
+                              :stderr-path (maybe-path-namestring stderr retain-files)
+                              :home-path (maybe-path-namestring home retain-files)))
+                result))))
       (unless retain-files
         (ignore-errors (delete-file script))
         (ignore-errors (delete-file stdout))

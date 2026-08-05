@@ -6,11 +6,15 @@
 (defvar *default-retry* 0)
 (defvar *default-timeout-ms* nil)
 (defconstant +default-max-workers-cap+ 32)
+
+(defconstant +default-max-workers-floor+ 2)
 (defconstant +maximum-retry-count+ 1000)
 (defconstant +maximum-timeout-ms+ 86400000)
 (defconstant +maximum-worker-count+ 4096)
 (defconstant +maximum-bail-limit+ 1000000)
 (defconstant +maximum-shard-count+ 1000000)
+
+(defparameter *failing-event-statuses* '(:fail :error))
 
 (defvar *max-workers* nil)
 (defvar *retry-budget-remaining* 0)

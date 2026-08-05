@@ -220,29 +220,28 @@ default method below, so extending never requires modifying cl-weave.")
             (journal-frame-form frame)
             (journal-frame-pass frame))))
 
-(defmethod journal-frame-line-for-kind ((kind (eql :note)) frame)
-  (format nil "#~D note ~S = ~S"
-          (journal-frame-index frame)
-          (journal-frame-form frame)
-          (journal-frame-actual frame)))
+(defmacro define-journal-frame-line (kind format-suffix &rest arg-forms)
+  "Define a JOURNAL-FRAME-LINE-FOR-KIND method for the eql-specialized KIND
+whose rendered line leads with the frames index, then FORMAT-SUFFIX -- a
+FORMAT control string. ARG-FORMS are expressions (with FRAME bound)
+supplying FORMAT-SUFFIXs remaining arguments. Shared by the built-in :NOTE,
+:MOCK-CALL, :HOOK, and :SHRINK-STEP renderers below; user extensions may
+still DEFMETHOD JOURNAL-FRAME-LINE-FOR-KIND directly, as documented above."
+  `(defmethod journal-frame-line-for-kind ((kind (eql ,kind)) frame)
+     (format nil ,(concatenate 'string "#~D " format-suffix)
+             (journal-frame-index frame)
+             ,@arg-forms)))
 
-(defmethod journal-frame-line-for-kind ((kind (eql :mock-call)) frame)
-  (format nil "#~D mock-call ~S"
-          (journal-frame-index frame)
-          (journal-frame-actual frame)))
+(define-journal-frame-line :note "note ~S = ~S"
+  (journal-frame-form frame) (journal-frame-actual frame))
 
-(defmethod journal-frame-line-for-kind ((kind (eql :hook)) frame)
-  (format nil "#~D hook ~(~A~) -> ~:[FAIL~;ok~]"
-          (journal-frame-index frame)
-          (journal-frame-form frame)
-          (journal-frame-pass frame)))
+(define-journal-frame-line :mock-call "mock-call ~S" (journal-frame-actual frame))
 
-(defmethod journal-frame-line-for-kind ((kind (eql :shrink-step)) frame)
-  (format nil "#~D shrink-step arg ~D -> ~S ~:[rejected~;accepted~]"
-          (journal-frame-index frame)
-          (journal-frame-expected frame)
-          (journal-frame-form frame)
-          (journal-frame-pass frame)))
+(define-journal-frame-line :hook "hook ~(~A~) -> ~:[FAIL~;ok~]"
+  (journal-frame-form frame) (journal-frame-pass frame))
+
+(define-journal-frame-line :shrink-step "shrink-step arg ~D -> ~S ~:[rejected~;accepted~]"
+  (journal-frame-expected frame) (journal-frame-form frame) (journal-frame-pass frame))
 
 (defun journal-frame-line (frame)
   "Return a one-line human-readable description of FRAME. Shared by the spec

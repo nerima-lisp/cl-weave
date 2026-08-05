@@ -1,5 +1,14 @@
 (in-package #:cl-weave/cli)
 
+(defparameter *cli-falsy-tokens* '("0" "false" "no" "off" "nil")
+  "Tokens PARSE-BOOLEAN, PARSE-BAIL, and TRUTHY-ENVIRONMENT-P treat as false.")
+
+(defparameter *cli-boolean-truthy-tokens* '("1" "true" "yes" "on")
+  "Tokens PARSE-BOOLEAN treats as true.")
+
+(defparameter *cli-bail-truthy-tokens* '("true" "yes" "on" "t")
+  "Tokens PARSE-BAIL treats as true.")
+
 (define-cli-options
   (:fields
    (command :run :type keyword)

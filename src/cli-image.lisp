@@ -6,6 +6,13 @@ NIL means work it out from where the running image sits, which is what keeps a
 delivered binary relocatable. A packager whose layout the discovery in
 INSTALLED-SOURCE-ROOT cannot express can set this before the image is dumped.")
 
+(defparameter *image-fasl-output-translations*
+  '(:output-translations (t (:home ".cache" "common-lisp" :implementation))
+    :ignore-inherited-configuration)
+  "Where IMAGE-ENTRY-POINT sends FASLs a --coverage recompile produces. The
+sources shipped with this image are read-only, so output has to land in a
+writable per-user cache no matter what the surrounding environment asks for.")
+
 (defun anchor-prefix-pathname (anchor)
   "The installation prefix ANCHOR sits under: the parent of its directory, so
 that $prefix/bin/cl-weave and $prefix/lib/cl-weave.core both yield $prefix/."
@@ -88,10 +95,9 @@ already called the universal restore hooks."
      (if root
          `(:source-registry (:tree ,root) :inherit-configuration)
          '(:source-registry :inherit-configuration)))
-    ;; --coverage recompiles the system under test, and the sources shipped
-    ;; with this image are read-only, so FASLs have to land in a writable
-    ;; per-user cache no matter what the surrounding environment asks for.
+    ;; See *IMAGE-FASL-OUTPUT-TRANSLATIONS* for why: --coverage recompiles the
+    ;; system under test, and the sources shipped with this image are
+    ;; read-only.
     (asdf:initialize-output-translations
-     '(:output-translations (t (:home ".cache" "common-lisp" :implementation))
-       :ignore-inherited-configuration))
+     *image-fasl-output-translations*)
     (main)))

@@ -13,6 +13,12 @@
 (defun elapsed-milliseconds (start end)
   (* 1000d0 (/ (- end start) internal-time-units-per-second)))
 
+(defun sample-elapsed-milliseconds (function iterations)
+  "Run FUNCTION ITERATIONS times and return the average elapsed milliseconds per call."
+  (let ((start (get-internal-real-time)))
+    (loop repeat iterations do (funcall function))
+    (/ (elapsed-milliseconds start (get-internal-real-time)) iterations)))
+
 (defun measure (function &key (warmup 0) (samples 10) (iterations 1))
   "Measure FUNCTION after WARMUP calls and return a BENCHMARK-RESULT.
 
@@ -24,12 +30,8 @@ result is observational only; use per-test :TIMEOUT-MS for stable CI limits."
   (ensure-positive-integer iterations "iterations")
   (loop repeat warmup do (funcall function))
   (make-benchmark-result
-   :samples
-   (loop repeat samples
-         collect (let ((start (get-internal-real-time)))
-                   (loop repeat iterations do (funcall function))
-                   (/ (elapsed-milliseconds start (get-internal-real-time))
-                      iterations)))
+   :samples (loop repeat samples
+                   collect (sample-elapsed-milliseconds function iterations))
    :iterations iterations
    :warmup warmup))
 

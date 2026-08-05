@@ -15,26 +15,23 @@
    (lambda () (funcall test (mutation-form mutation) mutation))
    #'identity))
 
+(defun make-mutation-outcome (mutation status &optional condition)
+  (make-mutation-result :mutation mutation :status status :condition condition))
+
 (defun run-mutation (mutation test timeout-ms)
   (handler-case
-      (make-mutation-result
-       :mutation mutation
-       :status (if (call-mutation-test mutation test timeout-ms)
-                    :survived
-                    :killed))
+      (make-mutation-outcome mutation
+                              (if (call-mutation-test mutation test timeout-ms)
+                                  :survived
+                                  :killed))
     (assertion-failure (condition)
-      (make-mutation-result :mutation mutation
-                            :status :killed
-                            :condition condition))
+      (make-mutation-outcome mutation :killed condition))
     (platform-timeout ()
-      (make-mutation-result :mutation mutation
-                            :status :errored
-                            :condition (make-condition 'test-timeout
-                                                       :timeout-ms timeout-ms)))
+      (make-mutation-outcome mutation :errored
+                              (make-condition 'test-timeout
+                                              :timeout-ms timeout-ms)))
     (error (condition)
-      (make-mutation-result :mutation mutation
-                            :status :errored
-                            :condition condition))))
+      (make-mutation-outcome mutation :errored condition))))
 
 (defun run-mutations (form test &key (operators *default-mutation-operators*)
                                      timeout-ms)
@@ -44,11 +41,14 @@
               (run-mutation mutation test timeout-ms))
             (collect-mutations form :operators operators))))
 
+(defun count-mutation-status (results status)
+  (count status results :key #'mutation-result-status))
+
 (defun mutation-summary (results)
   (let* ((total (length results))
-         (killed (count :killed results :key #'mutation-result-status))
-         (survived (count :survived results :key #'mutation-result-status))
-         (errored (count :errored results :key #'mutation-result-status)))
+         (killed (count-mutation-status results :killed))
+         (survived (count-mutation-status results :survived))
+         (errored (count-mutation-status results :errored)))
     (list :total total
           :killed killed
           :survived survived

@@ -152,6 +152,23 @@
        ((progv (list 'value) (list (+ 1 2)) (+ 3 4))
         (progv (list 'value) (list (- 1 2)) (+ 3 4))))))
 
+  (it "walks past bare-symbol let/let*/do bindings without signaling an error"
+    (expect (collected-mutation-forms
+             '(let (a) (+ a 1))
+             :operators '(:arithmetic-operator))
+            :to-equal
+            (list '(let (a) (- a 1))))
+    (expect (collected-mutation-forms
+             '(let* (a (b (+ 1 2))) (+ a b))
+             :operators '(:arithmetic-operator))
+            :to-contain
+            '(let* (a (b (- 1 2))) (+ a b)))
+    (expect (collected-mutation-forms
+             '(do (a (b 1 (+ b 1))) ((> b 3)) (+ a b))
+             :operators '(:arithmetic-operator))
+            :to-contain
+            '(do (a (b 1 (- b 1))) ((> b 3)) (+ a b))))
+
   (it "keeps syntax, declarations, and documentation immutable"
     (let ((forms
             '((let* (((+ 1 2) 3)) value)
@@ -336,3 +353,69 @@
       (expect (cl-weave:mutation-result-mutation result) :to-be mutation)
       (expect (cl-weave:mutation-result-status result) :to-be :errored)
       (expect (cl-weave:mutation-result-condition result) :to-be condition))))
+
+(describe "mutation walker coverage for uncommon special forms"
+  (it "walks dolist count/result forms and body, including the no-result-form path"
+    (expect-arithmetic-mutations
+     '(((dolist (value (+ 1 2) (+ value 9)) (+ value 3))
+        (dolist (value (- 1 2) (+ value 9)) (+ value 3)))
+       ((dolist (value (+ 1 2) (+ value 9)) (+ value 3))
+        (dolist (value (+ 1 2) (- value 9)) (+ value 3)))
+       ((dolist (value (+ 1 2)) (+ value 3))
+        (dolist (value (+ 1 2)) (- value 3))))))
+
+  (it "does not walk into a dolist binding with no result form"
+    (expect (collected-mutation-forms
+             '(dolist (value (list 1 2)) value)
+             :operators '(:arithmetic-operator))
+            :to-equal
+            nil))
+
+  (it "walks dotimes count/result forms and body"
+    (expect-arithmetic-mutations
+     '(((dotimes (value (+ 1 2) (+ value 9)) (+ value 3))
+        (dotimes (value (- 1 2) (+ value 9)) (+ value 3)))
+       ((dotimes (value (+ 1 2) (+ value 9)) (+ value 3))
+        (dotimes (value (+ 1 2) (- value 9)) (+ value 3))))))
+
+  (it "walks block, return-from, and tagbody go bodies"
+    (expect-arithmetic-mutations
+     '(((block done (+ 1 2))
+        (block done (- 1 2)))
+       ((return-from done (+ 1 2))
+        (return-from done (- 1 2)))))
+    (expect (collected-mutation-forms
+             '(tagbody
+               start
+               (setq value (+ 1 2))
+               (go start))
+             :operators '(:arithmetic-operator))
+            :to-contain
+            '(tagbody
+              start
+              (setq value (- 1 2))
+              (go start))))
+
+  (it "walks setq and psetq value forms but not the variable names"
+    (expect-arithmetic-mutation
+     '(setq value (+ 1 2))
+     '(setq value (- 1 2)))
+    (expect-arithmetic-mutation
+     '(psetq a (+ 1 2) b (+ 3 4))
+     '(psetq a (- 1 2) b (+ 3 4)))
+    (expect-arithmetic-mutation
+     '(psetq a (+ 1 2) b (+ 3 4))
+     '(psetq a (+ 1 2) b (- 3 4))))
+
+  (it "skips a defun/defmacro docstring but walks the body beneath it"
+    (let ((mutations (collect-mutations
+                       '(defun compute (x)
+                         "Adds one to X."
+                         (+ x 1))
+                       :operators '(:arithmetic-operator))))
+      (expect (length mutations) :to-be 1)
+      (expect (mapcar #'mutation-form mutations)
+              :to-contain
+              '(defun compute (x)
+                "Adds one to X."
+                (- x 1))))))

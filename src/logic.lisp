@@ -109,24 +109,36 @@
                 (return-from unify-logic-values (values nil nil)))))
     (values current-bindings t)))
 
-(defun resolve-logic-value (value bindings)
-  (ensure-acyclic-logic-value value bindings)
+(defun rebuild-logic-cons-structure (value transform-part)
+  "Iteratively rebuild the cons structure of VALUE without recursing, so an
+arbitrarily long proper list does not consume call stack. Each part
+encountered -- starting with VALUE itself -- is passed through
+TRANSFORM-PART first; a consp result is decomposed and its car/cdr walked
+the same way, and anything else becomes a leaf of the rebuilt structure.
+RESOLVE-LOGIC-VALUE and INSTANTIATE-LOGIC-TERM share this shape and differ
+only in what TRANSFORM-PART does with a raw part."
   (let ((pending (list (cons :visit value)))
-        (resolved (quote ())))
+        (rebuilt '()))
     (loop while pending
           for frame = (pop pending)
           do (if (eq frame :combine)
-                 (let ((right (pop resolved))
-                       (left (pop resolved)))
-                   (push (cons left right) resolved))
-                 (let ((part (logic-walk (cdr frame) bindings)))
+                 (let ((right (pop rebuilt))
+                       (left (pop rebuilt)))
+                   (push (cons left right) rebuilt))
+                 (let ((part (funcall transform-part (cdr frame))))
                    (if (consp part)
                        (progn
                          (push :combine pending)
                          (push (cons :visit (cdr part)) pending)
                          (push (cons :visit (car part)) pending))
-                       (push part resolved)))))
-    (pop resolved)))
+                       (push part rebuilt)))))
+    (pop rebuilt)))
+
+(defun resolve-logic-value (value bindings)
+  (ensure-acyclic-logic-value value bindings)
+  (rebuild-logic-cons-structure
+   value
+   (lambda (part) (logic-walk part bindings))))
 
 (defun normalize-logic-bindings (bindings)
   (nreverse
@@ -182,33 +194,18 @@
 
 (defun instantiate-logic-term (term mapping rule-id)
   (ensure-acyclic-logic-value term nil)
-  (let ((pending (list (cons :visit term)))
-        (instantiated '()))
-    (loop while pending
-          for frame = (pop pending)
-          do (if (eq frame :combine)
-                 (let ((right (pop instantiated))
-                       (left (pop instantiated)))
-                   (push (cons left right) instantiated))
-                 (let ((part (cdr frame)))
-                   (cond
-                     ((logic-variable-p part)
-                      (multiple-value-bind (renamed present-p)
-                          (gethash part mapping)
-                        (push (if present-p
-                                  renamed
-                                  (let ((fresh
-                                          (fresh-logic-variable part rule-id)))
-                                    (setf (gethash part mapping) fresh)
-                                    fresh))
-                              instantiated)))
-                     ((consp part)
-                      (push :combine pending)
-                      (push (cons :visit (cdr part)) pending)
-                      (push (cons :visit (car part)) pending))
-                     (t
-                      (push part instantiated))))))
-    (pop instantiated)))
+  (rebuild-logic-cons-structure
+   term
+   (lambda (part)
+     (if (logic-variable-p part)
+         (multiple-value-bind (renamed present-p)
+             (gethash part mapping)
+           (if present-p
+               renamed
+               (let ((fresh (fresh-logic-variable part rule-id)))
+                 (setf (gethash part mapping) fresh)
+                 fresh)))
+         part))))
 
 (defun instantiate-logic-rule (rule rule-id)
   (let ((mapping (make-hash-table :test #'eq)))
@@ -277,195 +274,53 @@
         (steps 0)
         (next-rule-id 0))
     (block search
-      (loop while (and frames (logic-below-limit-p results limit))
-          do (when (and max-steps (>= steps max-steps))
-               (restart-case
-                   (error 'logic-search-exhausted
-                          :steps steps
-                          :limit max-steps
-                          :pending (length frames)
-                          :partial-results (reverse results))
-                 (return-partial-results ()
-                   :report "Return the results found before the step budget was exhausted."
-                   (return-from search (nreverse results)))
-                 (increase-limit (new-limit)
-                   :report "Continue the logic query with a larger step limit."
-                   (unless (and (integerp new-limit) (> new-limit steps))
-                     (error "cl-weave: increased logic step limit must exceed ~D, got ~S."
-                            steps new-limit))
-                   (setf max-steps new-limit))))
-             (incf steps)
-             (let* ((frame (pop frames))
-                    (pending (logic-search-frame-pending frame))
-                    (bindings (logic-search-frame-bindings frame)))
-               (if (null pending)
-                   (push (project-logic-bindings bindings query-variables) results)
-                   (let ((goal (first pending))
-                         (rest-goals (rest pending))
-                         (new-frames nil))
-                     (dolist (candidate normalized-program)
-                       (let* ((rule-p (logic-rule-p candidate))
-                              (rule-id next-rule-id)
-                              (instantiated (if rule-p
-                                                (instantiate-logic-rule candidate rule-id)
-                                                candidate))
-                              (head (logic-entry-head instantiated))
-                              (body (logic-entry-body instantiated)))
-                         (when rule-p
-                           (incf next-rule-id))
-                         (multiple-value-bind (next-bindings matched-p)
-                             (unify-logic-values goal head bindings)
-                           (when matched-p
-                             (push (make-logic-search-frame (append body rest-goals)
-                                                            next-bindings)
-                                   new-frames)))))
-                     (dolist (new-frame new-frames)
-                       (push new-frame frames))))))
-      (nreverse results))))
+      (labels ((enforce-logic-search-step-limit ()
+                 (when (and max-steps (>= steps max-steps))
+                   (restart-case
+                       (error 'logic-search-exhausted
+                              :steps steps
+                              :limit max-steps
+                              :pending (length frames)
+                              :partial-results (reverse results))
+                     (return-partial-results ()
+                       :report "Return the results found before the step budget was exhausted."
+                       (return-from search (nreverse results)))
+                     (increase-limit (new-limit)
+                       :report "Continue the logic query with a larger step limit."
+                       (unless (and (integerp new-limit) (> new-limit steps))
+                         (error "cl-weave: increased logic step limit must exceed ~D, got ~S."
+                                steps new-limit))
+                       (setf max-steps new-limit)))))
+               (match-logic-search-candidate (candidate goal rest-goals bindings)
+                 (let* ((rule-p (logic-rule-p candidate))
+                        (rule-id next-rule-id)
+                        (instantiated (if rule-p
+                                           (instantiate-logic-rule candidate rule-id)
+                                           candidate))
+                        (head (logic-entry-head instantiated))
+                        (body (logic-entry-body instantiated)))
+                   (when rule-p
+                     (incf next-rule-id))
+                   (multiple-value-bind (next-bindings matched-p)
+                       (unify-logic-values goal head bindings)
+                     (when matched-p
+                       (make-logic-search-frame (append body rest-goals) next-bindings)))))
+               (expand-logic-search-frame (frame)
+                 (let ((pending (logic-search-frame-pending frame))
+                       (bindings (logic-search-frame-bindings frame)))
+                   (if (null pending)
+                       (push (project-logic-bindings bindings query-variables) results)
+                       (let* ((goal (first pending))
+                              (rest-goals (rest pending))
+                              (matched-frames
+                                (loop for candidate in normalized-program
+                                      for new-frame = (match-logic-search-candidate
+                                                        candidate goal rest-goals bindings)
+                                      when new-frame collect new-frame)))
+                         (setf frames (append matched-frames frames)))))))
+        (loop while (and frames (logic-below-limit-p results limit))
+              do (enforce-logic-search-step-limit)
+                 (incf steps)
+                 (expand-logic-search-frame (pop frames)))
+        (nreverse results)))))
 
-(defun split-logic-where-forms (forms)
-  (let ((limit nil)
-        (limit-present-p nil)
-        (max-steps nil)
-        (max-steps-present-p nil)
-        (clauses forms))
-    (loop while (and clauses
-                     (consp (first clauses))
-                     (member (first (first clauses)) '(:limit :max-steps)))
-          for option = (pop clauses)
-          do (unless (= 2 (length option))
-               (error "cl-weave: ~S expects exactly one value, got ~S."
-                      (first option) option))
-             (ecase (first option)
-               (:limit
-                (when limit-present-p
-                  (error "cl-weave: duplicate :limit logic option."))
-                (setf limit (second option)
-                      limit-present-p t))
-               (:max-steps
-                (when max-steps-present-p
-                  (error "cl-weave: duplicate :max-steps logic option."))
-                (setf max-steps (second option)
-                      max-steps-present-p t))))
-    (unless clauses
-      (error "cl-weave: logic where macros require at least one relation clause."))
-    (dolist (clause clauses)
-      (validate-logic-clause clause))
-    (values clauses limit limit-present-p max-steps max-steps-present-p)))
-
-(defun build-logic-query-form (operator program forms)
-  (multiple-value-bind (clauses limit limit-present-p max-steps max-steps-present-p)
-      (split-logic-where-forms forms)
-    `(,operator ,program ',clauses
-                ,@(when limit-present-p `(:limit ,limit))
-                ,@(when max-steps-present-p `(:max-steps ,max-steps)))))
-
-(defmacro define-logic-query-macro (name operator)
-  `(defmacro ,name (program &body forms)
-     (build-logic-query-form ',operator program forms)))
-
-(defmacro define-logic-query-family (&rest specifications)
-  `(progn
-     ,@(loop for (name operator) in specifications
-             collect `(define-logic-query-macro ,name ,operator))))
-
-(defun validate-logic-clause (clause)
-  (unless (and (consp clause) (keywordp (first clause)))
-    (error "cl-weave: logic clauses must be non-empty keyword relation lists, got ~S."
-           clause)))
-
-(defun test-plan-entry-fact (path relation value)
-  (list relation path value))
-
-(defun test-plan-entry-flag-fact (path relation)
-  (list relation path))
-
-(defmacro logic-program (&body entries)
-  `(list ,@(mapcar (lambda (entry) `',entry) entries)))
-
-(define-logic-query-family
-    (logic-where logic-query)
-    (logic-run logic-query)
-    (test-plan-where query-test-plan)
-    (journal-where query-journal))
-
-(defun test-plan-entry-facts (entry)
-  (let* ((path (test-plan-entry-path entry))
-         (status (test-plan-entry-status entry))
-         (retry (test-plan-entry-retry entry))
-         (reason (test-plan-entry-reason entry))
-         (focused (test-plan-entry-focused entry))
-         (timeout-ms (test-plan-entry-timeout-ms entry))
-         (concurrent (test-plan-entry-concurrent entry))
-         (location (test-plan-entry-location entry)))
-    (append (list (test-plan-entry-flag-fact path :test)
-                  (test-plan-entry-fact path :status status)
-                  (test-plan-entry-fact path :retry retry))
-            (when reason
-              (list (test-plan-entry-fact path :reason reason)))
-            (when focused
-              (list (test-plan-entry-flag-fact path :focused)))
-            (when timeout-ms
-              (list (test-plan-entry-fact path :timeout-ms timeout-ms)))
-            (when concurrent
-              (list (test-plan-entry-flag-fact path :concurrent)))
-            (when location
-              (list (test-plan-entry-fact path :location location))))))
-
-(defun test-plan-facts (plan)
-  (mapcan #'test-plan-entry-facts plan))
-
-(defun normalize-test-plan-query-input (value)
-  (if (and (listp value)
-           (every #'test-plan-entry-p value))
-      (test-plan-facts value)
-      value))
-
-(defun query-test-plan (plan-or-program clauses &key limit max-steps)
-  (logic-query (normalize-test-plan-query-input plan-or-program)
-               clauses
-               :limit limit
-               :max-steps max-steps))
-
-(defun journal-frame-facts (frame)
-  "Turn one JOURNAL-FRAME into relation facts keyed by its index: (:frame
-index), (:kind index kind), (:form index form), (:actual index actual),
-(:expected index expected), (:pass index generalized-boolean), and
-(:elapsed-internal-time index ticks) always; (:matcher index matcher) only
-when the frame has one, mirroring how TEST-PLAN-ENTRY-FACTS omits absent
-optional fields."
-  (let ((index (journal-frame-index frame))
-        (matcher (journal-frame-matcher frame)))
-    (append (list (list :frame index)
-                  (list :kind index (journal-frame-kind frame))
-                  (list :form index (journal-frame-form frame))
-                  (list :actual index (journal-frame-actual frame))
-                  (list :expected index (journal-frame-expected frame))
-                  (list :pass index (and (journal-frame-pass frame) t))
-                  (list :elapsed-internal-time index
-                        (journal-frame-elapsed-internal-time frame)))
-            (when matcher
-              (list (list :matcher index matcher))))))
-
-(defun journal-facts (frames)
-  "Turn a list of JOURNAL-FRAMEs (as returned by REPLAY-TEST, a TEST-EVENT's
-journal, or WITH-EXECUTION-JOURNAL) into a flat relation program, ready for
-LOGIC-QUERY, LOGIC-RUN, or JOURNAL-WHERE."
-  (mapcan #'journal-frame-facts frames))
-
-(defun normalize-journal-query-input (value)
-  (if (and (listp value) (every #'journal-frame-p value))
-      (journal-facts value)
-      value))
-
-(defun query-journal (frames-or-program clauses &key limit max-steps)
-  "Query a time-travel timeline declaratively. FRAMES-OR-PROGRAM is either a
-list of JOURNAL-FRAMEs or an already-expanded fact program, so derived views
-can layer on top of JOURNAL-FACTS the same way QUERY-TEST-PLAN layers on
-TEST-PLAN-FACTS -- for example a rule finding the first failing assertion
-after a passing shrink step, expressed as relations instead of a hand-rolled
-timeline walk."
-  (logic-query (normalize-journal-query-input frames-or-program)
-               clauses
-               :limit limit
-               :max-steps max-steps))

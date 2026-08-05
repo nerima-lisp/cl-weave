@@ -49,11 +49,15 @@
         (note-test-registry-change-unlocked))
       root)))
 
-(defun copy-list-with-tail (values)
+(defun copy-list-with-tail (values &optional (transform (function identity)))
+  "Copy VALUES into a fresh spine, passing each element through TRANSFORM.
+Returns the new head and a pointer to its last cons, so a caller can extend
+the tail in O(1)."
   (loop with head = nil
         with tail = nil
         for value in values
-        for cell = (list value)
+        for mapped = (funcall transform value)
+        for cell = (list mapped)
         do (if tail
                (setf (cdr tail) cell
                      tail cell)
@@ -61,20 +65,15 @@
                      tail cell))
         finally (return (values head tail))))
 
-(defun copy-suite-children-with-tail (children suite-map)
-  (loop with head = nil
-        with tail = nil
-        for child in children
-        for value = (if (suite-p child)
-                        (gethash child suite-map)
-                        child)
-        for cell = (list value)
-        do (if tail
-               (setf (cdr tail) cell
-                     tail cell)
-               (setf head cell
-                     tail cell))
-        finally (return (values head tail))))
+(defmacro copy-hook-list-slot (get-form set-place tail-place)
+  "Copy the list at GET-FORM into SET-PLACE, with fresh conses, and point
+TAIL-PLACE at the new list's last cons."
+  (let ((values-var (gensym "VALUES"))
+        (tail-var (gensym "TAIL")))
+    `(multiple-value-bind (,values-var ,tail-var)
+         (copy-list-with-tail ,get-form)
+       (setf ,set-place ,values-var
+             ,tail-place ,tail-var))))
 
 (defun clone-suite-tree-unlocked (root)
   (let ((suite-map (make-hash-table :test (function eq)))
@@ -97,29 +96,28 @@
     (maphash
      (lambda (suite clone)
        (multiple-value-bind (children children-tail)
-           (copy-suite-children-with-tail (suite-children suite) suite-map)
+           (copy-list-with-tail (suite-children suite)
+                                (lambda (child)
+                                  (if (suite-p child)
+                                      (gethash child suite-map)
+                                      child)))
          (setf (suite-children clone) children
                (suite-children-tail clone) children-tail))
-       (multiple-value-bind (before-each before-each-tail)
-           (copy-list-with-tail (suite-before-each suite))
-         (setf (suite-before-each clone) before-each
-               (suite-before-each-tail clone) before-each-tail))
-       (multiple-value-bind (after-each after-each-tail)
-           (copy-list-with-tail (suite-after-each suite))
-         (setf (suite-after-each clone) after-each
-               (suite-after-each-tail clone) after-each-tail))
-       (multiple-value-bind (before-all before-all-tail)
-           (copy-list-with-tail (suite-before-all suite))
-         (setf (suite-before-all clone) before-all
-               (suite-before-all-tail clone) before-all-tail))
-       (multiple-value-bind (after-all after-all-tail)
-           (copy-list-with-tail (suite-after-all suite))
-         (setf (suite-after-all clone) after-all
-               (suite-after-all-tail clone) after-all-tail))
-       (multiple-value-bind (around-each around-each-tail)
-           (copy-list-with-tail (suite-around-each suite))
-         (setf (suite-around-each clone) around-each
-               (suite-around-each-tail clone) around-each-tail)))
+       (copy-hook-list-slot (suite-before-each suite)
+                             (suite-before-each clone)
+                             (suite-before-each-tail clone))
+       (copy-hook-list-slot (suite-after-each suite)
+                             (suite-after-each clone)
+                             (suite-after-each-tail clone))
+       (copy-hook-list-slot (suite-before-all suite)
+                             (suite-before-all clone)
+                             (suite-before-all-tail clone))
+       (copy-hook-list-slot (suite-after-all suite)
+                             (suite-after-all clone)
+                             (suite-after-all-tail clone))
+       (copy-hook-list-slot (suite-around-each suite)
+                             (suite-around-each clone)
+                             (suite-around-each-tail clone)))
      suite-map)
     (values (and root (gethash root suite-map)) suite-map)))
 (defun snapshot-suite (suite)
@@ -157,21 +155,34 @@
                  (,tail ,suite-var) ,cell-var))
        ,value-var)))
 
+(defmacro set-suite-list-slot (value place tail-place)
+  "Bind VALUE once, set PLACE to it, and point TAIL-PLACE at its last cons."
+  (let ((value-var (gensym "VALUE")))
+    `(let ((,value-var ,value))
+       (setf ,place ,value-var
+             ,tail-place (last ,value-var)))))
+
 (defun set-suite-hook-lists
     (suite children before-all after-all before-each around-each after-each)
   "Replace SUITE's children and hook lists, recomputing each tail pointer."
-  (setf (suite-children suite) children
-        (suite-children-tail suite) (last children)
-        (suite-before-all suite) before-all
-        (suite-before-all-tail suite) (last before-all)
-        (suite-after-all suite) after-all
-        (suite-after-all-tail suite) (last after-all)
-        (suite-before-each suite) before-each
-        (suite-before-each-tail suite) (last before-each)
-        (suite-around-each suite) around-each
-        (suite-around-each-tail suite) (last around-each)
-        (suite-after-each suite) after-each
-        (suite-after-each-tail suite) (last after-each)))
+  (set-suite-list-slot children
+                        (suite-children suite)
+                        (suite-children-tail suite))
+  (set-suite-list-slot before-all
+                        (suite-before-all suite)
+                        (suite-before-all-tail suite))
+  (set-suite-list-slot after-all
+                        (suite-after-all suite)
+                        (suite-after-all-tail suite))
+  (set-suite-list-slot before-each
+                        (suite-before-each suite)
+                        (suite-before-each-tail suite))
+  (set-suite-list-slot around-each
+                        (suite-around-each suite)
+                        (suite-around-each-tail suite))
+  (set-suite-list-slot after-each
+                        (suite-after-each suite)
+                        (suite-after-each-tail suite)))
 
 (defmacro define-tail-registration (name head tail)
   `(defun ,name (function &key location)

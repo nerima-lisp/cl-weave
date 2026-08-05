@@ -1,9 +1,14 @@
 (in-package #:cl-weave)
 
+(defconstant +mock-history-initial-capacity+ 16
+  "Initial, and floor for regrown, capacity of a mock state's CALLS and
+RESULTS history vectors. Shared with the growth step in
+REGISTER-MOCK-CALL so the two never drift apart.")
+
 (defstruct mock-state
   implementation
-  (calls (make-array 16 :adjustable t :fill-pointer 0))
-  (results (make-array 16 :adjustable t :fill-pointer 0))
+  (calls (make-array +mock-history-initial-capacity+ :adjustable t :fill-pointer 0))
+  (results (make-array +mock-history-initial-capacity+ :adjustable t :fill-pointer 0))
   (generation 0)
   restore
   resident-spy-frame

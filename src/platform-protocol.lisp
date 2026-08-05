@@ -11,7 +11,11 @@
              (platform-capability-unavailable-capability condition)
              (platform-capability-unavailable-implementation condition)))))
 
-(define-condition platform-timeout (error) ())
+(define-condition platform-timeout (error) ()
+  (:report
+    (lambda (condition stream)
+      (declare (ignore condition))
+      (write-string "cl-weave: a platform-bounded operation exceeded its timeout." stream))))
 
 (defvar *platform-capabilities* nil)
 (defvar *platform-timeout-caller* nil)

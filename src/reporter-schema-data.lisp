@@ -188,3 +188,15 @@
                :description "Killed-to-total mutation score.")
               (:name "results" :kind "array" :required t
                :description "Per-mutation execution results."))))
+
+(defparameter *result-summary-field-specs*
+  '((:status :pass :plist-key :passed :json-key "passed")
+    (:status :skip :plist-key :skipped :json-key "skipped")
+    (:status :todo :plist-key :todos :json-key "todos")
+    (:status :fail :plist-key :failed :json-key "failed")
+    (:status :error :plist-key :errored :json-key "errored")))
+
+(defparameter *plan-summary-field-specs*
+  '((:status :run :plist-key :runnable :json-key "runnable")
+    (:status :skip :plist-key :skipped :json-key "skipped")
+    (:status :todo :plist-key :todos :json-key "todos")))

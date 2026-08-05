@@ -1,5 +1,16 @@
 (in-package #:cl-weave)
 
+(defparameter *tap-non-diagnostic-statuses*
+  (let ((table (make-hash-table :test (quote eq))))
+    (dolist (status (quote (:pass :skip :todo)) table)
+      (setf (gethash status table) t))))
+
+(defparameter *tap-assertion-field-specs*
+  (list (cons "form" (function assertion-detail-form))
+        (cons "matcher" (function assertion-detail-matcher))
+        (cons "actual" (function assertion-detail-actual))
+        (cons "expected" (function assertion-detail-expected))))
+
 (defun tap-line-string (value)
   (with-output-to-string (stream)
     (loop for char across (princ-to-string value)
@@ -17,22 +28,21 @@
       (:todo (format nil " # TODO~@[ ~A~]" (when reason (tap-line-string reason))))
       ((:pass :fail :error) ""))))
 
+(defun report-tap-assertion-field (detail field-spec stream)
+  (format stream "    ~A: ~A~%"
+          (car field-spec)
+          (tap-quoted-string (prin1-to-string (funcall (cdr field-spec) detail)))))
+
 (defun report-tap-assertion (detail stream)
   (when detail
     (format stream "  assertion:~%")
-    (format stream "    form: ~A~%"
-            (tap-quoted-string (prin1-to-string (assertion-detail-form detail))))
-    (format stream "    matcher: ~A~%"
-            (tap-quoted-string (prin1-to-string (assertion-detail-matcher detail))))
-    (format stream "    actual: ~A~%"
-            (tap-quoted-string (prin1-to-string (assertion-detail-actual detail))))
-    (format stream "    expected: ~A~%"
-            (tap-quoted-string (prin1-to-string (assertion-detail-expected detail))))
+    (dolist (field-spec *tap-assertion-field-specs*)
+      (report-tap-assertion-field detail field-spec stream))
     (format stream "    negated: ~:[false~;true~]~%"
             (assertion-detail-negated detail))))
 
 (defun report-tap-diagnostics (event stream)
-  (unless (member (test-event-status event) '(:pass :skip :todo))
+  (unless (gethash (test-event-status event) *tap-non-diagnostic-statuses*)
     (format stream "  ---~%")
     (format stream "  status: ~A~%"
             (tap-quoted-string (json-status-string (test-event-status event))))
@@ -53,7 +63,7 @@
         for status = (test-event-status event)
         do (progn
              (format stream "~:[not ok~;ok~] ~D - ~A~A~%"
-                     (member status '(:pass :skip :todo))
+                     (gethash status *tap-non-diagnostic-statuses*)
                      index
                      (tap-line-string (path-string (test-event-path event)))
                      (tap-directive event))

@@ -127,34 +127,37 @@
        (loop for tail on value by #'cddr
              always (symbolp (first tail)))))
 
+(defun object-value-kind (value)
+  "Classify VALUE as :hash-table, :alist, :plist, or :other, the shared
+key/value object kinds recognized by structural-match property lookup."
+  (cond
+    ((hash-table-p value) :hash-table)
+    ((alist-object-p value) :alist)
+    ((plist-object-p value) :plist)
+    (t :other)))
+
 (defun object-subset-designator-p (value)
-  (or (hash-table-p value)
-      (alist-object-p value)
-      (plist-object-p value)))
+  (not (eq (object-value-kind value) :other)))
 
 (defun object-entry-list (value)
-  (cond
-    ((hash-table-p value)
+  (case (object-value-kind value)
+    (:hash-table
      (loop for key being the hash-keys of value using (hash-value entry-value)
            collect (list key entry-value)))
-    ((alist-object-p value)
+    (:alist
      (loop for (key . entry-value) in value
            collect (list key entry-value)))
-    ((plist-object-p value)
+    (:plist
      (loop for (key entry-value) on value by #'cddr
            collect (list key entry-value)))
     (t nil)))
 
 (defun object-property-value (object key)
-  (typecase object
-    (hash-table (gethash key object))
-    (cons
-     (cond
-       ((alist-object-p object) (alist-value object key))
-       ((plist-object-p object) (plist-value object key))
-       (t (values nil nil))))
-    (t
-     (object-slot-value object key))))
+  (case (object-value-kind object)
+    (:hash-table (gethash key object))
+    (:alist (alist-value object key))
+    (:plist (plist-value object key))
+    (t (object-slot-value object key))))
 
 (defun match-object-failure (path reason actual-value expected-value)
   (list :path path

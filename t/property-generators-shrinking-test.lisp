@@ -468,3 +468,88 @@
       #-sbcl
       (exercise))))
 ))
+
+(describe "cycle-safe-candidate-equal-p direct branch coverage"
+  (it "compares EQUALP vectors by length and elementwise equality"
+    (expect (cl-weave::cycle-safe-candidate-equal-p #(1 2 3) #(1 2 3) (function equalp))
+            :to-be-truthy)
+    (expect (cl-weave::cycle-safe-candidate-equal-p #(1 2 3) #(1 2 4) (function equalp))
+            :to-be nil)
+    (expect (cl-weave::cycle-safe-candidate-equal-p #(1 2 3) #(1 2) (function equalp))
+            :to-be nil))
+
+  (it "compares EQUALP multi-dimensional arrays by dimensions and elementwise equality"
+    (let ((first (make-array '(2 2) :initial-contents '((1 2) (3 4))))
+          (same (make-array '(2 2) :initial-contents '((1 2) (3 4))))
+          (different-value (make-array '(2 2) :initial-contents '((1 2) (3 9))))
+          (different-shape (make-array '(4 1) :initial-contents '((1) (2) (3) (4)))))
+      (expect (cl-weave::cycle-safe-candidate-equal-p first same (function equalp))
+              :to-be-truthy)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different-value (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different-shape (function equalp))
+              :to-be nil)))
+
+  (it "rejects a one-sided EQUALP array comparison"
+    (expect (cl-weave::cycle-safe-candidate-equal-p #(1 2) 42 (function equalp)) :to-be nil)
+    (expect (cl-weave::cycle-safe-candidate-equal-p 42 #(1 2) (function equalp)) :to-be nil))
+
+  (it "does not deep-compare arrays under a plain EQUAL test"
+    (let ((first (vector 1 2))
+          (second (vector 1 2)))
+      (expect (cl-weave::cycle-safe-candidate-equal-p first second (function equal))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first first (function equal))
+              :to-be-truthy)))
+
+  (it "compares EQUALP hash tables by test, count, and entries"
+    (let ((first (make-hash-table :test (function equal)))
+          (same (make-hash-table :test (function equal)))
+          (different-value (make-hash-table :test (function equal)))
+          (different-count (make-hash-table :test (function equal)))
+          (different-test (make-hash-table :test (function eql))))
+      (setf (gethash :a first) 1
+            (gethash :b first) 2)
+      (setf (gethash :a same) 1
+            (gethash :b same) 2)
+      (setf (gethash :a different-value) 1
+            (gethash :b different-value) 99)
+      (setf (gethash :a different-count) 1)
+      (setf (gethash :a different-test) 1
+            (gethash :b different-test) 2)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first same (function equalp))
+              :to-be-truthy)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different-value (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different-count (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different-test (function equalp))
+              :to-be nil)))
+
+  (it "rejects a one-sided EQUALP hash-table comparison"
+    (let ((table (make-hash-table :test (function equal))))
+      (expect (cl-weave::cycle-safe-candidate-equal-p table :not-a-table (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p :not-a-table table (function equalp))
+              :to-be nil)))
+
+  #+sbcl
+  (it "compares EQUALP structure-objects by class and slot values"
+    (let ((first (make-equalp-shrink-candidate :value 7))
+          (same (make-equalp-shrink-candidate :value 7))
+          (different (make-equalp-shrink-candidate :value 9))
+          (other-class (make-recursive-equalp-shrink-candidate :value 7)))
+      (expect (cl-weave::cycle-safe-candidate-equal-p first same (function equalp))
+              :to-be-truthy)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first different (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p first other-class (function equalp))
+              :to-be nil)))
+
+  #+sbcl
+  (it "rejects a one-sided EQUALP structure-object comparison"
+    (let ((candidate (make-equalp-shrink-candidate :value 1)))
+      (expect (cl-weave::cycle-safe-candidate-equal-p candidate :not-a-structure (function equalp))
+              :to-be nil)
+      (expect (cl-weave::cycle-safe-candidate-equal-p :not-a-structure candidate (function equalp))
+              :to-be nil))))

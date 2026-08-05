@@ -57,25 +57,34 @@
 
 (defconstant +maximum-selection-filter-count+ 100000)
 
-(defun normalize-bounded-proper-list (value description element-normalizer)
+(defun bounded-proper-list-count (value limit)
+  "Walk VALUE without invoking any per-element work, returning its length if
+it is a finite proper list with at most LIMIT conses, or NIL if it is
+improper, circular, or too long. Kept separate from the element-normalizing
+pass so a doomed-to-reject oversized or cyclic list never pays the cost of
+calling an expensive per-element normalizer (e.g. one that stats the
+filesystem) up to LIMIT times just to be told no."
   (loop with seen = (make-hash-table :test #'eq)
-        with normalized = nil
         with count = 0
         with cursor = value
         do (cond
              ((null cursor)
-              (return (nreverse normalized)))
+              (return count))
              ((or (atom cursor)
                   (gethash cursor seen)
-                  (>= count +maximum-selection-filter-count+))
-              (error "cl-weave: ~A must be a finite proper list with at most ~D entries."
-                     description
-                     +maximum-selection-filter-count+))
+                  (>= count limit))
+              (return nil))
              (t
               (setf (gethash cursor seen) t)
               (incf count)
-              (push (funcall element-normalizer (car cursor)) normalized)
               (setf cursor (cdr cursor))))))
+
+(defun normalize-bounded-proper-list (value description element-normalizer)
+  (unless (bounded-proper-list-count value +maximum-selection-filter-count+)
+    (error "cl-weave: ~A must be a finite proper list with at most ~D entries."
+           description
+           +maximum-selection-filter-count+))
+  (mapcar element-normalizer value))
 
 (defun normalized-test-filter (filter)
   (when filter
@@ -110,13 +119,9 @@
          (1+ (mod (1- ordinal) (second shard))))))
 
 (defun location-pathname-designator (designator)
+  (check-type designator (or pathname string))
   (make-pathname
-   :defaults
-   (etypecase designator
-     (pathname
-      (uiop:ensure-absolute-pathname designator (uiop:getcwd)))
-     (string
-      (uiop:ensure-absolute-pathname designator (uiop:getcwd))))))
+   :defaults (uiop:ensure-absolute-pathname designator (uiop:getcwd))))
 
 (defun normalize-location-filter (location-filter)
   (normalize-bounded-proper-list
@@ -174,8 +179,7 @@
                  (tag-index-member-p tag include-tag-index))
         (setf include-match t)))))
 
-(defun base-selected-test-case-p (test path filter ancestor-focused)
-  (declare (ignore ancestor-focused))
+(defun base-selected-test-case-p (test path filter)
   (and (or (not (selection-filter-focus-enabled filter))
            (gethash test (selection-filter-focus-index filter)))
        (test-path-matches-filter-p path
@@ -214,7 +218,7 @@
                       (let ((path (test-path node child)))
                         (setf (gethash child test-paths) path)
                         (when (base-selected-test-case-p
-                               child path filter nil)
+                               child path filter)
                           (incf ordinal)
                           (when (or (null shard)
                                     (shard-includes-ordinal-p ordinal shard))
@@ -309,17 +313,36 @@
         decorated)
       children))
 
-(defun selected-test-case-p (suite test filter ancestor-focused)
-  (declare (ignore suite ancestor-focused))
-  (gethash test (selection-filter-selected-tests filter)))
+(defmacro define-selection-membership-predicate
+    (name lambda-list member-variable table-accessor)
+  "Define NAME as a selection-strategy predicate over LAMBDA-LIST that reports
+   whether MEMBER-VARIABLE belongs to the selection-filter table read by
+   TABLE-ACCESSOR. Every parameter in LAMBDA-LIST other than MEMBER-VARIABLE and
+   FILTER is unused by design: the filtering/focus/sharding selection strategies
+   share one calling convention so callers can invoke these predicates
+   interchangeably."
+  (let ((ignored (remove 'filter (remove member-variable lambda-list))))
+    `(defun ,name ,lambda-list
+       ,@(when ignored `((declare (ignore ,@ignored))))
+       (gethash ,member-variable (,table-accessor filter)))))
 
-(defun selected-suite-p (suite filter ancestor-focused)
-  (declare (ignore ancestor-focused))
-  (gethash suite (selection-filter-selected-suites filter)))
+(define-selection-membership-predicate
+    selected-test-case-p
+    (suite test filter ancestor-focused)
+    test
+    selection-filter-selected-tests)
 
-(defun selected-child-suite-p (child filter child-focused)
-  (declare (ignore child-focused))
-  (gethash child (selection-filter-selected-suites filter)))
+(define-selection-membership-predicate
+    selected-suite-p
+    (suite filter ancestor-focused)
+    suite
+    selection-filter-selected-suites)
+
+(define-selection-membership-predicate
+    selected-child-suite-p
+    (child filter child-focused)
+    child
+    selection-filter-selected-suites)
 
 (defun selected-child-test-p (suite child filter ancestor-focused)
   (selected-test-case-p suite child filter ancestor-focused))

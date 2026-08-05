@@ -22,8 +22,10 @@
                    unless (or (declaration-form-p element)
                               (and docstring-p first-p (stringp element)))
                      do (walk-child element context index)))
+           (walk-lambda-body (lambda-like-form context)
+             (walk-body (cddr lambda-like-form) context 2 :docstring-p t))
            (walk-binding-value (binding context binding-index value-index)
-             (when (consp (nthcdr value-index binding))
+             (when (and (consp binding) (consp (nthcdr value-index binding)))
                (walk-child (nth value-index binding)
                            context 1 binding-index value-index)))
            (walk-bindings (bindings context)
@@ -76,29 +78,20 @@
              (when (consp node)
                (case (first node)
                   ((quote declare) nil)
-                  (function
-                   (let ((function-form (second node)))
-                     (when (and (consp function-form)
-                                (eq (first function-form) 'lambda))
-                       (walk-body (cddr function-form)
-                                  (mutation-child-context context 1)
-                                  2
-                                  :docstring-p t))))
+                 (function
+                  (let ((function-form (second node)))
+                    (when (and (consp function-form)
+                               (eq (first function-form) 'lambda))
+                      (walk-lambda-body function-form (mutation-child-context context 1)))))
                  (lambda
-                  (walk-body (cddr node) context 2 :docstring-p t))
+                  (walk-lambda-body node context))
                  ((defun defmacro)
                   (walk-body (cdddr node) context 3 :docstring-p t))
-                 ((let let*)
+                 ((let let* symbol-macrolet handler-bind)
                   (walk-bindings (second node) context)
                   (walk-body (cddr node) context 2))
-                 ((flet labels)
+                 ((flet labels macrolet)
                   (walk-local-definitions (second node) context)
-                  (walk-body (cddr node) context 2))
-                 (macrolet
-                  (walk-local-definitions (second node) context)
-                  (walk-body (cddr node) context 2))
-                 (symbol-macrolet
-                  (walk-bindings (second node) context)
                   (walk-body (cddr node) context 2))
                  ((multiple-value-bind destructuring-bind)
                   (when (consp (cddr node))
@@ -121,20 +114,14 @@
                   (when (consp (rest node))
                     (walk-child (second node) context 1))
                   (walk-clauses (cddr node) context 2 2))
-                 (handler-bind
-                  (walk-bindings (second node) context)
-                  (walk-body (cddr node) context 2))
-                 ((block return-from)
+                 ((block return-from eval-when)
                   (walk-body (cddr node) context 2))
                  (go nil)
                  (the
                   (when (consp (cddr node))
                     (walk-child (third node) context 2)))
-                 (eval-when
-                  (walk-body (cddr node) context 2))
-                 ((locally unwind-protect multiple-value-prog1)
-                  (walk-body (rest node) context 1))
-                 ((multiple-value-call progv)
+                 ((locally unwind-protect multiple-value-prog1
+                   multiple-value-call progv)
                   (walk-body (rest node) context 1))
                  (tagbody
                   (loop for element in (rest node)

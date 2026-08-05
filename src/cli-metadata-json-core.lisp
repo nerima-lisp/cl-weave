@@ -13,6 +13,9 @@
 (defun write-json-string-value (value stream)
   (cl-weave::write-json-string value stream))
 
+(defun write-json-boolean (value stream)
+  (write-string (if value "true" "false") stream))
+
 (defun write-json-array (values element-writer stream)
   (write-char #\[ stream)
   (loop for value in values

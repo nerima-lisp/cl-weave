@@ -17,10 +17,12 @@
   (+ min-length
      (property-random-below rng (1+ (- max-length min-length)))))
 
+(defun hash-test-denotes-p (hash-test symbol)
+  (or (eq hash-test symbol)
+      (eq hash-test (symbol-function symbol))))
+
 (defun equalp-hash-test-p (hash-test)
-  (or (eq hash-test (quote equalp))
-      (eq hash-test (function equalp))
-      (eq hash-test (symbol-function (quote equalp)))))
+  (hash-test-denotes-p hash-test (quote equalp)))
 
 (defun candidate-container-p (value equalp-test-p)
   (or (consp value)
@@ -28,6 +30,11 @@
            (or (arrayp value)
                (hash-table-p value)
                (typep value (quote structure-object))))))
+
+(defun array-total-elements (array)
+  (if (vectorp array)
+      (length array)
+      (array-total-size array)))
 
 (defun candidate-requires-safe-equality-p (value hash-test)
   (let ((equal-test-p (equal-hash-test-p hash-test))
@@ -62,11 +69,7 @@
                          (push (list (cdr node) nil child-depth) pending)
                          (push (list (car node) nil child-depth) pending))
                         ((arrayp node)
-                         (dotimes
-                             (index
-                              (if (vectorp node)
-                                  (length node)
-                                  (array-total-size node)))
+                         (dotimes (index (array-total-elements node))
                            (push (list (row-major-aref node index)
                                        nil
                                        child-depth)
@@ -101,9 +104,76 @@
       (setf (gethash right rights) t))))
 
 (defun equal-hash-test-p (hash-test)
-  (or (eq hash-test (quote equal))
-      (eq hash-test (function equal))
-      (eq hash-test (symbol-function (quote equal)))))
+  (hash-test-denotes-p hash-test (quote equal)))
+
+(defun equalp-array-shapes-match-p (left right)
+  (if (or (vectorp left) (vectorp right))
+      (and (vectorp left)
+           (vectorp right)
+           (= (length left) (length right)))
+      (equal (array-dimensions left) (array-dimensions right))))
+
+(defun cycle-safe-hash-table-successors/k (seen left right fail/k)
+  (unless (and (eq (hash-table-test left) (hash-table-test right))
+               (= (hash-table-count left) (hash-table-count right)))
+    (funcall fail/k))
+  (when (candidate-pair-seen-p seen left right)
+    (return-from cycle-safe-hash-table-successors/k nil))
+  (let ((table-test (hash-table-test left))
+        (safe-left-entries nil)
+        (safe-right-entries nil))
+    (maphash
+     (lambda (key value)
+       (when (candidate-requires-safe-equality-p key table-test)
+         (push (cons key value) safe-left-entries)))
+     left)
+    (maphash
+     (lambda (key value)
+       (when (candidate-requires-safe-equality-p key table-test)
+         (push (cons key value) safe-right-entries)))
+     right)
+    (let* ((safe-left-count (length safe-left-entries))
+           (safe-entries (append safe-left-entries safe-right-entries))
+           (class-ids
+             (candidate-equality-class-ids
+              (mapcar (function car) safe-entries)
+              table-test))
+           (left-class-by-key (make-hash-table :test (function eq)))
+           (right-entry-by-class (make-hash-table)))
+      (loop for entry in safe-left-entries
+            for class-id in class-ids
+            do (setf (gethash (car entry) left-class-by-key) class-id))
+      (loop for entry in safe-right-entries
+            for class-id in (nthcdr safe-left-count class-ids)
+            do (setf (gethash class-id right-entry-by-class) entry))
+      (let ((pairs nil))
+        (maphash
+         (lambda (key left-value)
+           (if (candidate-requires-safe-equality-p key table-test)
+               (multiple-value-bind (class-id classified-p)
+                   (gethash key left-class-by-key)
+                 (declare (ignore classified-p))
+                 (multiple-value-bind (right-entry present-p)
+                     (gethash class-id right-entry-by-class)
+                   (unless present-p (funcall fail/k))
+                   (push (cons left-value (cdr right-entry)) pairs)))
+               (multiple-value-bind (right-value present-p)
+                   (gethash key right)
+                 (unless present-p (funcall fail/k))
+                 (push (cons left-value right-value) pairs))))
+         left)
+        pairs))))
+
+#+sbcl
+(defun structure-slot-successors/k (left right fail/k)
+  (loop for slot in (sb-mop:class-slots (class-of left))
+        for name = (sb-mop:slot-definition-name slot)
+        for left-bound-p = (slot-boundp left name)
+        for right-bound-p = (slot-boundp right name)
+        do (unless (eq (not (null left-bound-p)) (not (null right-bound-p)))
+             (funcall fail/k))
+        when left-bound-p
+          collect (cons (slot-value left name) (slot-value right name))))
 
 (defun cycle-safe-candidate-equal-p
     (left right hash-test &optional initial-seen)
@@ -123,20 +193,10 @@
                  ((or (consp left) (consp right))
                   (return-from cycle-safe-candidate-equal-p nil))
                  ((and equalp-test-p (arrayp left) (arrayp right))
-                  (unless
-                      (if (or (vectorp left) (vectorp right))
-                          (and (vectorp left)
-                               (vectorp right)
-                               (= (length left) (length right)))
-                          (equal (array-dimensions left)
-                                 (array-dimensions right)))
+                  (unless (equalp-array-shapes-match-p left right)
                     (return-from cycle-safe-candidate-equal-p nil))
                   (unless (candidate-pair-seen-p seen left right)
-                    (dotimes
-                        (index
-                         (if (vectorp left)
-                             (length left)
-                             (array-total-size left)))
+                    (dotimes (index (array-total-elements left))
                       (push (cons (row-major-aref left index)
                                   (row-major-aref right index))
                             pending))))
@@ -144,66 +204,15 @@
                        (or (arrayp left) (arrayp right)))
                   (return-from cycle-safe-candidate-equal-p nil))
                  ((and equalp-test-p
-      (hash-table-p left)
-      (hash-table-p right))
-  (unless
-      (and (eq (hash-table-test left)
-               (hash-table-test right))
-           (= (hash-table-count left)
-              (hash-table-count right)))
-    (return-from cycle-safe-candidate-equal-p nil))
-  (unless (candidate-pair-seen-p seen left right)
-    (let ((table-test (hash-table-test left))
-          (safe-left-entries nil)
-          (safe-right-entries nil))
-      (maphash
-       (lambda (key value)
-         (when (candidate-requires-safe-equality-p key table-test)
-           (push (cons key value) safe-left-entries)))
-       left)
-      (maphash
-       (lambda (key value)
-         (when (candidate-requires-safe-equality-p key table-test)
-           (push (cons key value) safe-right-entries)))
-       right)
-      (let* ((safe-left-count (length safe-left-entries))
-             (safe-entries
-               (append safe-left-entries safe-right-entries))
-             (class-ids
-               (candidate-equality-class-ids
-                (mapcar (function car) safe-entries)
-                table-test))
-             (left-class-by-key
-               (make-hash-table :test (function eq)))
-             (right-entry-by-class
-               (make-hash-table :test (function eql))))
-        (loop for entry in safe-left-entries
-              for class-id in class-ids
-              do (setf
-                  (gethash (car entry) left-class-by-key)
-                  class-id))
-        (loop for entry in safe-right-entries
-              for class-id in (nthcdr safe-left-count class-ids)
-              do (setf
-                  (gethash class-id right-entry-by-class)
-                  entry))
-        (maphash
-         (lambda (key left-value)
-           (if (candidate-requires-safe-equality-p key table-test)
-               (multiple-value-bind (class-id classified-p)
-                   (gethash key left-class-by-key)
-                 (declare (ignore classified-p))
-                 (multiple-value-bind (right-entry present-p)
-                     (gethash class-id right-entry-by-class)
-                   (unless present-p
-                     (return-from cycle-safe-candidate-equal-p nil))
-                   (push (cons left-value (cdr right-entry)) pending)))
-               (multiple-value-bind (right-value present-p)
-                   (gethash key right)
-                 (unless present-p
-                   (return-from cycle-safe-candidate-equal-p nil))
-                 (push (cons left-value right-value) pending))))
-         left)))))
+                       (hash-table-p left)
+                       (hash-table-p right))
+                  (setf pending
+                        (nconc
+                         (cycle-safe-hash-table-successors/k
+                          seen left right
+                          (lambda ()
+                            (return-from cycle-safe-candidate-equal-p nil)))
+                         pending)))
                  ((and equalp-test-p
                        (or (hash-table-p left) (hash-table-p right)))
                   (return-from cycle-safe-candidate-equal-p nil))
@@ -215,17 +224,14 @@
                     (return-from cycle-safe-candidate-equal-p nil))
                   #+sbcl
                   (unless (candidate-pair-seen-p seen left right)
-                    (dolist (slot (sb-mop:class-slots (class-of left)))
-                      (let* ((name (sb-mop:slot-definition-name slot))
-                             (left-bound-p (slot-boundp left name))
-                             (right-bound-p (slot-boundp right name)))
-                        (unless (eq (not (null left-bound-p))
-                                    (not (null right-bound-p)))
-                          (return-from cycle-safe-candidate-equal-p nil))
-                        (when left-bound-p
-                          (push (cons (slot-value left name)
-                                      (slot-value right name))
-                                pending)))))
+                    (setf pending
+                          (nconc
+                           (structure-slot-successors/k
+                            left right
+                            (lambda ()
+                              (return-from cycle-safe-candidate-equal-p
+                                nil)))
+                           pending)))
                   #-sbcl
                   (return-from cycle-safe-candidate-equal-p nil))
                  ((and equalp-test-p

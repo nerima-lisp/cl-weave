@@ -49,6 +49,14 @@
                (changed-registration-p registration changed-pathnames))
              registrations))
 
+(defun next-sibling-segment (sibling-ordinals child)
+  "Return (NAME . ORDINAL) identifying CHILD among the suites in SIBLING-ORDINALS
+that share its name, incrementing the ordinal recorded for NAME as a side effect."
+  (let* ((name (suite-name child))
+         (ordinal (gethash name sibling-ordinals 0)))
+    (setf (gethash name sibling-ordinals) (1+ ordinal))
+    (cons name ordinal)))
+
 (defun merge-suite-preservation-record (suite record)
   (labels ((merge-pattern (registrations pattern)
              (let ((anchors (make-hash-table :test (function eq)))
@@ -162,8 +170,8 @@
 (defun collect-suite-preservation-records-unlocked
     (root changed-pathnames)
   (let ((tree
-          (when root
-            (make-suite-preservation-node nil root)))
+         (when root
+           (make-suite-preservation-node nil root)))
         (visits 0))
     (when tree
       (let ((stack (list (list :enter root tree))))
@@ -177,25 +185,16 @@
                             (suite-preservation-record
                              suite changed-pathnames))
                       (let ((sibling-ordinals
-                              (make-hash-table
-                               :test (function equal)))
+                             (make-hash-table
+                              :test (function equal)))
                             (children nil)
                             (child-work nil))
                         (dolist (child (suite-children suite))
                           (when (suite-p child)
-                            (let* ((name (suite-name child))
-                                   (ordinal
-                                     (gethash
-                                      name sibling-ordinals 0))
-                                   (child-node
-                                     (make-suite-preservation-node
-                                      (cons name ordinal)
-                                      child)))
-                              (setf (gethash name sibling-ordinals)
-                                    (1+ ordinal))
+                            (let* ((segment (next-sibling-segment sibling-ordinals child))
+                                   (child-node (make-suite-preservation-node segment child)))
                               (push child-node children)
-                              (push (list :enter child child-node)
-                                    child-work))))
+                              (push (list :enter child child-node) child-work))))
                         (setf (suite-preservation-node-children node)
                               (nreverse children))
                         (push (list :exit suite node) stack)
@@ -219,11 +218,46 @@
           tree)
      visits)))
 
-(defun collect-suite-preservation-records
+(defmacro define-locked-registry-operation (name lambda-list unlocked-name)
+  "Define NAME as a thin, lock-guarded wrapper around UNLOCKED-NAME: acquire
+the test registry lock, forward LAMBDA-LIST to UNLOCKED-NAME, and return its
+result. Captures the shape shared by every locked entry point in this file:
+(defun NAME (args...) (with-test-registry-lock (UNLOCKED-NAME args...)))."
+  `(defun ,name ,lambda-list
+     (with-test-registry-lock
+       (,unlocked-name ,@lambda-list))))
+
+(define-locked-registry-operation collect-suite-preservation-records
     (root changed-pathnames)
-  (with-test-registry-lock
-    (collect-suite-preservation-records-unlocked
-     root changed-pathnames)))
+  collect-suite-preservation-records-unlocked)
+
+(defun prune-suite-hook-lists-unlocked (suite changed-pathnames)
+  (let ((children
+          (foreign-registrations
+           (suite-children suite)
+           changed-pathnames))
+        (before-all
+          (foreign-registrations
+           (suite-before-all suite)
+           changed-pathnames))
+        (after-all
+          (foreign-registrations
+           (suite-after-all suite)
+           changed-pathnames))
+        (before-each
+          (foreign-registrations
+           (suite-before-each suite)
+           changed-pathnames))
+        (around-each
+          (foreign-registrations
+           (suite-around-each suite)
+           changed-pathnames))
+        (after-each
+          (foreign-registrations
+           (suite-after-each suite)
+           changed-pathnames)))
+    (set-suite-hook-lists suite children before-all after-all
+                          before-each around-each after-each)))
 
 (defun prune-changed-registrations-unlocked
     (root changed-pathnames)
@@ -241,40 +275,13 @@
                     (dolist (child children)
                       (push (list :enter child) stack))))
                  (:exit
-                  (let ((children
-                          (foreign-registrations
-                           (suite-children suite)
-                           changed-pathnames))
-                        (before-all
-                          (foreign-registrations
-                           (suite-before-all suite)
-                           changed-pathnames))
-                        (after-all
-                          (foreign-registrations
-                           (suite-after-all suite)
-                           changed-pathnames))
-                        (before-each
-                          (foreign-registrations
-                           (suite-before-each suite)
-                           changed-pathnames))
-                        (around-each
-                          (foreign-registrations
-                           (suite-around-each suite)
-                           changed-pathnames))
-                        (after-each
-                          (foreign-registrations
-                           (suite-after-each suite)
-                           changed-pathnames)))
-                    (set-suite-hook-lists suite children before-all after-all
-                                          before-each around-each after-each)))))))
+                  (prune-suite-hook-lists-unlocked suite changed-pathnames))))))
   (note-test-registry-change-unlocked)
   root)
 
-(defun prune-changed-registrations
+(define-locked-registry-operation prune-changed-registrations
     (root changed-pathnames)
-  (with-test-registry-lock
-    (prune-changed-registrations-unlocked
-     root changed-pathnames)))
+  prune-changed-registrations-unlocked)
 
 (defun merge-suite-preservation-records-unlocked (root tree)
   (let ((stack (when tree (list (list root tree))))
@@ -302,17 +309,9 @@
                      (dolist (child (suite-children suite))
                        (incf visits)
                        (when (suite-p child)
-                         (let* ((name (suite-name child))
-                                (ordinal
-                                  (gethash
-                                   name sibling-ordinals 0))
-                                (segment (cons name ordinal)))
-                           (setf (gethash name sibling-ordinals)
-                                 (1+ ordinal)
-                                 (gethash segment child-index)
-                                 child
-                                 (gethash child suite-index)
-                                 child))))
+                         (let ((segment (next-sibling-segment sibling-ordinals child)))
+                           (setf (gethash segment child-index) child
+                                 (gethash child suite-index) child))))
                      (dolist (child-node child-nodes)
                        (let* ((segment
                                 (suite-preservation-node-segment
@@ -336,57 +335,7 @@
       (note-test-registry-change-unlocked))
     (values root visits)))
 
-(defun merge-suite-preservation-records (root tree)
-  (with-test-registry-lock
-    (merge-suite-preservation-records-unlocked
-     root tree)))
+(define-locked-registry-operation merge-suite-preservation-records
+    (root tree)
+  merge-suite-preservation-records-unlocked)
 
-(defun registry-reachable-objects-unlocked (root)
-  (let ((registrations (make-hash-table :test #'eq))
-        (suites (make-hash-table :test #'eq))
-        (stack (when root (list root))))
-    (flet ((record-list (values)
-             (dolist (value values)
-               (setf (gethash value registrations) t))))
-      (loop while stack
-            for suite = (pop stack)
-            unless (gethash suite suites)
-              do (setf (gethash suite registrations) t
-                       (gethash suite suites) t)
-                 (record-list (suite-before-all suite))
-                 (record-list (suite-after-all suite))
-                 (record-list (suite-before-each suite))
-                 (record-list (suite-around-each suite))
-                 (record-list (suite-after-each suite))
-                 (dolist (child (suite-children suite))
-                   (setf (gethash child registrations) t)
-                   (when (suite-p child)
-                     (push child stack)))))
-    (values registrations suites)))
-
-(defun registry-reachable-objects (root)
-  (with-test-registry-lock
-    (registry-reachable-objects-unlocked root)))
-
-(defun compact-registration-owner-table-unlocked (root)
-  (multiple-value-bind (reachable suites)
-      (registry-reachable-objects-unlocked root)
-    (declare (ignore suites))
-    (let ((compacted (make-hash-table :test #'eq)))
-      (maphash
-       (lambda (registration pathname)
-         (when (gethash registration reachable)
-           (setf (gethash registration compacted) pathname)))
-       *registration-owners*)
-      compacted)))
-(defun compact-named-suite-table-unlocked (root)
-  (multiple-value-bind (registrations reachable-suites)
-      (registry-reachable-objects-unlocked root)
-    (declare (ignore registrations))
-    (let ((compacted (make-hash-table :test #'equal)))
-      (maphash
-       (lambda (key suite)
-         (when (gethash suite reachable-suites)
-           (setf (gethash key compacted) suite)))
-       *named-suites*)
-      compacted)))

@@ -245,6 +245,21 @@
     (t
      (values nil nil nil))))
 
+(defun acquire-cached-or-snapshot-watch-test-index (suite)
+  (with-test-registry-lock
+    (multiple-value-bind
+          (index registered-files valid-p)
+        (cached-watch-test-index-unlocked suite)
+      (if valid-p
+          (values index registered-files t nil nil)
+          (multiple-value-bind
+                (new-snapshot new-generation)
+              (snapshot-watch-test-index-input-unlocked
+               suite)
+            (values nil nil nil
+                    new-snapshot
+                    new-generation))))))
+
 (defun ensure-watch-test-index-unlocked (suite)
   "Build without holding the registry lock; callers must not hold that lock."
   (loop repeat +watch-test-index-build-attempts+
@@ -252,19 +267,7 @@
            (multiple-value-bind
                  (cached-index cached-files cached-p
                   snapshot generation)
-               (with-test-registry-lock
-                 (multiple-value-bind
-                       (index registered-files valid-p)
-                     (cached-watch-test-index-unlocked suite)
-                   (if valid-p
-                       (values index registered-files t nil nil)
-                       (multiple-value-bind
-                             (new-snapshot new-generation)
-                           (snapshot-watch-test-index-input-unlocked
-                            suite)
-                         (values nil nil nil
-                                 new-snapshot
-                                 new-generation)))))
+               (acquire-cached-or-snapshot-watch-test-index suite)
              (when cached-p
                (return-from ensure-watch-test-index-unlocked
                  (values cached-index cached-files)))

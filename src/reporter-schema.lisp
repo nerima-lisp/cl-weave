@@ -43,18 +43,6 @@
                     (write-char char stream)
                     (write-char #\? stream)))))))
 
-(defparameter *result-summary-field-specs*
-  '((:status :pass :plist-key :passed :json-key "passed")
-    (:status :skip :plist-key :skipped :json-key "skipped")
-    (:status :todo :plist-key :todos :json-key "todos")
-    (:status :fail :plist-key :failed :json-key "failed")
-    (:status :error :plist-key :errored :json-key "errored")))
-
-(defparameter *plan-summary-field-specs*
-  '((:status :run :plist-key :runnable :json-key "runnable")
-    (:status :skip :plist-key :skipped :json-key "skipped")
-    (:status :todo :plist-key :todos :json-key "todos")))
-
 (defmacro define-reporter-artifact-schemas (&body schemas)
   "Define reporter schema data after validating its declarative contract."
   (labels ((property-present-p (plist property)
@@ -108,9 +96,7 @@
         (failed 0)
         (errored 0)
         (failed-paths nil)
-        (failed-paths-tail nil)
-        (errored-paths nil)
-        (errored-paths-tail nil))
+        (errored-paths nil))
     (dolist (event events)
       (incf total)
       (case (test-event-status event)
@@ -119,28 +105,18 @@
         (:todo (incf todos))
         (:fail
          (incf failed)
-         (let ((path (list (path-string (test-event-path event)))))
-           (if failed-paths-tail
-               (setf (cdr failed-paths-tail) path
-                     failed-paths-tail path)
-               (setf failed-paths path
-                     failed-paths-tail path))))
+         (push (path-string (test-event-path event)) failed-paths))
         (:error
          (incf errored)
-         (let ((path (list (path-string (test-event-path event)))))
-           (if errored-paths-tail
-               (setf (cdr errored-paths-tail) path
-                     errored-paths-tail path)
-               (setf errored-paths path
-                     errored-paths-tail path))))))
+         (push (path-string (test-event-path event)) errored-paths))))
     (list :total total
           :passed passed
           :skipped skipped
           :todos todos
           :failed failed
           :errored errored
-          :failed-paths failed-paths
-          :errored-paths errored-paths)))
+          :failed-paths (nreverse failed-paths)
+          :errored-paths (nreverse errored-paths))))
 
 (defun plan-summary (plan)
   (let ((total 0)

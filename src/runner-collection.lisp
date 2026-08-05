@@ -19,6 +19,10 @@
      (t
       (setf (cdr head-last) tail)
       (values head tail-last))))
+
+(defun continue-with-linked-segments (continue head head-last tail tail-last)
+  (multiple-value-call continue
+    (link-collection-segments head head-last tail tail-last)))
  (defun collect-suite-events/k
     (suite control continue filter
      &optional ancestor-focused suppressed-status suppressed-reason
@@ -63,10 +67,9 @@
                              (multiple-value-bind (with-before with-before-last)
                                  (link-collection-segments
                                   before-events before-events events events-last)
-                               (multiple-value-call continue
-                                 (link-collection-segments
-                                  with-before with-before-last
-                                  after-events after-events))))))
+                               (continue-with-linked-segments
+                                continue with-before with-before-last
+                                after-events after-events)))))
                   (unwind-protect
                        (if before-errors
                            (finish nil nil)
@@ -98,18 +101,16 @@
                  (head-events head-last remaining)
                (recur remaining
                       (lambda (tail tail-last)
-                        (multiple-value-call continue
-                          (link-collection-segments
-                           head-events head-last tail tail-last)))))
+                        (continue-with-linked-segments
+                         continue head-events head-last tail tail-last))))
              (continue-with-event (event)
                (let ((events (list event)))
                  (if (execution-control-stopped control)
                      (funcall continue events events)
                      (recur (rest children)
                             (lambda (tail tail-last)
-                              (multiple-value-call continue
-                                (link-collection-segments
-                                 events events tail tail-last))))))))
+                              (continue-with-linked-segments
+                               continue events events tail tail-last)))))))
       (if (or (null children) (execution-control-stopped control))
           (funcall continue nil nil)
           (let ((child (first children)))
@@ -239,42 +240,55 @@
               (*max-workers* (collection-options-max-workers options)))
           (funcall continue filter))))))
 
+(defparameter +default-strict-empty-collection-null-accessors+
+  (list (function collection-options-name-filter)
+        (function collection-options-location-filter)
+        (function collection-options-test-path-filter)
+        (function collection-options-include-tags)
+        (function collection-options-exclude-tags)
+        (function collection-options-bail)
+        (function collection-options-shard)
+        (function collection-options-timeout-ms)
+        (function collection-options-max-workers))
+  "Collection-options accessors that must all return NIL, alongside the
+default :order/:seed/:retry values, for the options to qualify for the
+strict-empty collection fast path.")
+
 (defun default-strict-empty-collection-options-p (options)
-  (and (null (collection-options-name-filter options))
-       (null (collection-options-location-filter options))
-       (null (collection-options-test-path-filter options))
-       (null (collection-options-include-tags options))
-       (null (collection-options-exclude-tags options))
-       (null (collection-options-bail options))
-       (null (collection-options-shard options))
+  (and (every (lambda (accessor) (null (funcall accessor options)))
+              +default-strict-empty-collection-null-accessors+)
        (eq (collection-options-order options) :defined)
        (eql (collection-options-seed options) 0)
-       (eql (collection-options-retry options) 0)
-       (null (collection-options-timeout-ms options))
-       (null (collection-options-max-workers options))))
+       (eql (collection-options-retry options) 0)))
+
+(defparameter +strict-empty-lineage-null-accessors+
+  (list (function suite-focus) (function suite-skip-reason)
+        (function suite-todo-reason) (function suite-execution-mode)
+        (function suite-before-each) (function suite-around-each)
+        (function suite-after-each))
+  "Suite accessors that must all return NIL, for every suite in a lineage,
+for the lineage to qualify for the strict-empty collection fast path.")
 
 (defun strict-empty-lineage-eligible-p (lineage)
   (every
    (lambda (current)
-     (and (null (suite-focus current))
-          (null (suite-skip-reason current))
-          (null (suite-todo-reason current))
-          (null (suite-execution-mode current))
-          (null (suite-before-each current))
-          (null (suite-around-each current))
-          (null (suite-after-each current))))
+     (every (lambda (accessor) (null (funcall accessor current)))
+            +strict-empty-lineage-null-accessors+))
    lineage))
+
+(defparameter +strict-empty-test-null-accessors+
+  (list (function test-case-focus) (function test-case-skip-reason)
+        (function test-case-todo-reason) (function test-case-retry)
+        (function test-case-timeout-ms) (function test-case-execution-mode)
+        (function test-case-expected-failure-reason)
+        (function test-case-watch-dependencies))
+  "Test-case accessors that must all return NIL for a test to qualify for
+the strict-empty collection fast path.")
 
 (defun strict-empty-test-eligible-p (test)
   (and (test-case-p test)
-       (null (test-case-focus test))
-       (null (test-case-skip-reason test))
-       (null (test-case-todo-reason test))
-       (null (test-case-retry test))
-       (null (test-case-timeout-ms test))
-       (null (test-case-execution-mode test))
-       (null (test-case-expected-failure-reason test))
-       (null (test-case-watch-dependencies test))
+       (every (lambda (accessor) (null (funcall accessor test)))
+              +strict-empty-test-null-accessors+)
        (let ((marker (test-case-trusted-empty-function test)))
          (and marker
               (eq marker (test-case-function test))))))
@@ -352,120 +366,3 @@
     :timeout-ms timeout-ms
     :max-workers max-workers)))
 
-
-
-(declaim (ftype (function (suite list function selection-filter
-                           &optional t t t t)
-                          *)
-                collect-children-plan/k))
-
-
-(defun collect-suite-plan/k
-    (suite continue filter
-     &optional ancestor-focused suppressed-status suppressed-reason
-       inherited-execution-mode)
-  (if (not (selected-suite-p suite filter ancestor-focused))
-      (funcall continue nil nil)
-      (let ((active-execution-mode
-              (effective-suite-execution-mode suite inherited-execution-mode)))
-        (multiple-value-bind (active-status active-reason)
-            (suite-suppression suite suppressed-status suppressed-reason)
-          (collect-children-plan/k
-           suite
-           (ordered-children suite (suite-children suite))
-           continue
-           filter
-           ancestor-focused
-           active-status
-           active-reason
-           active-execution-mode)))))
-
-
-
-(defun collect-children-plan/k
-    (suite children continue filter
-     &optional ancestor-focused suppressed-status suppressed-reason
-       execution-mode)
-  (macrolet ((recur (remaining next-continue)
-  `(collect-children-plan/k
-    suite
-    ,remaining
-    ,next-continue
-    filter
-    ancestor-focused
-    suppressed-status
-    suppressed-reason
-    execution-mode)))
-    (labels ((continue-with-tail (entries entries-last)
-               (recur (rest children)
-                      (lambda (tail tail-last)
-                        (multiple-value-call continue
-                          (link-collection-segments
-                           entries entries-last tail tail-last)))))
-             (continue-with-entry (entry)
-               (let ((entries (list entry)))
-                 (recur (rest children)
-                        (lambda (tail tail-last)
-                          (multiple-value-call continue
-                            (link-collection-segments
-                             entries entries tail tail-last)))))))
-      (if (null children)
-          (funcall continue nil nil)
-          (let ((child (first children)))
-            (multiple-value-bind (step payload)
-                (describe-plan-collection-step
-                 suite
-                 child
-                 filter
-                 ancestor-focused
-                 suppressed-status
-                 suppressed-reason
-                 execution-mode)
-              (ecase step
-                (:skip
-                 (recur (rest children) continue))
-                (:collect-suite
-                 (collect-suite-plan/k
-                  child
-                  #'continue-with-tail
-                  filter
-                  payload
-                  suppressed-status
-                  suppressed-reason
-                  execution-mode))
-                (:collect-test
-                 (continue-with-entry payload)))))))))
-
-
-
-
-(defun collect-test-plan-with-options (suite options)
-  (let ((suite (snapshot-suite suite)))
-    (call-with-collection-context
-     suite
-     options
-     (lambda (filter)
-       (collect-suite-plan/k
-        suite
-        (lambda (entries entries-last)
-          (declare (ignore entries-last))
-          entries)
-        filter)))))
-
-(defun collect-test-plan
-    (suite &key name-filter location-filter test-path-filter
-                include-tags exclude-tags shard order seed retry
-                timeout-ms)
-  (collect-test-plan-with-options
-   suite
-   (normalize-collection-options
-    :name-filter name-filter
-    :location-filter location-filter
-    :test-path-filter test-path-filter
-    :include-tags include-tags
-    :exclude-tags exclude-tags
-    :shard shard
-    :order order
-    :seed seed
-    :retry retry
-    :timeout-ms timeout-ms)))

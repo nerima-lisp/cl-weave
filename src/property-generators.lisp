@@ -16,24 +16,27 @@
             :final (car (last ordered-states))))))
 
 (defun state-machine-trace-p (trace)
-    (and (finite-proper-list-p trace)
-         (= (length trace) 8)
-         (eq (first trace) :initial)
-         (eq (third trace) :events)
-         (finite-proper-list-p (fourth trace))
-         (eq (fifth trace) :states)
-         (finite-proper-list-p (sixth trace))
-         (= (length (sixth trace)) (1+ (length (fourth trace))))
-         (eq (seventh trace) :final)))
+  (and (finite-proper-list-p trace)
+       (= (length trace) 8)
+       (eq (first trace) :initial)
+       (eq (third trace) :events)
+       (finite-proper-list-p (fourth trace))
+       (eq (fifth trace) :states)
+       (finite-proper-list-p (sixth trace))
+       (= (length (sixth trace)) (1+ (length (fourth trace))))
+       (eq (seventh trace) :final)))
 
-  (defun state-machine-trace-events (trace)
-    (getf trace :events))
+(defun state-machine-trace-events (trace)
+  (getf trace :events))
+
+(defun ensure-property-function (value caller argument)
+  (unless (functionp value)
+    (error "cl-weave: ~A requires ~A to be a function, got ~S." caller argument value))
+  value)
 
 (defun gen-state-machine (initial-state transition event-generator
                           &key (min-length 0) (max-length 16))
-  (unless (functionp transition)
-    (error "cl-weave: gen-state-machine requires TRANSITION to be a function, got ~S."
-           transition))
+  (ensure-property-function transition "gen-state-machine" "TRANSITION")
   (let ((events-generator (gen-list event-generator
                                     :min-length min-length
                                     :max-length max-length)))
@@ -94,13 +97,9 @@
                    (remove-duplicate-shrink-candidates
                     (nreverse candidates) #'equal)))))))
 
-
-
 (defun gen-such-that (predicate generator &key (attempts 100))
   (ensure-property-generator generator "gen-such-that")
-  (unless (functionp predicate)
-    (error "cl-weave: gen-such-that requires PREDICATE to be a function, got ~S."
-           predicate))
+  (ensure-property-function predicate "gen-such-that" "PREDICATE")
   (unless (and (integerp attempts) (plusp attempts))
     (error "cl-weave: gen-such-that requires a positive integer ATTEMPTS, got ~S."
            attempts))
@@ -121,9 +120,7 @@
 
 (defun gen-recursive (base-generator builder &key (max-depth 4))
   (ensure-property-generator base-generator "gen-recursive")
-  (unless (functionp builder)
-    (error "cl-weave: gen-recursive requires BUILDER to be a function, got ~S."
-           builder))
+  (ensure-property-function builder "gen-recursive" "BUILDER")
   (unless (and (integerp max-depth) (not (minusp max-depth)))
     (error "cl-weave: gen-recursive requires a non-negative integer MAX-DEPTH, got ~S."
            max-depth))
