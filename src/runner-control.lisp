@@ -18,11 +18,11 @@
 (defun detect-default-max-workers ()
   (let ((detected (ignore-errors (online-processor-count))))
     (min +default-max-workers-cap+
-         (max 2
+         (max +default-max-workers-floor+
               (if (and (integerp detected)
                        (plusp detected))
                   detected
-                  2)))))
+                  +default-max-workers-floor+)))))
 
 (defparameter *default-max-workers* (detect-default-max-workers))
 
@@ -53,7 +53,7 @@
             +maximum-bail-limit+ bail))))
 
 (defun failing-event-p (event)
-  (member (test-event-status event) '(:fail :error)))
+  (member (test-event-status event) *failing-event-statuses*))
 
 (defun record-event/control (control event)
   (when (and (execution-control-bail-limit control)
