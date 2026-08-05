@@ -100,3 +100,5 @@ cl-weave-doctor.json
 
 # Claude Code tooling state (worktrees, session data).
 /.claude/
+
+.worktrees/
