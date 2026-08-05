@@ -45,7 +45,14 @@
   (remaining 0)
   (color 0))
 
-(defun candidate-equality-class-ids (candidates hash-test)
+(defun candidate-equality-ordered-colors (node color-function)
+  (let ((colors
+          (mapcar color-function (candidate-equality-node-children node))))
+    (if (candidate-equality-node-unordered-p node)
+        (sort colors (function <))
+        colors)))
+
+(defun build-candidate-equality-graph (candidates hash-test)
   (let ((nodes nil)
         (pending nil)
         (atom-number 0)
@@ -197,149 +204,158 @@
                     #-sbcl
                     (error
                      "Cycle-safe structure equality is unsupported on this implementation."))))
-        (dolist (node nodes)
-          (setf
-           (candidate-equality-node-remaining node)
-           (length (candidate-equality-node-children node)))
-          (dolist (child (candidate-equality-node-children node))
-            (push node (candidate-equality-node-parents child))))
-        (let ((queue nil)
-              (processed nil)
-              (fixed-class-count 0)
-              (fixed-classes (make-hash-table :test (function equal))))
-          (dolist (node nodes)
-            (when (zerop (candidate-equality-node-remaining node))
-              (push node queue)))
-          (loop while queue
-                for node = (pop queue)
-                do
-                   (push node processed)
-                   (dolist (parent
-                            (candidate-equality-node-parents node))
-                     (when
-                         (zerop
-                          (decf
-                           (candidate-equality-node-remaining
-                            parent)))
-                       (push parent queue))))
-          (labels
-              ((ordered-colors (node color-function)
-                 (let ((colors
-                         (mapcar
-                          color-function
-                          (candidate-equality-node-children node))))
-                   (if (candidate-equality-node-unordered-p node)
-                       (sort colors (function <))
-                       colors))))
-            (dolist (node (nreverse processed))
-              (let* ((descriptor
-                       (list
-                        (candidate-equality-node-base node)
-                        (ordered-colors
-                         node
-                         (lambda (child)
-                           (candidate-equality-node-color child)))))
-                     (color
-                       (multiple-value-bind (existing present-p)
-                           (gethash descriptor fixed-classes)
-                         (if present-p
-                             existing
-                             (setf
-                              (gethash descriptor fixed-classes)
-                              (incf fixed-class-count))))))
-                (setf (candidate-equality-node-color node) color)))
-            (let ((unresolved
-                    (remove-if
-                     (lambda (node)
-                       (zerop
-                        (candidate-equality-node-remaining node)))
-                     nodes)))
-              (when unresolved
-                (labels
-                    ((encoded-child-color (child)
-                       (if
-                           (zerop
-                            (candidate-equality-node-remaining child))
-                           (ash
-                            (candidate-equality-node-color child)
-                            1)
-                           (1+
-                            (ash
-                             (candidate-equality-node-color child)
-                             1))))
-                     (assign-partition (descriptor-function)
-                       (let ((classes
-                               (make-hash-table
-                                :test (function equal)))
-                             (class-count 0)
-                             (next-colors
-                               (make-hash-table
-                                :test (function eq))))
-                         (dolist (node unresolved)
-                           (let* ((descriptor
-                                    (funcall
-                                     descriptor-function
-                                     node))
-                                  (color
-                                    (multiple-value-bind
-                                        (existing present-p)
-                                        (gethash descriptor classes)
-                                      (if present-p
-                                          existing
-                                          (setf
-                                           (gethash descriptor classes)
-                                           (incf class-count))))))
-                             (setf (gethash node next-colors) color)))
-                         (values next-colors class-count))))
-                  (multiple-value-bind (colors class-count)
-                      (assign-partition
-                       (lambda (node)
-                         (list
-                          (candidate-equality-node-base node)
-                          (ordered-colors
-                           node
-                           (lambda (child)
-                             (if
-                                 (zerop
-                                  (candidate-equality-node-remaining
-                                   child))
-                                 (ash
-                                  (candidate-equality-node-color child)
-                                  1)
-                                 1))))))
-                    (maphash
-                     (lambda (node color)
-                       (setf
-                        (candidate-equality-node-color node)
-                        color))
-                     colors)
-                    (loop
+        (values nodes roots)))))
+
+(defun link-candidate-equality-parents (nodes)
+  (dolist (node nodes)
+    (setf
+     (candidate-equality-node-remaining node)
+     (length (candidate-equality-node-children node)))
+    (dolist (child (candidate-equality-node-children node))
+      (push node (candidate-equality-node-parents child)))))
+
+(defun color-acyclic-candidate-equality-nodes (nodes)
+  (let ((queue nil)
+        (processed nil)
+        (fixed-class-count 0)
+        (fixed-classes (make-hash-table :test (function equal))))
+    (dolist (node nodes)
+      (when (zerop (candidate-equality-node-remaining node))
+        (push node queue)))
+    (loop while queue
+          for node = (pop queue)
+          do
+             (push node processed)
+             (dolist (parent
+                      (candidate-equality-node-parents node))
+               (when
+                   (zerop
+                    (decf
+                     (candidate-equality-node-remaining
+                      parent)))
+                 (push parent queue))))
+    (dolist (node (nreverse processed))
+      (let* ((descriptor
+               (list
+                (candidate-equality-node-base node)
+                (candidate-equality-ordered-colors
+                 node
+                 (lambda (child)
+                   (candidate-equality-node-color child)))))
+             (color
+               (multiple-value-bind (existing present-p)
+                   (gethash descriptor fixed-classes)
+                 (if present-p
+                     existing
+                     (setf
+                      (gethash descriptor fixed-classes)
+                      (incf fixed-class-count))))))
+        (setf (candidate-equality-node-color node) color)))
+    fixed-class-count))
+
+(defun color-cyclic-candidate-equality-nodes (unresolved fixed-class-count)
+  (labels
+      ((encoded-child-color (child)
+         (if
+             (zerop
+              (candidate-equality-node-remaining child))
+             (ash
+              (candidate-equality-node-color child)
+              1)
+             (1+
+              (ash
+               (candidate-equality-node-color child)
+               1))))
+       (assign-partition (descriptor-function)
+         (let ((classes
+                 (make-hash-table
+                  :test (function equal)))
+               (class-count 0)
+               (next-colors
+                 (make-hash-table
+                  :test (function eq))))
+           (dolist (node unresolved)
+             (let* ((descriptor
+                      (funcall
+                       descriptor-function
+                       node))
+                    (color
                       (multiple-value-bind
-                          (next-colors next-class-count)
-                          (assign-partition
-                           (lambda (node)
-                             (list
-                              (candidate-equality-node-color node)
-                              (candidate-equality-node-base node)
-                              (ordered-colors
-                               node
-                               (function encoded-child-color)))))
-                        (when (= next-class-count class-count)
-                          (maphash
-                           (lambda (node color)
-                             (setf
-                              (candidate-equality-node-color node)
-                              (+ fixed-class-count color)))
-                           next-colors)
-                          (return))
-                        (setf class-count next-class-count)
-                        (maphash
-                         (lambda (node color)
-                           (setf
-                            (candidate-equality-node-color node)
-                            color))
-                         next-colors))))))))
-          (mapcar
-           (lambda (root)
-             (candidate-equality-node-color root))
-           roots))))))
+                          (existing present-p)
+                          (gethash descriptor classes)
+                        (if present-p
+                            existing
+                            (setf
+                             (gethash descriptor classes)
+                             (incf class-count))))))
+               (setf (gethash node next-colors) color)))
+           (values next-colors class-count))))
+    (multiple-value-bind (colors class-count)
+        (assign-partition
+         (lambda (node)
+           (list
+            (candidate-equality-node-base node)
+            (candidate-equality-ordered-colors
+             node
+             (lambda (child)
+               (if
+                   (zerop
+                    (candidate-equality-node-remaining
+                     child))
+                   (ash
+                    (candidate-equality-node-color child)
+                    1)
+                   1))))))
+      (maphash
+       (lambda (node color)
+         (setf
+          (candidate-equality-node-color node)
+          color))
+       colors)
+      (loop
+        (multiple-value-bind
+            (next-colors next-class-count)
+            (assign-partition
+             (lambda (node)
+               (list
+                (candidate-equality-node-color node)
+                (candidate-equality-node-base node)
+                (candidate-equality-ordered-colors
+                 node
+                 (function encoded-child-color)))))
+          (when (= next-class-count class-count)
+            (maphash
+             (lambda (node color)
+               (setf
+                (candidate-equality-node-color node)
+                (+ fixed-class-count color)))
+             next-colors)
+            (return))
+          (setf class-count next-class-count)
+          (maphash
+           (lambda (node color)
+             (setf
+              (candidate-equality-node-color node)
+              color))
+           next-colors))))))
+
+(defun candidate-equality-class-ids (candidates hash-test)
+  (multiple-value-bind (nodes roots)
+      (build-candidate-equality-graph candidates hash-test)
+    (link-candidate-equality-parents nodes)
+    (let ((fixed-class-count
+            (color-acyclic-candidate-equality-nodes nodes)))
+      (let ((unresolved
+              (remove-if
+               (lambda (node)
+                 (zerop
+                  (candidate-equality-node-remaining node)))
+               nodes)))
+        (when unresolved
+          (color-cyclic-candidate-equality-nodes
+           unresolved
+           fixed-class-count))))
+    (mapcar
+     (lambda (root)
+       (candidate-equality-node-color root))
+     roots)))
