@@ -43,7 +43,7 @@ verification and scope policy for those channels lives in
 {
   "schemaVersion": 23,
   "kind": "cl-weave-metadata",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "homepage": "https://github.com/nerima-lisp/cl-weave",
   "bugTracker": "https://github.com/nerima-lisp/cl-weave/issues",
   "license": "MIT",
