@@ -5,8 +5,7 @@
 
 (defparameter *metadata-extra-environment-variables*
   '("CL_WEAVE_PROPERTY_TESTS"
-    "CL_WEAVE_PROPERTY_SEED"
-    "CL_WEAVE_COVERAGE_REPORT_DIR"))
+    "CL_WEAVE_PROPERTY_SEED"))
 
 (defparameter *metadata-policy-documents*
   '("docs/src/project/community-health.md"
