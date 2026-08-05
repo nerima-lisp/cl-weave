@@ -57,25 +57,34 @@
 
 (defconstant +maximum-selection-filter-count+ 100000)
 
-(defun normalize-bounded-proper-list (value description element-normalizer)
+(defun bounded-proper-list-count (value limit)
+  "Walk VALUE without invoking any per-element work, returning its length if
+it is a finite proper list with at most LIMIT conses, or NIL if it is
+improper, circular, or too long. Kept separate from the element-normalizing
+pass so a doomed-to-reject oversized or cyclic list never pays the cost of
+calling an expensive per-element normalizer (e.g. one that stats the
+filesystem) up to LIMIT times just to be told no."
   (loop with seen = (make-hash-table :test #'eq)
-        with normalized = nil
         with count = 0
         with cursor = value
         do (cond
              ((null cursor)
-              (return (nreverse normalized)))
+              (return count))
              ((or (atom cursor)
                   (gethash cursor seen)
-                  (>= count +maximum-selection-filter-count+))
-              (error "cl-weave: ~A must be a finite proper list with at most ~D entries."
-                     description
-                     +maximum-selection-filter-count+))
+                  (>= count limit))
+              (return nil))
              (t
               (setf (gethash cursor seen) t)
               (incf count)
-              (push (funcall element-normalizer (car cursor)) normalized)
               (setf cursor (cdr cursor))))))
+
+(defun normalize-bounded-proper-list (value description element-normalizer)
+  (unless (bounded-proper-list-count value +maximum-selection-filter-count+)
+    (error "cl-weave: ~A must be a finite proper list with at most ~D entries."
+           description
+           +maximum-selection-filter-count+))
+  (mapcar element-normalizer value))
 
 (defun normalized-test-filter (filter)
   (when filter
