@@ -115,6 +115,7 @@
    (:file "watch-discovery")
    (:file "watch-scope")
    (:file "watch-suite-diff")
+   (:file "watch-registry-compaction")
    (:file "watch")
    (:file "cli-options")
    (:file "cli-options-parsers")
