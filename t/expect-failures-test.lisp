@@ -378,3 +378,32 @@
       (expect-not 1 matcher 2))))
 
 )
+
+(describe "expect-poll option validation"
+  (it "rejects EXPECT-POLL options that are not a property list"
+    (expect (lambda ()
+              (cl-weave::call-polling-expectation-thunk
+               (lambda () :ok)
+               (list :to-be :ok)
+               '(:timeout-ms)
+               '(expect-poll (lambda () :ok) (:timeout-ms) :to-be :ok)))
+            :to-throw
+            "must be a property list"))
+
+  (it "rejects a non-real or negative EXPECT-POLL timeout-ms"
+    (dolist (bad-timeout (list "1000" -1))
+      (expect (lambda ()
+                (eval `(expect-poll (lambda () :ok)
+                         (:timeout-ms ,bad-timeout :interval-ms 0)
+                         :to-be :ok)))
+              :to-throw
+              "timeout-ms")))
+
+  (it "rejects a non-real or negative EXPECT-POLL interval-ms"
+    (dolist (bad-interval (list "10" -1))
+      (expect (lambda ()
+                (eval `(expect-poll (lambda () :ok)
+                         (:timeout-ms 0 :interval-ms ,bad-interval)
+                         :to-be :ok)))
+              :to-throw
+              "interval-ms"))))
