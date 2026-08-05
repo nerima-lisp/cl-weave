@@ -805,3 +805,19 @@
         (when previous-method
           (add-method generic-function previous-method))
         (remprop probe-symbol count-indicator)))))
+
+(describe "registration internals branch coverage"
+  (it "treats an empty case list as a valid literal proper list"
+    (expect (cl-weave::registration-proper-list-p nil) :to-be t))
+  (it "rejects a dotted list as an improper list"
+    (expect (cl-weave::registration-proper-list-p '(1 2 . 3)) :to-be nil))
+  (it "rejects an odd-length leading form as an options plist"
+    (expect (cl-weave::option-plist-form-p '(:retry)) :to-be nil))
+  (it "defaults it-isolated systems to cl-weave when the option is omitted"
+    (expect
+     (macroexpand-1
+      '(it-isolated "child process"
+         (:timeout 5)
+         (expect 1 :to-be 1)))
+     :to-satisfy
+     (lambda (form) (tree-contains-p form '("cl-weave"))))))

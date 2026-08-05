@@ -531,3 +531,14 @@
       (expect (getf expected-report :test) :to-be :valid-pattern)))
 
 )
+
+(describe "matcher builtins branch coverage"
+  (it "fails to-be-defined for a nil actual"
+    (expect-not nil :to-be-defined))
+  #+sbcl
+  (it "fails to-be-close-to when the expected value is NaN"
+    (expect-not 1.0d0 :to-be-close-to (quiet-nan)))
+  (it "fails to-have-slot via expect-not when the slot is missing"
+    (expect-not 'sample-widget :to-have-slot 'missing-slot))
+  (it "fails to-have-method-specialized-on via expect-not when unspecialized"
+    (expect-not #'render-widget-mode :to-have-method-specialized-on '(missing t))))
