@@ -29,6 +29,13 @@
         :status status
         :summary summary))
 
+(defmacro doctor-boolean-check (predicate name pass-status fail-status pass-message fail-message)
+  (let ((result (gensym "RESULT")))
+    `(let ((,result ,predicate))
+       (doctor-check ,name
+                     (if ,result ,pass-status ,fail-status)
+                     (if ,result ,pass-message ,fail-message)))))
+
 (defun doctor-runtime-metadata ()
   (list :lisp-implementation (lisp-implementation-type)
         :lisp-version (lisp-implementation-version)
@@ -46,6 +53,58 @@
 (defun doctor-requested-system (options)
   (first (cli-options-systems options)))
 
+(defun doctor-runtime-check ()
+  (doctor-check "runtime" :pass
+                (format nil "~A ~A on ~A"
+                        (lisp-implementation-type)
+                        (lisp-implementation-version)
+                        (software-type))))
+
+(defun doctor-cl-weave-system-check ()
+  (doctor-boolean-check (visible-asdf-system-p "cl-weave")
+                        "cl-weave-system"
+                        :pass :fail
+                        "ASDF can resolve the bundled cl-weave system."
+                        "ASDF cannot resolve the bundled cl-weave system."))
+
+(defun doctor-requested-system-check (requested-system)
+  (multiple-value-bind (status summary)
+      (cond
+       ((null requested-system)
+        (values :pass
+                "No ASDF system was requested; doctor is running in runtime-only mode."))
+       ((visible-asdf-system-p requested-system)
+        (values :pass
+                (format nil "ASDF can resolve the requested system ~A."
+                        requested-system)))
+       (t
+        (values :fail
+                (format nil "ASDF cannot resolve the requested system ~A."
+                        requested-system))))
+    (doctor-check "requested-system" status summary)))
+
+(defun doctor-workspace-asd-files-check (asd-files)
+  (doctor-boolean-check asd-files
+                        "workspace-asd-files"
+                        :pass :warn
+                        (format nil "Found ~D .asd file(s) in the current working directory."
+                                (length asd-files))
+                        "No .asd files were found in the current working directory."))
+
+(defun doctor-output-target-check (output-file)
+  (doctor-check "output-target" :pass
+                (if output-file
+                    (format nil "Doctor output is configured to write to ~A."
+                            output-file)
+                    "Doctor output is configured to write to standard output.")))
+
+(defun doctor-command-metadata-check (metadata)
+  (doctor-boolean-check (member "doctor" (getf metadata :commands) :test #'string=)
+                        "command-metadata"
+                        :pass :fail
+                        "Framework metadata advertises the doctor command."
+                        "Framework metadata does not advertise the doctor command."))
+
 (defun doctor-checks (options)
   (let* ((cwd (uiop:getcwd))
          (asd-files (directory-asd-files cwd))
@@ -53,54 +112,12 @@
          (requested-system (doctor-requested-system options))
          (output-file (cli-options-output-file options)))
     (list
-     (doctor-check
-      "runtime"
-      :pass
-      (format nil "~A ~A on ~A"
-              (lisp-implementation-type)
-              (lisp-implementation-version)
-              (software-type)))
-     (doctor-check
-      "cl-weave-system"
-      (if (visible-asdf-system-p "cl-weave") :pass :fail)
-      (if (visible-asdf-system-p "cl-weave")
-          "ASDF can resolve the bundled cl-weave system."
-          "ASDF cannot resolve the bundled cl-weave system."))
-     (doctor-check
-      "requested-system"
-      (cond
-        ((null requested-system) :pass)
-        ((visible-asdf-system-p requested-system) :pass)
-        (t :fail))
-      (cond
-        ((null requested-system)
-         "No ASDF system was requested; doctor is running in runtime-only mode.")
-        ((visible-asdf-system-p requested-system)
-         (format nil "ASDF can resolve the requested system ~A."
-                 requested-system))
-        (t
-         (format nil "ASDF cannot resolve the requested system ~A."
-                 requested-system))))
-     (doctor-check
-      "workspace-asd-files"
-      (if asd-files :pass :warn)
-      (if asd-files
-          (format nil "Found ~D .asd file(s) in the current working directory."
-                  (length asd-files))
-          "No .asd files were found in the current working directory."))
-     (doctor-check
-      "output-target"
-      :pass
-      (if output-file
-          (format nil "Doctor output is configured to write to ~A."
-                  output-file)
-          "Doctor output is configured to write to standard output."))
-     (doctor-check
-      "command-metadata"
-      (if (member "doctor" (getf metadata :commands) :test #'string=) :pass :fail)
-      (if (member "doctor" (getf metadata :commands) :test #'string=)
-          "Framework metadata advertises the doctor command."
-          "Framework metadata does not advertise the doctor command.")))))
+     (doctor-runtime-check)
+     (doctor-cl-weave-system-check)
+     (doctor-requested-system-check requested-system)
+     (doctor-workspace-asd-files-check asd-files)
+     (doctor-output-target-check output-file)
+     (doctor-command-metadata-check metadata))))
 
 (defun doctor-report (&optional (options (make-cli-options)))
   (let* ((checks (doctor-checks options))
