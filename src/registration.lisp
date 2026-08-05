@@ -128,15 +128,29 @@
   (:reasoned describe-skip-each describe-skip "skipped" t)
   (:reasoned describe-todo-each describe-todo "todo" t))
 
-(defmacro describe-skip-if (condition name &body body)
-  `(if ,condition
-       (describe-skip ,name "conditional skip" ,@body)
-       (describe ,name ,@body)))
+(defun conditional-registration-form (condition reg-name body active-macro skip-macro
+                                       skip-reason skip-includes-body-p skip-branch-first-p)
+  (let ((active-form `(,active-macro ,reg-name ,@body))
+        (skip-form `(,skip-macro ,reg-name ,skip-reason
+                                  ,@(when skip-includes-body-p body))))
+    (if skip-branch-first-p
+        `(if ,condition ,skip-form ,active-form)
+        `(if ,condition ,active-form ,skip-form))))
 
-(defmacro describe-run-if (condition name &body body)
-  `(if ,condition
-       (describe ,name ,@body)
-       (describe-skip ,name "conditional run-if" ,@body)))
+(defmacro define-conditional-registration-macro
+    (macro-name active-macro skip-macro skip-reason skip-includes-body-p
+     skip-branch-first-p)
+  `(defmacro ,macro-name (condition reg-name &body body)
+     (conditional-registration-form condition reg-name body
+                                     ',active-macro ',skip-macro
+                                     ,skip-reason ,skip-includes-body-p
+                                     ,skip-branch-first-p)))
+
+(define-conditional-registration-macro describe-skip-if describe describe-skip
+    "conditional skip" t t)
+
+(define-conditional-registration-macro describe-run-if describe describe-skip
+    "conditional run-if" t nil)
 
 (defun option-plist-form-p (form)
   (and (consp form)
@@ -171,11 +185,14 @@
         do (push key seen))
   options)
 
+(defparameter *test-registration-option-keys*
+  '(:retry :timeout-ms :execution-mode :tags :watch-depends-on)
+  "Option keys accepted by TEST-REGISTRATION-OPTIONS.")
+
 (defun test-registration-options (options)
   (ensure-unique-option-keys options)
   (loop for (key nil) on options by #'cddr
-        unless (member key '(:retry :timeout-ms :execution-mode :tags
-                             :watch-depends-on))
+        unless (member key *test-registration-option-keys*)
           do (error "Unknown test option ~S." key))
   (append
      (when (plist-key-present-p options :retry)
@@ -260,15 +277,9 @@
   (:reasoned it-skip-each it-skip "skipped" nil)
   (:reasoned it-todo-each it-todo "todo" nil))
 
-(defmacro it-skip-if (condition name &body body)
-  `(if ,condition
-       (it-skip ,name "conditional skip")
-       (it ,name ,@body)))
+(define-conditional-registration-macro it-skip-if it it-skip "conditional skip" nil t)
 
-(defmacro it-run-if (condition name &body body)
-  `(if ,condition
-       (it ,name ,@body)
-       (it-skip ,name "conditional run-if")))
+(define-conditional-registration-macro it-run-if it it-skip "conditional run-if" nil nil)
 
 (defun isolated-option-form (options key fallback)
   (if (plist-key-present-p options key)
@@ -325,12 +336,16 @@
         ',names
         '(it-property ,name ,bindings ,@body)))))
 
+(defparameter *fuzz-registration-option-keys*
+  '(:trials :timeout-per-trial)
+  "Option keys accepted by IT-FUZZ's OPTIONS plist.")
+
 (defun %fuzz-options-plist (options)
   (unless (registration-proper-list-p options)
     (registration-syntax-error
      "IT-FUZZ requires OPTIONS to be a literal proper list, got ~S." options))
   (loop for (key value) on options by #'cddr
-        unless (member key '(:trials :timeout-per-trial))
+        unless (member key *fuzz-registration-option-keys*)
           do (registration-syntax-error
               "IT-FUZZ OPTIONS accepts only :TRIALS and :TIMEOUT-PER-TRIAL, got ~S." key)
         collect key
