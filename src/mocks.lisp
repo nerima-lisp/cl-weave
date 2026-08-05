@@ -15,6 +15,17 @@
 
 (define-conditional-lock-macro with-mock-registry-lock () *mock-registry-lock*)
 
+(defmacro with-state-unless-disposed ((state disposed-p) &body body)
+  "Run BODY with STATE locked, unless the mock STATE belongs to has already
+been disposed. When disposed, BODY is skipped and DISPOSED-P (a place) is
+set to true; STATE's lock is released either way before this form
+returns, so callers signal MOCK-DISPOSED-ERROR (if that is what disposal
+means to them) only after the lock is gone."
+  `(with-mock-state-lock (,state)
+     (cond
+       ((mock-state-disposed-p ,state) (setf ,disposed-p t))
+       (t ,@body))))
+
 (defun mock-registry-entries ()
   ;; Cross-lock order is registry then state.  Code holding a state lock must
   ;; never acquire the registry lock.
@@ -27,29 +38,27 @@
   (let ((disposed-p nil)
         (call-token nil)
         (implementation nil))
-    (with-mock-state-lock (state)
-      (if (mock-state-disposed-p state)
-          (setf disposed-p t)
-          (labels ((push-history (history value)
-                     (let ((size (array-total-size history)))
-                       (when (= (fill-pointer history) size)
-                         (setf history
-                               (adjust-array
-                                history
-                                (max 16 (* 2 size))
-                                :fill-pointer (fill-pointer history))))
-                       (vector-push value history)
-                       history)))
-            (let ((index (fill-pointer (mock-state-calls state))))
-              (setf (mock-state-calls state)
-                    (push-history (mock-state-calls state) arguments)
-                    (mock-state-results state)
-                    (push-history (mock-state-results state)
-                                  '(:type :incomplete))
-                    call-token
-                    (cons (mock-state-generation state) index)
-                    implementation
-                    (mock-state-implementation state))))))
+    (with-state-unless-disposed (state disposed-p)
+      (labels ((push-history (history value)
+                 (let ((size (array-total-size history)))
+                   (when (= (fill-pointer history) size)
+                     (setf history
+                           (adjust-array
+                             history
+                             (max +mock-history-initial-capacity+ (* 2 size))
+                             :fill-pointer (fill-pointer history))))
+                   (vector-push value history)
+                   history)))
+        (let ((index (fill-pointer (mock-state-calls state))))
+          (setf (mock-state-calls state)
+                (push-history (mock-state-calls state) arguments)
+                (mock-state-results state)
+                (push-history (mock-state-results state)
+                              '(:type :incomplete))
+                call-token
+                (cons (mock-state-generation state) index)
+                implementation
+                (mock-state-implementation state)))))
     (when disposed-p
       (error 'mock-disposed-error :mock mock))
     ;; Interleave mock invocations onto the time-travel timeline (opt-in).
@@ -123,7 +132,7 @@
       (labels ((copy-reference (value)
                  (if (consp value) (multiple-value-bind (copy present-p) (gethash value copies)
                 (unless present-p
-                  (setf copy (cons nil nil)
+                  (setf copy (list nil)
                         (gethash value copies) copy)
                   (push value pending))
                 copy)
@@ -162,10 +171,8 @@
   (let ((state (mock-state-for mock))
         (implementation (ensure-mock-implementation implementation))
         (disposed-p nil))
-    (with-mock-state-lock
-      (state)
-      (if (mock-state-disposed-p state) (setf disposed-p t)
-        (setf (mock-state-implementation state) implementation)))
+    (with-state-unless-disposed (state disposed-p)
+      (setf (mock-state-implementation state) implementation))
     (when disposed-p
       (error 'mock-disposed-error :mock mock)))
   mock)
@@ -180,17 +187,28 @@
 (defun mock-return-value (mock value)
   (mock-return-values mock value))
 
+(defun restore-symbol-if-current (symbol frame)
+  "If SYMBOL's function cell still holds FRAME's mock, restore it to
+FRAME's original function."
+  (when (and (fboundp symbol) (eq (symbol-function symbol) (spy-frame-mock frame)))
+    (setf (symbol-function symbol) (spy-frame-original frame))))
+
+(defun clear-resident-spy-frame (frame)
+  "Detach FRAME's mock state from resident-spy bookkeeping once FRAME is
+no longer the active occupant of its target symbol."
+  (with-mock-state-lock ((spy-frame-state frame))
+    (setf (mock-state-implementation (spy-frame-state frame)) (spy-frame-original frame)
+          (mock-state-resident-spy-frame (spy-frame-state frame)) nil)))
+
 (defun collapse-restored-spies (symbol)
   (let ((stack (gethash symbol *spy-stacks*)))
     (loop while (and stack (spy-frame-restored-p (first stack)))
           for frame = (pop stack)
-          do (when (and (fboundp symbol) (eq (symbol-function symbol) (spy-frame-mock frame)))
-        (setf (symbol-function symbol) (spy-frame-original frame))) (with-mock-state-lock
-        ((spy-frame-state frame))
-        (setf (mock-state-implementation (spy-frame-state frame)) (spy-frame-original frame)
-              (mock-state-resident-spy-frame (spy-frame-state frame)) nil)))
-    (if stack (setf (gethash symbol *spy-stacks*) stack)
-      (remhash symbol *spy-stacks*))))
+          do (restore-symbol-if-current symbol frame)
+             (clear-resident-spy-frame frame))
+    (if stack
+        (setf (gethash symbol *spy-stacks*) stack)
+        (remhash symbol *spy-stacks*))))
 
 (defun spy-on (symbol)
   (unless (symbolp symbol)
@@ -198,9 +216,10 @@
   (let ((missing-target-p nil)
         (mock nil))
     (with-mock-registry-lock
-      (if (not (fboundp symbol)) (setf missing-target-p t)
+      (if (fboundp symbol)
         (let ((original (symbol-function symbol)))
-          (multiple-value-bind (created-mock state) (make-unregistered-mock-function original)
+          (multiple-value-bind (created-mock state)
+              (make-unregistered-mock-function original)
             (let ((frame
                   (make-spy-frame
                     :symbol
@@ -218,7 +237,8 @@
                     (mock-state-resident-spy-frame state) frame
                     (gethash created-mock *mock-states*) state)
               (push frame (gethash symbol *spy-stacks*))
-              (setf (symbol-function symbol) created-mock))))))
+              (setf (symbol-function symbol) created-mock))))
+        (setf missing-target-p t)))
     (when missing-target-p
       (error "cl-weave: spy target must name a function cell, got ~S." symbol))
     mock))
@@ -249,14 +269,11 @@
       (when registered-p
         (setf frame (mock-state-resident-spy-frame state))
         (unless frame
-          (with-mock-state-lock
-            (state)
-            (if (mock-state-disposed-p state) (setf disposed-p t)
-              (progn
-                (setf (mock-state-disposed-p state) t
-                      (mock-state-implementation state) #'default-mock-implementation)
-                (clear-mock-history-unlocked state)
-                (remhash mock *mock-states*)))))))
+          (with-state-unless-disposed (state disposed-p)
+            (setf (mock-state-disposed-p state) t
+                  (mock-state-implementation state) #'default-mock-implementation)
+            (clear-mock-history-unlocked state)
+            (remhash mock *mock-states*)))))
     (cond
       ((not registered-p) (error "Value is not a cl-weave mock function: ~S" mock))
       (frame
@@ -325,7 +342,7 @@
   index)
 
 (defun expected-index-and-tail (expected matcher)
-  (when (null expected)
+  (unless expected
     (error "cl-weave: ~A expects an index followed by expected values." matcher))
   (values (one-based-index-expected (first expected) matcher) (rest expected)))
 
