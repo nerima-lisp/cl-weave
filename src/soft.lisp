@@ -19,13 +19,17 @@
         :negated (assertion-detail-negated detail)
         :pass (assertion-detail-pass detail)))
 
+(defparameter *soft-assertion-aggregate-expected* '(:failures 0)
+  "Expected value recorded on the aggregated failure detail: no collected
+failures.")
+
 (defun aggregated-soft-failure-detail (details)
   (make-assertion-detail
    :form '(with-soft-assertions)
    :matcher :soft-assertions
    :actual (list :failures (length details)
                  :details (mapcar #'soft-detail-report details))
-   :expected '(:failures 0)
+   :expected *soft-assertion-aggregate-expected*
    :negated nil
    :pass nil))
 
