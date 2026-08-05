@@ -152,6 +152,23 @@
        ((progv (list 'value) (list (+ 1 2)) (+ 3 4))
         (progv (list 'value) (list (- 1 2)) (+ 3 4))))))
 
+  (it "walks past bare-symbol let/let*/do bindings without signaling an error"
+    (expect (collected-mutation-forms
+             '(let (a) (+ a 1))
+             :operators '(:arithmetic-operator))
+            :to-equal
+            (list '(let (a) (- a 1))))
+    (expect (collected-mutation-forms
+             '(let* (a (b (+ 1 2))) (+ a b))
+             :operators '(:arithmetic-operator))
+            :to-contain
+            '(let* (a (b (- 1 2))) (+ a b)))
+    (expect (collected-mutation-forms
+             '(do (a (b 1 (+ b 1))) ((> b 3)) (+ a b))
+             :operators '(:arithmetic-operator))
+            :to-contain
+            '(do (a (b 1 (- b 1))) ((> b 3)) (+ a b))))
+
   (it "keeps syntax, declarations, and documentation immutable"
     (let ((forms
             '((let* (((+ 1 2) 3)) value)

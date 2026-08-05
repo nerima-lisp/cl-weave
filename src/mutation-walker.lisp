@@ -25,7 +25,7 @@
            (walk-lambda-body (lambda-like-form context)
              (walk-body (cddr lambda-like-form) context 2 :docstring-p t))
            (walk-binding-value (binding context binding-index value-index)
-             (when (consp (nthcdr value-index binding))
+             (when (and (consp binding) (consp (nthcdr value-index binding)))
                (walk-child (nth value-index binding)
                            context 1 binding-index value-index)))
            (walk-bindings (bindings context)
