@@ -138,14 +138,12 @@ if LIST is circular, improper, or longer than MAXIMUM elements."
         :todo-reason todo-reason
         :retry retry
         :timeout-ms timeout-ms
-        :execution-mode (and execution-mode
-                             (normalize-execution-mode execution-mode))
+        :execution-mode (normalize-execution-mode execution-mode)
         :expected-failure-reason expected-failure-reason
         :location location
-        :tags (and tags (normalize-tags tags))
+        :tags (normalize-tags tags)
         :watch-dependencies
-        (and watch-dependencies
-             (normalize-watch-dependencies watch-dependencies location))))
+        (normalize-watch-dependencies watch-dependencies location)))
 
 (defun register-suite
     (name thunk &key focus execution-mode skip-reason todo-reason location)
