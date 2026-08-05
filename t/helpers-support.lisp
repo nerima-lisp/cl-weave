@@ -102,9 +102,57 @@ a recognized XML entity reference."
                                         (random (expt 36 6)))))
                          (test-temporary-root))
         unless (probe-file directory)
-          do (ensure-directories-exist (merge-pathnames #P".keep" directory))
-             (return directory)
+        do (ensure-directories-exist (merge-pathnames #P".keep" directory))
+        (return directory)
         finally (error "Failed to allocate test temporary directory for ~A." prefix)))
+
+(defun call-with-test-temporary-directory (prefix thunk)
+  "Allocate a fresh directory from MAKE-TEST-TEMPORARY-DIRECTORY named after
+PREFIX, call THUNK with the directory, and always delete the directory tree
+afterward."
+  (let ((directory (make-test-temporary-directory prefix)))
+    (unwind-protect
+         (funcall thunk directory)
+      (uiop:delete-directory-tree directory
+                                   :validate t
+                                   :if-does-not-exist :ignore))))
+
+(defmacro with-test-temporary-directory ((directory-variable prefix) &body body)
+  "Bind DIRECTORY-VARIABLE to a fresh temporary directory for the extent of
+BODY, deleting it afterward regardless of how BODY exits. Captures the
+allocate/run/delete-tree shape that recurs across the temporary-directory
+tests in t/; see CALL-WITH-TEST-TEMPORARY-DIRECTORY."
+  `(call-with-test-temporary-directory
+    ,prefix
+    (lambda (,directory-variable) ,@body)))
+
+(defun call-with-test-snapshot-directory
+    (thunk &key (prefix "cl-weave-snapshot")
+                (file-name "snapshot.snapshots")
+                (update-snapshots nil update-snapshots-supplied-p))
+  "Isolate THUNK inside a throwaway snapshot environment: reset
+CL-WEAVE::*SNAPSHOT-SESSION* to NIL, allocate a temporary directory via
+CALL-WITH-TEST-TEMPORARY-DIRECTORY, and bind CL-WEAVE::*SNAPSHOT-DIRECTORY*
+and CL-WEAVE::*SNAPSHOT-FILE-NAME* to it. UPDATE-SNAPSHOTS, when supplied,
+also binds CL-WEAVE::*UPDATE-SNAPSHOTS*; callers that stage updates via
+CL-WEAVE:WITH-SNAPSHOT-UPDATES can omit it."
+  (let ((cl-weave::*snapshot-session* nil))
+    (call-with-test-temporary-directory
+     prefix
+     (lambda (directory)
+       (let* ((cl-weave::*snapshot-directory* directory)
+              (cl-weave::*snapshot-file-name* file-name))
+         (if update-snapshots-supplied-p
+             (let ((cl-weave::*update-snapshots* update-snapshots))
+               (funcall thunk))
+             (funcall thunk)))))))
+
+(defmacro with-test-snapshot-directory ((&rest keyword-arguments) &body body)
+  "Evaluate BODY inside a throwaway snapshot environment shared by the
+external-snapshot tests in expect-core-test.lisp, expect-failures-test.lisp,
+and snapshots-runtime-test.lisp; see CALL-WITH-TEST-SNAPSHOT-DIRECTORY for
+KEYWORD-ARGUMENTS."
+  `(call-with-test-snapshot-directory (lambda () ,@body) ,@keyword-arguments))
 
 (defmacro with-relaxed-package-locks (&body body)
   "Run BODY with SBCL's package-lock enforcement relaxed. Several tests here

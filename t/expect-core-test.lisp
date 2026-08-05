@@ -28,70 +28,64 @@
             (format nil "alpha~%beta")
             (format nil "alpha~%beta"))
            :to-be-null)
-   (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root
-            (make-test-temporary-directory "snapshot-linearization"))
-          (cl-weave::*snapshot-directory* snapshot-root)
-          (cl-weave::*snapshot-file-name* "linearization.snapshots")
-          (cl-weave::*update-snapshots* t))
-     (unwind-protect
-          (progn
-            (cl-weave::write-snapshot-file
-             '(("before" . "before")
-               ("after" . "after")))
-            (expect
-             (cl-weave::snapshot-sequence-match-or-update-p
-              '(:created)
-              '("vm/run"))
-             :to-be-truthy)
-            (expect (cl-weave::read-snapshot-file)
-                    :to-equal
-                    '(("before" . "before")
-                      ("after" . "after")
-                      ("vm/run[0]" . ":created")))
-            (cl-weave::write-snapshot-file
-             '(("before" . "before")
-               ("vm/run[0]" . ":stale-0")
-               ("middle" . "middle")
-               ("vm/run[2]" . ":stale-2")
-               ("after" . "after")))
-            (expect
-             (cl-weave::snapshot-sequence-match-or-update-p
-              '(:first :second)
-              '("vm/run"))
-             :to-be-truthy)
-            (expect (cl-weave::read-snapshot-file)
-                    :to-equal
-                    '(("before" . "before")
-                      ("middle" . "middle")
-                      ("after" . "after")
-                      ("vm/run[0]" . ":first")
-                      ("vm/run[1]" . ":second")))
-            (let ((write-count 0))
-              (with-mocked-functions
-                  (((symbol-function
-                     'cl-weave::write-snapshot-file-unlocked)
-                    (lambda (entries file)
-                      (declare (ignore entries file))
-                      (incf write-count))))
-                (expect
-                 (cl-weave::snapshot-sequence-match-or-update-p
-                  '(:first :second)
-                  '("vm/run"))
-                 :to-be-truthy))
-              (expect write-count :to-be 0))
-            (expect
-             (cl-weave::snapshot-sequence-match-or-update-p
-              '()
-              '("vm/run"))
-             :to-be-truthy)
-            (expect (cl-weave::read-snapshot-file)
-                    :to-equal
-                    '(("before" . "before")
-                      ("middle" . "middle")
-                      ("after" . "after"))))
-       (uiop:delete-directory-tree snapshot-root
-                                   :validate t
-                                   :if-does-not-exist :ignore))))))
+   (with-test-snapshot-directory
+    (:prefix "snapshot-linearization"
+             :file-name "linearization.snapshots"
+             :update-snapshots t)
+    (cl-weave::write-snapshot-file
+     '(("before" . "before")
+       ("after" . "after")))
+    (expect
+     (cl-weave::snapshot-sequence-match-or-update-p
+      '(:created)
+      '("vm/run"))
+     :to-be-truthy)
+    (expect (cl-weave::read-snapshot-file)
+            :to-equal
+            '(("before" . "before")
+              ("after" . "after")
+              ("vm/run[0]" . ":created")))
+    (cl-weave::write-snapshot-file
+     '(("before" . "before")
+       ("vm/run[0]" . ":stale-0")
+       ("middle" . "middle")
+       ("vm/run[2]" . ":stale-2")
+       ("after" . "after")))
+    (expect
+     (cl-weave::snapshot-sequence-match-or-update-p
+      '(:first :second)
+      '("vm/run"))
+     :to-be-truthy)
+    (expect (cl-weave::read-snapshot-file)
+            :to-equal
+            '(("before" . "before")
+              ("middle" . "middle")
+              ("after" . "after")
+              ("vm/run[0]" . ":first")
+              ("vm/run[1]" . ":second")))
+    (let ((write-count 0))
+      (with-mocked-functions
+       (((symbol-function
+          'cl-weave::write-snapshot-file-unlocked)
+         (lambda (entries file)
+           (declare (ignore entries file))
+           (incf write-count))))
+       (expect
+        (cl-weave::snapshot-sequence-match-or-update-p
+         '(:first :second)
+         '("vm/run"))
+        :to-be-truthy))
+      (expect write-count :to-be 0))
+    (expect
+     (cl-weave::snapshot-sequence-match-or-update-p
+      '()
+      '("vm/run"))
+     :to-be-truthy)
+    (expect (cl-weave::read-snapshot-file)
+            :to-equal
+            '(("before" . "before")
+              ("middle" . "middle")
+              ("after" . "after"))))))
     ("to-equal" (expect (list :a 1) :to-equal (list :a 1)))
     ("to-equalp" (expect "ok" :to-equalp "OK"))
     ("to-be-truthy" (expect :value :to-be-truthy))
@@ -437,65 +431,44 @@
     ("to-match-inline-snapshot"
      (expect '(:ok 42) :to-match-inline-snapshot "(:ok 42)"))
     ("to-match-snapshot"
-     ;; Write and read the snapshot in a throwaway temp directory that is
-     ;; deleted afterwards, like the sibling snapshot tests. Using a persistent
-     ;; directory left the written file behind in the working tree.
-     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "cl-weave-core-snapshots"))
-            (cl-weave::*snapshot-directory* snapshot-root)
-            (cl-weave::*snapshot-file-name* "matchers.snapshots"))
-       (unwind-protect
-            (progn
-              (cl-weave:with-snapshot-updates
-                (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
-              (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
-         (uiop:delete-directory-tree snapshot-root
-                                     :validate t
-                                     :if-does-not-exist :ignore)))))
+     (with-test-snapshot-directory
+      (:prefix "cl-weave-core-snapshots" :file-name "matchers.snapshots")
+      (cl-weave:with-snapshot-updates
+       (expect '(:ok 42) :to-match-snapshot "matcher external snapshot"))
+      (expect '(:ok 42) :to-match-snapshot "matcher external snapshot")))
     ("to-match-snapshot-sequence"
-     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-sequence"))
-            (cl-weave::*snapshot-directory* snapshot-root)
-            (cl-weave::*snapshot-file-name* "sequence.snapshots"))
-       (unwind-protect
-            (progn
-              (cl-weave:with-snapshot-updates
-                (expect #((:pc 0 :acc 0) (:pc 1 :acc 1))
-                        :to-match-snapshot-sequence
-                        "vm/run"))
-              (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
-                      :to-match-snapshot-sequence
-                      "vm/run")
-              (multiple-value-bind (value present-p)
-                  (cl-weave:snapshot-value "vm/run[1]")
-                (expect value :to-equal "(:pc 1 :acc 1)")
-                (expect present-p :to-be-truthy)))
-         (uiop:delete-directory-tree snapshot-root
-                                     :validate t
-                                     :if-does-not-exist :ignore)))))
+     (with-test-snapshot-directory
+      (:prefix "snapshot-sequence" :file-name "sequence.snapshots")
+      (cl-weave:with-snapshot-updates
+       (expect #((:pc 0 :acc 0) (:pc 1 :acc 1))
+               :to-match-snapshot-sequence
+               "vm/run"))
+      (expect '((:pc 0 :acc 0) (:pc 1 :acc 1))
+              :to-match-snapshot-sequence
+              "vm/run")
+      (multiple-value-bind (value present-p)
+          (cl-weave:snapshot-value "vm/run[1]")
+        (expect value :to-equal "(:pc 1 :acc 1)")
+        (expect present-p :to-be-truthy))))
     ("snapshot inspection API reads external snapshot artifacts"
-     (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-api"))
-            (cl-weave::*snapshot-directory* snapshot-root)
-            (cl-weave::*snapshot-file-name* "api.snapshots")
-            (key "snapshot-api-entry"))
-       (unwind-protect
-            (progn
-              (cl-weave:with-snapshot-updates
-                (expect '(:state :ready :attempt 2) :to-match-snapshot key))
-              (expect (cl-weave:snapshot-entries)
-                      :to-contain-equal
-                      (cons key "(:state :ready :attempt 2)"))
-              (multiple-value-bind (value present-p)
-                  (cl-weave:snapshot-value key)
-                (expect value :to-equal "(:state :ready :attempt 2)")
-                (expect present-p :to-be-truthy))
-              (multiple-value-bind (value present-p)
-                  (cl-weave:snapshot-value "missing-snapshot-key")
-                (expect value :to-be-null)
-                (expect present-p :to-be-falsy))
-              (expect (lambda () (cl-weave:snapshot-value :not-a-string))
-                      :to-throw))
-         (uiop:delete-directory-tree snapshot-root
-                                     :validate t
-                                     :if-does-not-exist :ignore)))))
+     (with-test-snapshot-directory
+      (:prefix "snapshot-api" :file-name "api.snapshots")
+      (let ((key "snapshot-api-entry"))
+        (cl-weave:with-snapshot-updates
+         (expect '(:state :ready :attempt 2) :to-match-snapshot key))
+        (expect (cl-weave:snapshot-entries)
+                :to-contain-equal
+                (cons key "(:state :ready :attempt 2)"))
+        (multiple-value-bind (value present-p)
+            (cl-weave:snapshot-value key)
+          (expect value :to-equal "(:state :ready :attempt 2)")
+          (expect present-p :to-be-truthy))
+        (multiple-value-bind (value present-p)
+            (cl-weave:snapshot-value "missing-snapshot-key")
+          (expect value :to-be-null)
+          (expect present-p :to-be-falsy))
+        (expect (lambda () (cl-weave:snapshot-value :not-a-string))
+                :to-throw))))
     ("to-match-snapshot rejects missing snapshots"
      (let ((cl-weave::*snapshot-directory* (test-snapshot-directory "cl-weave-core-snapshots"))
            (cl-weave::*snapshot-file-name* "missing.snapshots")
