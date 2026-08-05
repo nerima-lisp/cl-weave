@@ -34,47 +34,58 @@
                   (funcall continue (cons source child-files)))
                 (funcall continue child-files)))))))))
 
+(defun collect-asdf-dependency-graph/k
+    (system include-dependencies seen-systems own-files/k continue)
+  "Walk SYSTEM's ASDF dependency graph, and, when INCLUDE-DEPENDENCIES, every
+transitive dependency reachable via ASDF:SYSTEM-DEPENDS-ON. OWN-FILES/K is
+called once per distinct system, as (FUNCALL OWN-FILES/K SYSTEM-OBJECT
+OWN-CONTINUE), to compute that system's own contribution before it is
+combined with its dependencies' files and handed to CONTINUE."
+  (let ((system-object (asdf:find-system system)))
+    (if (gethash system-object seen-systems)
+        (funcall continue '())
+        (progn
+          (setf (gethash system-object seen-systems) t)
+          (funcall
+           own-files/k
+           system-object
+           (lambda (own-files)
+             (if include-dependencies
+                 (labels ((collect-dependencies/k (remaining dependencies-continue)
+                            (if (null remaining)
+                                (funcall dependencies-continue '())
+                                (let ((dependency-system
+                                        (asdf/find-component:resolve-dependency-spec
+                                         system-object (first remaining))))
+                                  (if dependency-system
+                                      (collect-asdf-dependency-graph/k
+                                       dependency-system t seen-systems own-files/k
+                                       (lambda (files)
+                                         (collect-dependencies/k
+                                          (rest remaining)
+                                          (lambda (tail)
+                                            (funcall dependencies-continue
+                                                     (append files tail))))))
+                                      (collect-dependencies/k
+                                       (rest remaining) dependencies-continue))))))
+                   (collect-dependencies/k
+                    (asdf:system-depends-on system-object)
+                    (lambda (dependency-files)
+                      (funcall continue (append own-files dependency-files)))))
+                 (funcall continue own-files))))))))
+
 (defun system-files/k (system include-dependencies continue)
-  (let ((seen-components (make-hash-table :test (function eq)))
+  (let ((seen-systems (make-hash-table :test (function eq)))
+        (seen-components (make-hash-table :test (function eq)))
         (seen-pathnames (make-hash-table :test (function equal))))
-    (labels ((collect-system/k (system-designator system-continue)
-               (let ((system-object (asdf:find-system system-designator)))
-                 (collect-component-files/k
-                  system-object
-                  seen-components
-                  seen-pathnames
-                  (lambda (own-files)
-                    (if include-dependencies
-                        (collect-dependencies/k
-                         system-object
-                         (asdf:system-depends-on system-object)
-                         (lambda (dependency-files)
-                           (funcall system-continue
-                                    (append own-files dependency-files))))
-                        (funcall system-continue own-files))))))
-             (collect-dependencies/k
-                 (parent-system dependencies dependencies-continue)
-               (if (null dependencies)
-                   (funcall dependencies-continue (quote ()))
-                   (let ((dependency-system
-                           (asdf/find-component:resolve-dependency-spec
-                            parent-system
-                            (first dependencies))))
-                     (if dependency-system
-                         (collect-system/k
-                          dependency-system
-                          (lambda (files)
-                            (collect-dependencies/k
-                             parent-system
-                             (rest dependencies)
-                             (lambda (tail)
-                               (funcall dependencies-continue
-                                        (append files tail))))))
-                         (collect-dependencies/k
-                          parent-system
-                          (rest dependencies)
-                          dependencies-continue))))))
-      (collect-system/k system continue))))
+    (collect-asdf-dependency-graph/k
+     system
+     include-dependencies
+     seen-systems
+     (lambda (system-object own-continue)
+       (collect-component-files/k
+        system-object seen-components seen-pathnames own-continue))
+     continue)))
 
 (defun asdf-system-files (system &key include-dependencies)
   "Return existing source files declared by SYSTEM and, optionally, its dependencies."
@@ -83,29 +94,22 @@
 (defun asdf-system-definition-files (system &key include-dependencies)
   "Return existing ASDF definition files for SYSTEM and, optionally, its dependencies."
   (let ((seen-systems (make-hash-table :test #'eq))
-        (seen-pathnames (make-hash-table :test #'equal))
-        (files nil))
-    (labels ((collect-system (system-designator)
-               (let ((system-object (asdf:find-system system-designator)))
-                 (unless (gethash system-object seen-systems)
-                   (setf (gethash system-object seen-systems) t)
-                   (let ((pathname (asdf:system-source-file system-object)))
-                     (when (and pathname
-                                (probe-file pathname)
-                                (not (gethash pathname seen-pathnames)))
-                       (setf (gethash pathname seen-pathnames) t)
-                       (push pathname files)))
-                   (when include-dependencies
-                     (dolist (dependency
-                              (asdf:system-depends-on system-object))
-                       (let ((dependency-system
-                               (asdf/find-component:resolve-dependency-spec
-                                system-object
-                                dependency)))
-                         (when dependency-system
-                           (collect-system dependency-system)))))))))
-      (collect-system system)
-      (nreverse files))))
+        (seen-pathnames (make-hash-table :test #'equal)))
+    (collect-asdf-dependency-graph/k
+     system
+     include-dependencies
+     seen-systems
+     (lambda (system-object own-continue)
+       (let ((pathname (asdf:system-source-file system-object)))
+         (funcall own-continue
+                  (if (and pathname
+                           (probe-file pathname)
+                           (not (gethash pathname seen-pathnames)))
+                      (progn
+                        (setf (gethash pathname seen-pathnames) t)
+                        (list pathname))
+                      '()))))
+     #'identity)))
 
 (defun watched-system-files (system &key include-dependencies)
   "Return source and definition files that can change SYSTEM's component graph."
@@ -124,14 +128,24 @@
         (push pathname files)))
     (nreverse files)))
 
+(defconstant +watch-file-signature-buffer-size+ 8192)
+
+(defconstant +watch-file-signature-fnv-offset-basis+ #xcbf29ce484222325)
+
+(defconstant +watch-file-signature-fnv-mask+ #xffffffffffffffff)
+
+(defconstant +watch-file-signature-fnv-prime+ #x100000001b3)
+
+(defparameter *watch-file-signature-element-type* (quote (unsigned-byte 8)))
+
 (defun file-content-signature (pathname &optional buffer)
   (with-open-file (stream pathname
                           :direction :input
-                          :element-type (quote (unsigned-byte 8)))
+                          :element-type *watch-file-signature-element-type*)
     (let ((buffer (or buffer
-                      (make-array 8192
-                                  :element-type (quote (unsigned-byte 8)))))
-          (hash #xcbf29ce484222325)
+                      (make-array +watch-file-signature-buffer-size+
+                                  :element-type *watch-file-signature-element-type*)))
+          (hash +watch-file-signature-fnv-offset-basis+)
           (byte-count 0))
       (loop
         for count = (read-sequence buffer stream)
@@ -139,8 +153,8 @@
         do (incf byte-count count)
            (loop for index below count
                  do (setf hash
-                          (logand #xffffffffffffffff
-                                  (* #x100000001b3
+                          (logand +watch-file-signature-fnv-mask+
+                                  (* +watch-file-signature-fnv-prime+
                                      (logxor hash (aref buffer index))))))
         finally (return (values hash byte-count))))))
 
@@ -159,8 +173,8 @@
       (list :exists :unknown))))
 
 (defun file-state (pathnames)
-  (let ((buffer (make-array 8192
-                            :element-type (quote (unsigned-byte 8)))))
+  (let ((buffer (make-array +watch-file-signature-buffer-size+
+                            :element-type *watch-file-signature-element-type*)))
     (mapcar (lambda (pathname)
               (cons pathname (pathname-signature pathname buffer)))
             pathnames)))
