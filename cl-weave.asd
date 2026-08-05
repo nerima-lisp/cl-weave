@@ -65,6 +65,7 @@
    (:file "soft")
    (:file "benchmark")
    (:file "logic")
+   (:file "logic-queries")
    (:file "isolation")
    (:file "snapshots-storage")
    (:file "snapshots-session")
