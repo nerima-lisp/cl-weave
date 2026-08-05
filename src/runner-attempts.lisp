@@ -41,35 +41,40 @@
    :journal (current-journal-frames)
    :replay-seed *attempt-replay-seed*))
 
-(defun normalize-retry-count (retry)
-  (cond
-    ((null retry) 0)
-    ((and (integerp retry)
-          (<= 0 retry +maximum-retry-count+))
-     retry)
-    (t
-     (error "Retry must be NIL or an integer between 0 and ~D: ~S"
-            +maximum-retry-count+ retry))))
+(defmacro define-bounded-integer-normalizer
+    (name (value-var) &key null-value min-bound max-constant label unit)
+  "Define a function NAME (VALUE-VAR) that normalizes an optional bounded
+integer: NIL maps to NULL-VALUE, an integer within [MIN-BOUND, MAX-CONSTANT]
+passes through unchanged, and anything else signals an error describing the
+bound as LABEL (with an optional trailing UNIT word, e.g. \"milliseconds\")."
+  `(defun ,name (,value-var)
+     (cond
+       ((null ,value-var) ,null-value)
+       ((and (integerp ,value-var)
+             (<= ,min-bound ,value-var ,max-constant))
+        ,value-var)
+       (t
+        (error "~A must be NIL or an integer between ~D and ~D~@[ ~A~]: ~S"
+               ,label ,min-bound ,max-constant ,unit ,value-var)))))
 
-(defun normalize-timeout-ms (timeout-ms)
-  (cond
-    ((null timeout-ms) nil)
-    ((and (integerp timeout-ms)
-          (<= 1 timeout-ms +maximum-timeout-ms+))
-     timeout-ms)
-    (t
-     (error "Timeout must be NIL or an integer between 1 and ~D milliseconds: ~S"
-            +maximum-timeout-ms+ timeout-ms))))
+(define-bounded-integer-normalizer normalize-retry-count (retry)
+  :null-value 0
+  :min-bound 0
+  :max-constant +maximum-retry-count+
+  :label "Retry")
 
-(defun normalize-max-workers (max-workers)
-  (cond
-    ((null max-workers) nil)
-    ((and (integerp max-workers)
-          (<= 1 max-workers +maximum-worker-count+))
-     max-workers)
-    (t
-     (error "Max workers must be NIL or an integer between 1 and ~D: ~S"
-            +maximum-worker-count+ max-workers))))
+(define-bounded-integer-normalizer normalize-timeout-ms (timeout-ms)
+  :null-value nil
+  :min-bound 1
+  :max-constant +maximum-timeout-ms+
+  :label "Timeout"
+  :unit "milliseconds")
+
+(define-bounded-integer-normalizer normalize-max-workers (max-workers)
+  :null-value nil
+  :min-bound 1
+  :max-constant +maximum-worker-count+
+  :label "Max workers")
 
 (defun retry-count (test)
   (let ((retry (test-case-retry test)))
@@ -200,6 +205,22 @@ handlers, so runner propagation cannot abort an enclosing runner."
                       (make-event :error suite test start
                                   :condition condition))))))))
 
+(defun platform-timeout-condition-handler (finish-attempt suite test start timeout-ms)
+  "Build a handler that finishes the current attempt as a structured
+TEST-TIMEOUT failure. Mirrors ATTEMPT-CONDITION-HANDLER's decline-while-
+propagating shape for the PLATFORM-TIMEOUT condition specifically, since its
+failure event embeds TIMEOUT-MS rather than the signaled condition itself."
+  (lambda (condition)
+    (unless *runner-default-condition-handler-disabled*
+      (funcall finish-attempt
+               (call-with-propagated-condition/k
+                condition
+                (lambda ()
+                  (make-event :fail suite test start
+                              :condition
+                              (make-condition (quote test-timeout)
+                                              :timeout-ms timeout-ms))))))))
+
 (defun run-test-attempt/k (suite test start timeout-ms timeout retry continue)
   (let* ((*attempt-replay-seed* (replay-seed-for-attempt (test-path suite test)))
          (*attempt-secondary-conditions* nil)
@@ -211,19 +232,8 @@ handlers, so runner propagation cannot abort an enclosing runner."
                (with-escape-continuation (finish-attempt)
                  (handler-bind
                      ((platform-timeout
-                        (lambda (condition)
-                          (unless *runner-default-condition-handler-disabled*
-                            (funcall
-                             finish-attempt
-                             (call-with-propagated-condition/k
-                              condition
-                              (lambda ()
-                                (make-event
-                                 :fail suite test start
-                                 :condition
-                                 (make-condition
-                                  (quote test-timeout)
-                                  :timeout-ms timeout-ms))))))))
+                        (platform-timeout-condition-handler
+                         finish-attempt suite test start timeout-ms))
                       (serious-condition
                         (attempt-condition-handler
                          finish-attempt suite test start)))
@@ -238,6 +248,16 @@ handlers, so runner propagation cannot abort an enclosing runner."
 
 (defun retryable-event-p (event)
   (member (test-event-status event) '(:fail :error)))
+
+(defun call-with-attempt-outcome/k (event retries-remaining on-retry on-give-up)
+  "Dispatch on one finished attempt EVENT the way CALL-WITH-WATCH-RUN-ATTEMPT/K
+dispatches on a watch cycle's outcome: a retryable EVENT with RETRIES-REMAINING
+budget left calls ON-RETRY to spend one more attempt, and any other outcome --
+a pass, or a retryable failure with no budget left -- calls ON-GIVE-UP with
+EVENT as the final result."
+  (if (and (plusp retries-remaining) (retryable-event-p event))
+      (funcall on-retry)
+      (funcall on-give-up event)))
 
 (defun run-test-attempts
     (suite test start remaining-retries timeout-ms)
@@ -262,10 +282,10 @@ handlers, so runner propagation cannot abort an enclosing runner."
                           (return-from retry-attempt
                             (attempt (1- retries))))
                         (lambda (event)
-                          (if (and (plusp retries)
-                                   (retryable-event-p event))
-                              (attempt (1- retries))
-                              event)))))))
+                          (call-with-attempt-outcome/k
+                           event retries
+                           (lambda () (attempt (1- retries)))
+                           (function identity))))))))
           (attempt remaining-retries)))))
 
 (defun run-trusted-empty-test-case (suite test start)
@@ -275,24 +295,30 @@ handlers, so runner propagation cannot abort an enclosing runner."
    start
    (make-event :pass suite test start)))
 
+(defun trusted-empty-fast-path-p (suite test marker remaining-retries timeout-ms)
+  "True when TEST's function is still MARKER, its own known-empty
+trusted-empty-function, and nothing -- a retry budget, a timeout, or a suite
+hook -- could tell running it apart from skipping it entirely."
+  (and marker
+       (eq marker (test-case-function test))
+       (zerop remaining-retries)
+       (null timeout-ms)
+       (test-case-hookless-p suite)))
+
 (defun run-test-case/internal (suite test)
   (let ((start (get-internal-real-time)))
     (cond
       ((test-case-todo-reason test)
-        (make-event :todo suite test start :reason (test-case-todo-reason test)))
+       (make-event :todo suite test start :reason (test-case-todo-reason test)))
       ((test-case-skip-reason test)
-        (make-event :skip suite test start :reason (test-case-skip-reason test)))
+       (make-event :skip suite test start :reason (test-case-skip-reason test)))
       (t
-        (let ((remaining-retries (retry-count test))
-              (timeout-ms (effective-timeout-ms test))
-              (marker (test-case-trusted-empty-function test)))
-          (if (and
-              marker
-              (eq marker (test-case-function test))
-              (zerop remaining-retries)
-              (null timeout-ms)
-              (test-case-hookless-p suite)) (run-trusted-empty-test-case suite test start)
-            (run-test-attempts suite test start remaining-retries timeout-ms)))))))
+       (let ((remaining-retries (retry-count test))
+             (timeout-ms (effective-timeout-ms test))
+             (marker (test-case-trusted-empty-function test)))
+         (if (trusted-empty-fast-path-p suite test marker remaining-retries timeout-ms)
+             (run-trusted-empty-test-case suite test start)
+             (run-test-attempts suite test start remaining-retries timeout-ms)))))))
 
 (defun run-test-case (suite test)
   (with-runner-condition-propagation (nil)
