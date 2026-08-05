@@ -73,48 +73,39 @@
 
   #+sbcl
   (it "detects same-size content changes with an unchanged modification time"
-    (let* ((directory (make-test-temporary-directory "watch-signature"))
-           (pathname (merge-pathnames #P"watched.bin" directory)))
-      (unwind-protect
-          (progn
-            (with-open-file (stream pathname
-                                    :direction :output
-                                    :if-exists :supersede
-                                    :element-type (quote (unsigned-byte 8)))
-              (write-sequence #(65 66 67 68) stream))
-            (let* ((old-state (cl-weave::file-state (list pathname)))
-                   (modified-time
-                     (sb-posix:stat-mtime
-                      (sb-posix:stat (namestring pathname)))))
-              (with-open-file (stream pathname
-                                      :direction :output
-                                      :if-exists :supersede
-                                      :element-type (quote (unsigned-byte 8)))
-                (write-sequence #(87 88 89 90) stream))
-              (sb-posix:utime (namestring pathname)
-                              modified-time
-                              modified-time)
-              (let ((new-state (cl-weave::file-state (list pathname))))
-                (expect (getf (cdr (first new-state)) :write-date)
-                        :to-be
-                        (getf (cdr (first old-state)) :write-date))
-                (expect (getf (cdr (first new-state)) :length)
-                        :to-be
-                        (getf (cdr (first old-state)) :length))
-                (expect (equal (getf (cdr (first new-state)) :hash)
-                               (getf (cdr (first old-state)) :hash))
-                        :to-be-falsy)
-                (expect (cl-weave::changed-pathnames old-state new-state)
-                        :to-equal (list pathname)))))
-        (uiop:delete-directory-tree directory
-                                    :validate t
-                                    :if-does-not-exist :ignore))))
+    (with-test-temporary-directory (directory "watch-signature")
+      (let ((pathname (merge-pathnames #P"watched.bin" directory)))
+        (with-open-file (stream pathname
+                                :direction :output
+                                :if-exists :supersede
+                                :element-type (quote (unsigned-byte 8)))
+          (write-sequence #(65 66 67 68) stream))
+        (let* ((old-state (cl-weave::file-state (list pathname)))
+               (modified-time
+                 (sb-posix:stat-mtime
+                  (sb-posix:stat (namestring pathname)))))
+          (with-open-file (stream pathname
+                                  :direction :output
+                                  :if-exists :supersede
+                                  :element-type (quote (unsigned-byte 8)))
+            (write-sequence #(87 88 89 90) stream))
+          (sb-posix:utime (namestring pathname)
+                          modified-time
+                          modified-time)
+          (let ((new-state (cl-weave::file-state (list pathname))))
+            (expect (getf (cdr (first new-state)) :write-date)
+                    :to-be
+                    (getf (cdr (first old-state)) :write-date))
+            (expect (getf (cdr (first new-state)) :length)
+                    :to-be
+                    (getf (cdr (first old-state)) :length))
+            (expect (equal (getf (cdr (first new-state)) :hash)
+                           (getf (cdr (first old-state)) :hash))
+                    :to-be-falsy)
+            (expect (cl-weave::changed-pathnames old-state new-state)
+                    :to-equal (list pathname)))))))
 
   (it "reports an unknown signature when a path cannot be read as a file"
-    (let ((directory (make-test-temporary-directory "watch-signature-unreadable")))
-      (unwind-protect
-           (expect (cl-weave::pathname-signature directory)
-                   :to-equal (list :exists :unknown))
-        (uiop:delete-directory-tree directory
-                                    :validate t
-                                    :if-does-not-exist :ignore)))))
+    (with-test-temporary-directory (directory "watch-signature-unreadable")
+      (expect (cl-weave::pathname-signature directory)
+              :to-equal (list :exists :unknown)))))
