@@ -26,19 +26,31 @@ seeding requires SBCL.")
   "The effective per-test seed for the current attempt, or NIL. Read when an
 event is constructed so reporters can surface it for replay.")
 
-;; FNV-1a over the test path, mixed with the base seed. Mirrors
-;; STABLE-STRING-HASH in runner-selection, duplicated here because that helper
-;; loads after the runner internals that call us.
 (defun replay-path-string (path)
   (format nil "~{~A~^ > ~}" path))
 
+;; FNV-1a over the test path, mixed with the base seed. Mirrors
+;; +STABLE-HASH-*+/UPDATE-STABLE-STRING-HASH in runner-control-data and
+;; runner-selection, duplicated here (own constants, own function names)
+;; because REPLAY.LISP loads before those files per cl-weave.asd and so
+;; cannot reference their definitions.
+(defconstant +replay-hash-offset-basis+ 2166136261)
+
+(defconstant +replay-hash-prime+ 16777619)
+
+(defconstant +replay-hash-modulus+ 4294967296)
+
+(defun update-replay-string-hash (hash string)
+  (loop for char across string
+        do (setf hash
+                 (mod (* (logxor hash (char-code char)) +replay-hash-prime+)
+                      +replay-hash-modulus+))
+        finally (return hash)))
+
 (defun replay-string-hash (string base)
-  (let ((hash (mod (+ 2166136261 base) 4294967296)))
-    (loop for char across string
-          do (setf hash
-                   (mod (* (logxor hash (char-code char)) 16777619)
-                        4294967296)))
-    hash))
+  (update-replay-string-hash
+   (mod (+ +replay-hash-offset-basis+ base) +replay-hash-modulus+)
+   string))
 
 (defun normalize-test-random-seed (seed)
   (cond
