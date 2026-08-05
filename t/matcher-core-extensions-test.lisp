@@ -283,3 +283,77 @@
                   (logic-query program '((:cyclic :resolved)) :max-steps 1))
                 :to-throw
                 "cyclic logic value")))))
+
+(describe "matcher-runtime CLOS introspection and validation gaps"
+  (it "resolves to-have-slot across symbol, class, and instance designators"
+    (expect 'sample-widget :to-have-slot 'name)
+    (expect (find-class 'sample-widget) :to-have-slot 'state)
+    (expect (make-instance 'sample-widget :name "widget") :to-have-slot 'name))
+
+  (it "reports to-have-slot failure detail when the slot is absent"
+    (handler-case
+        (progn
+          (expect 'sample-widget :to-have-slot 'no-such-slot)
+          (expect nil :to-be-truthy))
+      (cl-weave:assertion-failure (condition)
+        (with-assertion-detail (detail condition actual)
+          (expect (cl-weave::assertion-detail-matcher detail) :to-be :to-have-slot)
+          (expect (getf actual :class) :to-be 'sample-widget)
+          (expect (getf actual :slots) :to-contain 'name)
+          (expect (getf actual :slots) :to-contain 'state)
+          (expect (cl-weave::assertion-detail-expected detail)
+                  :to-equal '(:slot no-such-slot))))))
+
+  (it "resolves to-have-method-specialized-on across symbol and function designators"
+    (expect (quote render-widget-mode) :to-have-method-specialized-on
+            (list (quote sample-widget) t))
+    (expect (function render-widget-mode) :to-have-method-specialized-on
+            (list (quote sample-widget) t))
+    (expect (quote render-widget-mode) :to-have-method-specialized-on
+            (list (quote (eql :preview)) t)))
+
+  (it "rejects a non-generic-function designator for to-have-method-specialized-on"
+    (expect (lambda () (expect 'sample-size :to-have-method-specialized-on (list t)))
+            :to-throw
+            "expects a generic function designator"))
+
+  (it "rejects non-real comparison and close-to targets"
+    (expect (lambda () (expect 1 :to-be-greater-than "not-a-number"))
+            :to-throw
+            "expects a real")
+    (expect (lambda () (expect 1 :to-be-close-to "not-a-number"))
+            :to-throw
+            "expects a real target"))
+
+  (it "rejects a non-function to-throw thunk"
+    (expect (lambda () (expect 42 :to-throw))
+            :to-throw
+            "expects a function thunk"))
+
+  (it "accepts a condition class object, not just a symbol, for to-throw"
+    (expect (lambda () (error 'simple-error :format-control "boom"))
+            :to-throw
+            (find-class 'simple-error)))
+
+  (it "rejects more than one expected value for to-throw"
+    (expect (lambda ()
+              (expect (lambda () (error "boom")) :to-throw 'simple-error "extra"))
+            :to-throw
+            "expects zero or one expected value"))
+
+  (it "rejects string candidates for to-be-one-of despite strings being vectors"
+    (expect (lambda () (expect #\x :to-be-one-of "abc"))
+            :to-throw
+            "finite proper list"))
+
+  (it "defends measured-bytes-consed and thrown-condition-matches-p against malformed data"
+    (expect (lambda ()
+              (cl-weave::measured-bytes-consed
+               (list :elapsed-ms 1.0d0)
+               :to-allocate-under))
+            :to-throw
+            "cannot read bytes consed")
+    (expect (cl-weave::thrown-condition-matches-p
+             (make-condition 'simple-error)
+             (list :matcher :bogus))
+            :to-be nil)))

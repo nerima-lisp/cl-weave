@@ -351,3 +351,50 @@
               :to-equal expected-names)
       (expect (mapcar (function cl-weave::test-event-status) events)
               :to-equal (make-list (1+ depth) :initial-element :pass)))))
+
+(progn
+  (it "rejects a malformed logic rule form and out-of-range query bounds"
+    (expect (lambda () (logic-query (list '(:-)) '((:x ?y))))
+            :to-throw
+            "logic rule requires a head and optional body")
+    (expect (lambda () (logic-query nil '((:x ?y)) :limit -1))
+            :to-throw
+            "must be NIL or a positive integer")
+    (expect (lambda () (logic-query nil '((:x ?y)) :max-steps 0))
+            :to-throw
+            "must be NIL or a positive integer"))
+
+  (it "rejects a non-keyword-headed relation clause in logic-where macros"
+    (expect (lambda () (eval '(logic-where '((:test 1)) (42 :bad))))
+            :to-throw
+            "logic clauses must be non-empty keyword relation lists"))
+
+  (it "rejects an increase-limit restart invocation that does not raise the budget"
+    (let ((program (logic-program
+                    (:- (:loop ?value)
+                        (:loop ?value)))))
+      (expect (lambda ()
+                (handler-bind
+                    ((logic-search-exhausted
+                       (lambda (condition)
+                         (invoke-restart
+                          (find-restart 'cl-weave:increase-limit condition)
+                          1))))
+                  (logic-query program '((:loop "forever")) :max-steps 3)))
+              :to-throw
+              "increased logic step limit must exceed")))
+
+  (it "reports a human-readable message for an exhausted logic search"
+    (let ((program (logic-program
+                    (:- (:loop ?value)
+                        (:loop ?value))))
+          (message nil))
+      (handler-bind
+          ((logic-search-exhausted
+             (lambda (condition)
+               (setf message (princ-to-string condition))
+               (invoke-restart
+                (find-restart 'cl-weave:return-partial-results condition)))))
+        (logic-query program '((:loop "forever")) :max-steps 3))
+      (expect message :to-contain "step limit")
+      (expect message :to-contain "frames pending"))))
