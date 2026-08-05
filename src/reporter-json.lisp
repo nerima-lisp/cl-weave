@@ -191,44 +191,64 @@
       ((symbolp value) (write-json-string (princ-to-string value) stream))
       (t (json-write-printed-value value stream)))))
 
+(defun json-write-boolean (value stream)
+  "Write VALUE to STREAM as the JSON literal true or false."
+  (write-string (if value "true" "false") stream))
+
+(defun json-write-nullable-integer (value stream)
+  "Write VALUE to STREAM as a JSON number, or the JSON literal null when
+VALUE is NIL."
+  (if value
+      (princ value stream)
+      (write-string "null" stream)))
+
+(defmacro json-write-fields (stream &body fields)
+  "Write a JSON object literal to a stream. Each entry in FIELDS is
+(KEY-STRING VALUE-FORM): KEY-STRING is the JSON key, and VALUE-FORM is
+a form evaluated for its side effect of writing exactly one JSON value
+to STREAM. STREAM is evaluated exactly once (bound to a fresh
+variable), but VALUE-FORM must still reference the original STREAM
+symbol as written at the call site, since it runs in the caller lexical
+scope where that symbol names the same underlying stream object."
+  (let ((stream-var (gensym "STREAM")))
+    `(let ((,stream-var ,stream))
+       (write-char #\{ ,stream-var)
+       ,@(loop for (key value-form) in fields
+               for firstp = t then nil
+               append (if firstp
+                          (list `(write-json-string ,key ,stream-var)
+                                `(write-char #\: ,stream-var)
+                                value-form)
+                          (list `(write-char #\, ,stream-var)
+                                `(write-json-string ,key ,stream-var)
+                                `(write-char #\: ,stream-var)
+                                value-form)))
+       (write-char #\} ,stream-var))))
+
 (defun json-write-assertion (detail stream)
   (if detail
-      (progn
-        (write-string "{" stream)
-        (write-string "\"form\":" stream)
-        (json-write-printed-value (assertion-detail-form detail) stream)
-        (write-string ",\"matcher\":" stream)
-        (json-write-printed-value (assertion-detail-matcher detail) stream)
-        (write-string ",\"actual\":" stream)
-        (json-write-value (assertion-detail-actual detail) stream)
-        (write-string ",\"expected\":" stream)
-        (json-write-value (assertion-detail-expected detail) stream)
-        (write-string ",\"negated\":" stream)
-        (write-string (if (assertion-detail-negated detail) "true" "false") stream)
-        (write-string ",\"pass\":" stream)
-        (write-string (if (assertion-detail-pass detail) "true" "false") stream)
-        (write-string "}" stream))
+      (json-write-fields stream
+        ("form" (json-write-printed-value (assertion-detail-form detail) stream))
+        ("matcher" (json-write-printed-value (assertion-detail-matcher detail) stream))
+        ("actual" (json-write-value (assertion-detail-actual detail) stream))
+        ("expected" (json-write-value (assertion-detail-expected detail) stream))
+        ("negated" (json-write-boolean (assertion-detail-negated detail) stream))
+        ("pass" (json-write-boolean (assertion-detail-pass detail) stream)))
       (write-string "null" stream)))
 
 (defun json-write-journal-frame (frame stream)
-  (write-string "{\"index\":" stream)
-  (princ (journal-frame-index frame) stream)
-  (write-string ",\"kind\":" stream)
-  (write-json-string (string-downcase (symbol-name (journal-frame-kind frame)))
-                     stream)
-  (write-string ",\"form\":" stream)
-  (json-write-printed-value (journal-frame-form frame) stream)
-  (write-string ",\"matcher\":" stream)
-  (json-write-printed-value (journal-frame-matcher frame) stream)
-  (write-string ",\"actual\":" stream)
-  (json-write-value (journal-frame-actual frame) stream)
-  (write-string ",\"expected\":" stream)
-  (json-write-value (journal-frame-expected frame) stream)
-  (write-string ",\"pass\":" stream)
-  (write-string (if (journal-frame-pass frame) "true" "false") stream)
-  (write-string ",\"elapsedInternalTime\":" stream)
-  (princ (journal-frame-elapsed-internal-time frame) stream)
-  (write-string "}" stream))
+  (json-write-fields stream
+    ("index" (princ (journal-frame-index frame) stream))
+    ("kind" (write-json-string
+             (string-downcase (symbol-name (journal-frame-kind frame)))
+             stream))
+    ("form" (json-write-printed-value (journal-frame-form frame) stream))
+    ("matcher" (json-write-printed-value (journal-frame-matcher frame) stream))
+    ("actual" (json-write-value (journal-frame-actual frame) stream))
+    ("expected" (json-write-value (journal-frame-expected frame) stream))
+    ("pass" (json-write-boolean (journal-frame-pass frame) stream))
+    ("elapsedInternalTime"
+     (princ (journal-frame-elapsed-internal-time frame) stream))))
 
 (defun json-write-journal (frames stream)
   (json-write-sequence frames #'json-write-journal-frame stream))
@@ -236,44 +256,30 @@
 (defun json-write-location (location stream)
   (let ((file (and location (getf location :file))))
     (if file
-        (progn
-          (write-string "{\"file\":" stream)
-          (write-json-string file stream)
-          (write-string "}" stream))
+        (json-write-fields stream
+          ("file" (write-json-string file stream)))
         (write-string "null" stream))))
 
 (defun json-write-event (event stream)
-  (write-string "{" stream)
-  (write-string "\"status\":" stream)
-  (write-json-string (json-status-string (test-event-status event)) stream)
-  (write-string ",\"path\":" stream)
-  (json-write-path (test-event-path event) stream)
-  (write-string ",\"pathString\":" stream)
-  (write-json-string (path-string (test-event-path event)) stream)
-  (write-string ",\"location\":" stream)
-  (json-write-location (test-event-location event) stream)
-  (format stream ",\"seconds\":~,6F" (event-duration-seconds event))
-  (format stream ",\"durationMs\":~,3F" (event-duration-ms event))
-  (write-string ",\"condition\":" stream)
-  (json-write-nullable-string
-   (when (test-event-condition event)
-     (princ-to-string (test-event-condition event)))
-   stream)
-  (write-string ",\"secondaryConditions\":" stream)
-  (json-write-sequence
-   (test-event-secondary-conditions event)
-   (lambda (condition output)
-     (write-json-string (princ-to-string condition) output))
-   stream)
-  (write-string ",\"reason\":" stream)
-  (json-write-nullable-string (test-event-reason event) stream)
-  (write-string ",\"assertion\":" stream)
-  (json-write-assertion (test-event-assertion event) stream)
-  (write-string ",\"timeline\":" stream)
-  (json-write-journal (test-event-journal event) stream)
-  (write-string ",\"replaySeed\":" stream)
-  (let ((seed (test-event-replay-seed event)))
-    (if seed
-        (princ seed stream)
-        (write-string "null" stream)))
-  (write-string "}" stream))
+  (json-write-fields stream
+    ("status" (write-json-string (json-status-string (test-event-status event)) stream))
+    ("path" (json-write-path (test-event-path event) stream))
+    ("pathString" (write-json-string (path-string (test-event-path event)) stream))
+    ("location" (json-write-location (test-event-location event) stream))
+    ("seconds" (format stream "~,6F" (event-duration-seconds event)))
+    ("durationMs" (format stream "~,3F" (event-duration-ms event)))
+    ("condition"
+     (json-write-nullable-string
+      (when (test-event-condition event)
+        (princ-to-string (test-event-condition event)))
+      stream))
+    ("secondaryConditions"
+     (json-write-sequence
+      (test-event-secondary-conditions event)
+      (lambda (condition output)
+        (write-json-string (princ-to-string condition) output))
+      stream))
+    ("reason" (json-write-nullable-string (test-event-reason event) stream))
+    ("assertion" (json-write-assertion (test-event-assertion event) stream))
+    ("timeline" (json-write-journal (test-event-journal event) stream))
+    ("replaySeed" (json-write-nullable-integer (test-event-replay-seed event) stream))))
