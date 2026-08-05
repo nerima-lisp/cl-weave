@@ -4,28 +4,19 @@
 
 (defvar *snapshot-file-name* "snapshots.sexp")
 
-#+
-
-sbcl
-
+#+sbcl
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require :sb-posix))
 
 (defvar *update-snapshots* nil)
 
-#+
-
-sb-thread
-
+#+sb-thread
 (progn
   (defstruct (snapshot-file-lock-entry (:constructor make-snapshot-file-lock-entry (mutex))) mutex
     (references 0 :type (integer 0 *)))
   (defvar *snapshot-file-locks* (make-hash-table :test #'equal)))
 
-#+
-
-sb-thread
-
+#+sb-thread
 (defvar *snapshot-file-locks-lock* (sb-thread:make-mutex :name "cl-weave snapshot lock registry"))
 
 (defvar *snapshot-temporary-file-counter* 0)
@@ -44,10 +35,7 @@ sb-thread
 (defun canonical-snapshot-file-pathname (&optional (file (snapshot-file-pathname)))
   (uiop:truenamize (uiop:ensure-absolute-pathname file)))
 
-#+
-
-sb-thread
-
+#+sb-thread
 (defun acquire-snapshot-file-lock-entry (file)
   (let ((key (namestring file)))
     (sb-thread:with-mutex
@@ -65,10 +53,7 @@ sb-thread
     (format nil ".~A.lock" (file-namestring file))
     (uiop:pathname-directory-pathname file)))
 
-#+
-
-sbcl
-
+#+sbcl
 (defun call-with-snapshot-process-lock (file function)
   (let ((directory (uiop:pathname-directory-pathname file)))
     (if (probe-file directory) (let ((descriptor nil)
@@ -87,17 +72,13 @@ sbcl
             (ignore-errors (sb-posix:close descriptor)))))
       (funcall function))))
 
-#-
-
-sbcl
-
+#-sbcl
 (defun call-with-snapshot-process-lock (file function)
   (declare (ignore file))
   (funcall function))
 
 (defun call-with-snapshot-file-lock (file function)
-  #+
-  sb-thread
+  #+sb-thread
   (multiple-value-bind (key entry) (acquire-snapshot-file-lock-entry file)
     (unwind-protect (sb-thread:with-mutex
         ((snapshot-file-lock-entry-mutex entry))
@@ -109,18 +90,15 @@ sbcl
             (zerop (snapshot-file-lock-entry-references entry))
             (eq entry (gethash key *snapshot-file-locks*)))
           (remhash key *snapshot-file-locks*)))))
-  #-
-  sb-thread
+  #-sb-thread
   (call-with-snapshot-process-lock file function))
 
 (defun next-snapshot-temporary-file-counter ()
-  #+
-  sb-thread
+  #+sb-thread
   (sb-thread:with-mutex
     (*snapshot-file-locks-lock*)
     (incf *snapshot-temporary-file-counter*))
-  #-
-  sb-thread
+  #-sb-thread
   (incf *snapshot-temporary-file-counter*))
 
 (defun snapshot-temporary-file-pathname (file)
@@ -133,10 +111,7 @@ sbcl
       (next-snapshot-temporary-file-counter))
     (uiop:pathname-directory-pathname file)))
 
-#+
-
-sbcl
-
+#+sbcl
 (defun open-snapshot-temporary-pathname (temporary-file)
   (handler-case (let ((descriptor
           (sb-posix:open
@@ -163,10 +138,7 @@ sbcl
       (if (= (sb-posix:syscall-errno condition) sb-posix:eexist) nil
         (error condition)))))
 
-#-
-
-sbcl
-
+#-sbcl
 (defun open-snapshot-temporary-pathname (temporary-file)
   (open
     temporary-file
@@ -177,10 +149,7 @@ sbcl
     :if-does-not-exist
     :create))
 
-#+
-
-sbcl
-
+#+sbcl
 (defun restrict-snapshot-temporary-file-permissions (temporary-file file)
   (let ((target-mode
         (when (probe-file file)
@@ -190,10 +159,7 @@ sbcl
       (if target-mode (logand #o600 target-mode)
         #o600))))
 
-#-
-
-sbcl
-
+#-sbcl
 (defun restrict-snapshot-temporary-file-permissions (temporary-file file)
   (declare (ignore temporary-file file)))
 
@@ -264,8 +230,7 @@ sbcl
   dirty-p)
 
 (defstruct (snapshot-session (:constructor make-snapshot-session ())) (files (make-hash-table :test #'equal))
-  #+
-  sb-thread
+  #+sb-thread
   (lock (sb-thread:make-mutex :name "cl-weave snapshot session")))
 
 (defvar *snapshot-session* nil)
@@ -409,12 +374,10 @@ sbcl
 (defun snapshot-update-enabled-p ()
   (or
     *update-snapshots*
-    #+
-    sbcl
+    #+sbcl
     (let ((value (sb-ext:posix-getenv "CL_WEAVE_UPDATE_SNAPSHOTS")))
       (and value (snapshot-update-token-p value)))
-    #-
-    sbcl
+    #-sbcl
     nil))
 
 (defmacro define-snapshot-expected-reader (name matcher-label value-name)
@@ -532,27 +495,41 @@ sbcl
       on-mismatch
       (snapshot-comparison-values key actual-string entry))))
 
+(defun snapshot-sequence-build-entry-index (entries)
+  (let ((entry-table (make-hash-table :test (function equal))))
+    (dolist (entry entries entry-table)
+      (when (and (consp entry) (not (nth-value 1 (gethash (car entry) entry-table))))
+        (setf (gethash (car entry) entry-table) entry)))))
+
+(defun snapshot-sequence-compare-entry (key actual-string entry)
+  (call-with-snapshot-comparison/k
+    key
+    actual-string
+    entry
+    (lambda ()
+      (values t nil nil))
+    (lambda (actual expected)
+      (values nil actual expected))))
+
+(defun snapshot-sequence-find-extra-entry (prefix count entries)
+  (find-if
+    (lambda (candidate)
+      (let ((candidate-index
+            (and (consp candidate) (snapshot-sequence-key-index prefix (car candidate)))))
+        (and candidate-index (>= candidate-index count))))
+    entries))
+
 (defun call-with-snapshot-sequence-comparison/k (values entries prefix count index on-match on-mismatch &optional entry-index)
-  (let ((entry-index
-        (or
-          entry-index
-          (let ((entry-table (make-hash-table :test (function equal))))
-            (dolist (entry entries entry-table)
-              (when (and (consp entry) (not (nth-value 1 (gethash (car entry) entry-table))))
-                (setf (gethash (car entry) entry-table) entry)))))))
+  (let ((entry-index (or entry-index (snapshot-sequence-build-entry-index entries))))
     (loop for value in values
           for position from index
           for key = (snapshot-sequence-key prefix position)
           for actual-string = (snapshot-string value)
           for entry = (gethash key entry-index)
-          do (multiple-value-bind (matched reported-actual reported-expected) (call-with-snapshot-comparison/k
+          do (multiple-value-bind (matched reported-actual reported-expected) (snapshot-sequence-compare-entry
           key
           actual-string
-          entry
-          (lambda ()
-            (values t nil nil))
-          (lambda (actual expected)
-            (values nil actual expected)))
+          entry)
         (unless matched
           (return
             (multiple-value-call
@@ -563,13 +540,7 @@ sbcl
                 prefix
                 position
                 count)))))
-          finally (let ((extra-entry
-            (find-if
-              (lambda (candidate)
-                (let ((candidate-index
-                      (and (consp candidate) (snapshot-sequence-key-index prefix (car candidate)))))
-                  (and candidate-index (>= candidate-index count))))
-              entries)))
+          finally (let ((extra-entry (snapshot-sequence-find-extra-entry prefix count entries)))
         (return
           (if extra-entry (multiple-value-call
               on-mismatch
