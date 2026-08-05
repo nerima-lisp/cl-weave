@@ -1,8 +1,5 @@
 (in-package #:cl-weave/metadata)
 
-(defun write-json-boolean (value stream)
-  (write-string (if value "true" "false") stream))
-
 (defmacro define-json-plist-array-writer (name fields)
   `(defun ,name (entries stream)
      (write-json-plist-array entries ,fields stream)))
