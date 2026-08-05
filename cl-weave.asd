@@ -72,6 +72,7 @@
    (:file "snapshots")
    (:file "mocks-data")
    (:file "mocks")
+   (:file "mocks-lifecycle")
    (:file "matcher-core")
    (:file "matcher-structural")
    (:file "matcher-runtime")
