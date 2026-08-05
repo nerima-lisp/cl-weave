@@ -12,7 +12,7 @@
 (defmatcher :to-be-one-of (actual expected)
   (multiple-value-bind (raw-candidates candidates candidate-count)
       (one-of-candidates expected :to-be-one-of)
-    (let ((matched-index (position actual candidates :test #'eql)))
+    (let ((matched-index (position actual candidates)))
       (values (not (null matched-index))
               (one-of-report actual raw-candidates candidate-count matched-index)
               (one-of-expected-report raw-candidates candidate-count)))))
@@ -29,8 +29,7 @@
 (defpredicate-matcher :to-be-defined (actual)
   (not (null actual)))
 
-(defmatcher :to-be-nan (actual expected)
-  (expected-none expected :to-be-nan)
+(defpredicate-matcher :to-be-nan (actual)
   (values (nan-value-p actual)
           (nan-report actual)
           (nan-expected-report)))
@@ -168,11 +167,16 @@
   "Matches a list or vector of states against external snapshots named prefix[0], prefix[1], ..."
   (snapshot-sequence-match-or-update-p actual expected))
 
-(defpredicate-matcher :to-have-been-called (actual)
+(defun mock-count-report (actual field)
+  "Shared report for TO-HAVE-BEEN-CALLED, TO-HAVE-RETURNED, and TO-HAVE-THROWN:
+passes when the mock report's FIELD count is at least one."
   (let ((report (mock-report actual)))
-    (values (plusp (getf report :call-count))
+    (values (plusp (getf report field))
             report
-            '(:call-count (:min 1)))))
+            (list field (quote (:min 1))))))
+
+(defpredicate-matcher :to-have-been-called (actual)
+  (mock-count-report actual :call-count))
 
 (defmatcher :to-have-been-called-times (actual expected)
   (let* ((times (expected-one expected :to-have-been-called-times))
@@ -206,10 +210,7 @@
                 (list :index index :arguments expected-arguments))))))
 
 (defpredicate-matcher :to-have-returned (actual)
-  (let ((report (mock-report actual)))
-    (values (plusp (getf report :return-count))
-            report
-            '(:return-count (:min 1)))))
+  (mock-count-report actual :return-count))
 
 (defmatcher :to-have-returned-times (actual expected)
   (let* ((times (expected-one expected :to-have-returned-times))
@@ -244,8 +245,5 @@
                 (list :index index :values expected-values))))))
 
 (defpredicate-matcher :to-have-thrown (actual)
-  (let ((report (mock-report actual)))
-    (values (plusp (getf report :throw-count))
-            report
-            '(:throw-count (:min 1)))))
+  (mock-count-report actual :throw-count))
 
