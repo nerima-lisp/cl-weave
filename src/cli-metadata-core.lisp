@@ -56,7 +56,6 @@
       ("doctor" ,(metadata-output-reporters))
       ("metadata" ,(metadata-output-reporters)))))
 
-
 (defun cli-option-usage-name (name argument)
   (if argument
       (format nil "~A ~A" name argument)
@@ -95,14 +94,14 @@
          :test #'string=)
         #'string<))
 
-(defun cli-version ()
-  (or (ignore-errors
-        (let ((system (asdf:find-system "cl-weave" nil)))
-          (and system (asdf:component-version system))))
-      "unknown"))
-
 (defun metadata-system ()
   (ignore-errors (asdf:find-system "cl-weave" nil)))
+
+(defun cli-version ()
+  (or (ignore-errors
+        (let ((system (metadata-system)))
+          (and system (asdf:component-version system))))
+      "unknown"))
 
 (defmacro define-framework-system-reader (name accessor)
   `(defun ,name ()
