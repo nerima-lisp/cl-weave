@@ -88,6 +88,7 @@
    (:file "mutation-walker")
    (:file "mutation-runner")
    (:file "registration")
+   (:file "registration-tests")
    (:file "fixtures")
    (:file "continuations")
    (:file "expect-runtime")
