@@ -1,32 +1,26 @@
 (in-package #:cl-weave)
 
-(defun suite-suppression (suite inherited-status inherited-reason)
+(defun todo-or-skip-suppression (todo-reason skip-reason)
   (cond
-    (inherited-status
-     (values inherited-status inherited-reason))
-    ((suite-todo-reason suite)
-     (values :todo (suite-todo-reason suite)))
-    ((suite-skip-reason suite)
-     (values :skip (suite-skip-reason suite)))
-    (t
-     (values nil nil))))
+    (todo-reason (values :todo todo-reason))
+    (skip-reason (values :skip skip-reason))
+    (t (values nil nil))))
+
+(defun suite-suppression (suite inherited-status inherited-reason)
+  (if inherited-status
+      (values inherited-status inherited-reason)
+      (todo-or-skip-suppression (suite-todo-reason suite) (suite-skip-reason suite))))
 
 (defun suppressed-test-event (suite test status reason)
   (make-event status suite test (get-internal-real-time) :reason reason))
 
-(defun planned-test-status (test suppressed-status)
-  (or suppressed-status
-      (when (test-case-todo-reason test) :todo)
-      (when (test-case-skip-reason test) :skip)
-      :run))
-
-(defun planned-test-reason (test suppressed-status suppressed-reason status)
+(defun planned-test-suppression (test suppressed-status suppressed-reason)
   (if suppressed-status
-      suppressed-reason
-      (ecase status
-        (:run nil)
-        (:todo (test-case-todo-reason test))
-        (:skip (test-case-skip-reason test)))))
+      (values suppressed-status suppressed-reason)
+      (multiple-value-bind (status reason)
+          (todo-or-skip-suppression
+           (test-case-todo-reason test) (test-case-skip-reason test))
+        (values (or status :run) reason))))
 
 (defun effective-suite-execution-mode (suite inherited-mode)
   (or (suite-execution-mode suite)
@@ -41,8 +35,7 @@
        (eq (effective-test-execution-mode test inherited-mode) :concurrent)))
 
 (defun make-plan-entry
-    (suite test status reason filter ancestor-focused execution-mode)
-  (declare (ignore suite))
+    (test status reason filter ancestor-focused execution-mode)
   (make-test-plan-entry-record
    (gethash test (selection-filter-test-paths filter))
    status
@@ -84,6 +77,11 @@
     (t
      (values :skip nil))))
 
+(defun collected-test-event (suite test suppressed-status suppressed-reason)
+  (if suppressed-status
+      (suppressed-test-event suite test suppressed-status suppressed-reason)
+      (run-test-case/internal suite test)))
+
 (defun describe-event-collection-step
     (suite child children control filter ancestor-focused
      suppressed-status suppressed-reason execution-mode)
@@ -102,9 +100,7 @@
            (values :collect-test
                    (record-event/control
                     control
-                    (if suppressed-status
-                        (suppressed-test-event suite child suppressed-status suppressed-reason)
-                        (run-test-case/internal suite child)))
+                    (collected-test-event suite child suppressed-status suppressed-reason))
                    nil
                    nil)))
       (:skip
@@ -118,16 +114,16 @@
       (:suite
        (values :collect-suite child-focused nil))
       (:test
-       (let* ((status (planned-test-status child suppressed-status))
-              (reason (planned-test-reason child suppressed-status suppressed-reason status))
-              (entry (make-plan-entry
-                      suite
-                      child
-                      status
-                      reason
-                      filter
-                      ancestor-focused
-                      execution-mode)))
-         (values :collect-test entry nil)))
+       (multiple-value-bind (status reason)
+           (planned-test-suppression child suppressed-status suppressed-reason)
+         (values :collect-test
+                 (make-plan-entry
+                  child
+                  status
+                  reason
+                  filter
+                  ancestor-focused
+                  execution-mode)
+                 nil)))
       (:skip
        (values :skip nil nil)))))
