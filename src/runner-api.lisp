@@ -15,16 +15,21 @@
 (defun list-reporters ()
   (copy-list *list-reporters*))
 
-(defun ensure-run-reporter (reporter)
-  (unless (member reporter (run-reporters))
-    (error "cl-weave: run mode supports spec, sexp, json, jsonl, tap, github, ~
-            and junit reporters."))
+(defun ensure-reporter (reporter reporters message)
+  (unless (member reporter reporters)
+    (error message))
   reporter)
 
+(defun ensure-run-reporter (reporter)
+  (ensure-reporter
+   reporter (run-reporters)
+   "cl-weave: run mode supports spec, sexp, json, jsonl, tap, github, ~
+    and junit reporters."))
+
 (defun ensure-list-reporter (reporter)
-  (unless (member reporter (list-reporters))
-    (error "cl-weave: list mode supports spec, sexp, json, and jsonl reporters."))
-  reporter)
+  (ensure-reporter
+   reporter (list-reporters)
+   "cl-weave: list mode supports spec, sexp, json, and jsonl reporters."))
 
 (defun ensure-output-stream (stream)
   (unless (and (streamp stream)
@@ -90,9 +95,14 @@
            (error "cl-weave: unknown suite designator ~S."
                   suite-designator))))))
 
-(defun normalize-run-results (results)
-  (let ((events nil)
-        (active-conses (make-hash-table :test (function eq)))
+(defun walk-nested-events (results visit-event)
+  "Iteratively visit every TEST-EVENT-P leaf reachable from RESULTS, calling
+VISIT-EVENT on each in left-to-right order. RESULTS may be NIL, a single test
+event, or a (possibly shared, non-circular) cons tree combining the same.
+Signals an error on a circular cons structure or on a value that is none of
+the above. Uses an explicit worklist so arbitrarily deep or long structures
+never consume the control stack."
+  (let ((active-conses (make-hash-table :test (function eq)))
         (work (list (cons :visit results))))
     (loop while work
           for item = (pop work)
@@ -102,8 +112,7 @@
                (:visit
                 (cond
                   ((null value))
-                  ((test-event-p value)
-                   (push value events))
+                  ((test-event-p value) (funcall visit-event value))
                   ((consp value)
                    (when (gethash value active-conses)
                      (error "cl-weave: circular nested event lists are not supported."))
@@ -115,7 +124,11 @@
                    (error "cl-weave: expected test events or nested event lists, got ~S."
                           value))))
                (:leave
-                (remhash value active-conses))))
+                (remhash value active-conses))))))
+
+(defun normalize-run-results (results)
+  (let ((events nil))
+    (walk-nested-events results (lambda (event) (push event events)))
     (nreverse events)))
 
 (defun run (suite-designator
@@ -146,30 +159,11 @@
   (values))
 
 (defun results-status (results)
-  (let ((passedp t)
-        (leave-marker (list nil))
-        (active-conses (make-hash-table :test (function eq)))
-        (work (list results)))
-    (loop while work
-          for item = (pop work)
-          do (if (and (consp item)
-                      (eq (car item) leave-marker))
-                 (remhash (cdr item) active-conses)
-                 (cond
-                   ((null item))
-                   ((test-event-p item)
-                    (unless (passed-event-p item)
-                      (setf passedp nil)))
-                   ((consp item)
-                    (when (gethash item active-conses)
-                      (error "cl-weave: circular nested event lists are not supported."))
-                    (setf (gethash item active-conses) t)
-                    (push (cons leave-marker item) work)
-                    (push (cdr item) work)
-                    (push (car item) work))
-                   (t
-                    (error "cl-weave: expected test events or nested event lists, got ~S."
-                           item)))))
+  (let ((passedp t))
+    (walk-nested-events results
+                        (lambda (event)
+                          (unless (passed-event-p event)
+                            (setf passedp nil))))
     passedp))
 
 (defun run-all (&key (reporter :spec)
