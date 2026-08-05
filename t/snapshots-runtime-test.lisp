@@ -249,3 +249,117 @@
 (describe "snapshot sessions" (it "makes staged updates visible and flushes them on scope exit" (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-session")) (cl-weave::*snapshot-directory* snapshot-root) (cl-weave::*snapshot-file-name* "session.snapshots") (cl-weave::*update-snapshots* t)) (unwind-protect (progn (let ((cl-weave::*snapshot-session* nil)) (cl-weave::call-with-snapshot-session (lambda () (expect (cl-weave::snapshot-match-or-update-p (list :value 1) (list "session/first")) :to-be-truthy) (expect (cl-weave::snapshot-match-or-update-p (list :value 2) (list "session/second")) :to-be-truthy) (multiple-value-bind (value present-p) (cl-weave:snapshot-value "session/first") (expect value :to-equal (cl-weave::snapshot-string (list :value 1))) (expect present-p :to-be-truthy))))) (expect (cl-weave:snapshot-entries) :to-equal (list (cons "session/first" (cl-weave::snapshot-string (list :value 1))) (cons "session/second" (cl-weave::snapshot-string (list :value 2)))))) (uiop:delete-directory-tree snapshot-root :validate t :if-does-not-exist :ignore))))))
 
 (it "flushes staged updates when execution exits with an error" (let ((cl-weave::*snapshot-session* nil)) (let* ((snapshot-root (make-test-temporary-directory "snapshot-session-unwind")) (cl-weave::*snapshot-directory* snapshot-root) (cl-weave::*snapshot-file-name* "unwind.snapshots") (cl-weave::*update-snapshots* t)) (unwind-protect (progn (handler-case (let ((cl-weave::*snapshot-session* nil)) (cl-weave::call-with-snapshot-session (lambda () (cl-weave::snapshot-match-or-update-p (list :value :unwind) (list "session/unwind")) (error "expected test error")))) (error () nil)) (multiple-value-bind (value present-p) (cl-weave:snapshot-value "session/unwind") (expect value :to-equal (cl-weave::snapshot-string (list :value :unwind))) (expect present-p :to-be-truthy))) (uiop:delete-directory-tree snapshot-root :validate t :if-does-not-exist :ignore)))))
+(it
+  "reads snapshot state from disk on first session access with nothing staged yet"
+  (let ((cl-weave::*snapshot-session* nil))
+    (let* ((snapshot-root
+             (make-test-temporary-directory "snapshot-session-cold-read"))
+           (cl-weave::*snapshot-directory* snapshot-root)
+           (cl-weave::*snapshot-file-name* "cold-read.snapshots"))
+      (unwind-protect
+           (progn
+             (cl-weave::write-snapshot-file
+              (list (cons "cold/first" "on-disk-value")))
+             (cl-weave::call-with-snapshot-session
+              (lambda ()
+                (expect (cl-weave::read-snapshot-file)
+                        :to-equal
+                        (list (cons "cold/first" "on-disk-value")))
+                (multiple-value-bind (value present-p)
+                    (cl-weave:snapshot-value "cold/first")
+                  (expect value :to-equal "on-disk-value")
+                  (expect present-p :to-be-truthy)))))
+        (uiop:delete-directory-tree snapshot-root
+                                    :validate t
+                                    :if-does-not-exist :ignore)))))
+(it
+  "keeps the first duplicate-key snapshot entry when building the sequence index"
+  (let* ((actual-value (list :dedup-check 1))
+         (actual-string (cl-weave::snapshot-string actual-value))
+         (entries
+           (list
+             (cons "dedup-seq[0]" actual-string)
+             (cons "dedup-seq[0]" "shadowed-duplicate-value")))
+         (matched nil))
+    (cl-weave::call-with-snapshot-sequence-comparison/k
+      (list actual-value)
+      entries
+      "dedup-seq"
+      1
+      0
+      (lambda ()
+        (setf matched t)
+        t)
+      (lambda (&rest reported)
+        (declare (ignore reported))
+        (setf matched :mismatch)
+        nil))
+    (expect matched :to-be t)))
+(it
+  "skips rewriting the snapshot file when a flushed session made no net change"
+  (let ((cl-weave::*snapshot-session* nil))
+    (let* ((snapshot-root
+             (make-test-temporary-directory "snapshot-session-unchanged"))
+           (cl-weave::*snapshot-directory* snapshot-root)
+           (cl-weave::*snapshot-file-name* "unchanged.snapshots")
+           (cl-weave::*update-snapshots* t)
+           (actual-value (list :idempotent 42))
+           (actual-string (cl-weave::snapshot-string actual-value))
+           (write-calls 0))
+      (unwind-protect
+           (progn
+             (cl-weave::write-snapshot-file
+              (list (cons "idempotent" actual-string)))
+             (with-mocked-functions
+                 (((symbol-function 'cl-weave::write-snapshot-file-unlocked)
+                   (lambda (entries file)
+                     (declare (ignore entries file))
+                     (incf write-calls)
+                     nil)))
+               (cl-weave::call-with-snapshot-session
+                (lambda ()
+                  (expect
+                   (cl-weave::snapshot-match-or-update-p
+                    actual-value
+                    (list "idempotent"))
+                   :to-be-truthy))))
+             (expect write-calls :to-be 0)
+             (expect (cl-weave::read-snapshot-file)
+                     :to-equal (list (cons "idempotent" actual-string))))
+        (uiop:delete-directory-tree snapshot-root
+                                    :validate t
+                                    :if-does-not-exist :ignore)))))
+(let ((cl-weave::*snapshot-session* nil)) #+sbcl
+(it
+  "retries the temporary snapshot file under a concurrent O_EXCL collision"
+  (let* ((snapshot-root (make-test-temporary-directory "snapshot-eexist-race"))
+         (cl-weave::*snapshot-directory* snapshot-root)
+         (cl-weave::*snapshot-file-name* "eexist.snapshots")
+         (file (cl-weave::snapshot-file-pathname))
+         (colliding
+           (merge-pathnames ".eexist.snapshots.colliding.tmp" snapshot-root))
+         (retry (merge-pathnames ".eexist.snapshots.retry.tmp" snapshot-root))
+         (attempts 0))
+    (ensure-directories-exist file)
+    (with-open-file (stream colliding
+                            :direction :output
+                            :if-exists :supersede
+                            :if-does-not-exist :create)
+      (write-line "already-there" stream))
+    (unwind-protect
+         (with-mocked-functions
+             (((symbol-function 'cl-weave::snapshot-temporary-file-pathname)
+               (lambda (target-file)
+                 (declare (ignore target-file))
+                 (incf attempts)
+                 (if (= attempts 1) colliding retry))))
+           (expect (cl-weave::write-snapshot-file (list (cons "race" "value")))
+                   :to-be-null)
+           (expect attempts :to-be 2)
+           (expect (probe-file retry) :to-be-falsy)
+           (expect (probe-file colliding) :to-be-truthy)
+           (expect (cl-weave::read-snapshot-file)
+                   :to-equal (list (cons "race" "value"))))
+      (uiop:delete-directory-tree snapshot-root
+                                  :validate t
+                                  :if-does-not-exist :ignore)))))
