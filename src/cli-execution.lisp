@@ -113,33 +113,54 @@ dynamic environment, so worker threads inherit them."
          pass --load path/to/system.asd, or configure CL_SOURCE_REGISTRY."
         system))))
 
-(defun load-requested-inputs (options)
+(defun partition-cli-load-files (options)
+  "Split OPTIONS's --load files into ASD files and plain Lisp source files,
+each in its original relative order."
   (let ((asd-files (quote ()))
         (source-files (quote ())))
     (dolist (file (cli-options-load-files options))
       (if (pathname-asd-file-p (uiop:ensure-pathname file))
           (push file asd-files)
           (push file source-files)))
-    (dolist (file (nreverse asd-files))
-      (asdf:load-asd file))
-    (when (cli-options-coverage options)
-      (dolist (system (cli-options-coverage-systems options))
-        (ensure-requested-system-visible system options)
-        (asdf:load-system system :force t)))
+    (values (nreverse asd-files) (nreverse source-files))))
+
+(defun load-cli-asd-files (asd-files)
+  (dolist (file asd-files)
+    (asdf:load-asd file)))
+
+(defun load-cli-coverage-systems (options)
+  (when (cli-options-coverage options)
+    (dolist (system (cli-options-coverage-systems options))
+      (ensure-requested-system-visible system options)
+      (asdf:load-system system :force t))))
+
+(defun load-cli-requested-systems (options)
+  "Load OPTIONS's requested systems, forcing a recompile under coverage. A
+system already force-loaded by LOAD-CLI-COVERAGE-SYSTEMS is skipped here; the
+membership check runs against a hash table built once, not the raw
+coverage-systems list, so it stays O(1) per requested system."
+  (let* ((coverage-p (cli-options-coverage options))
+         (coverage-systems (make-hash-table :test (function equal))))
+    (dolist (system (cli-options-coverage-systems options))
+      (setf (gethash system coverage-systems) t))
     (dolist (system (cli-options-systems options))
-      (unless (and
-               (cli-options-coverage options)
-               (member
-                system
-                (cli-options-coverage-systems options)
-                :test
-                (function string=)))
+      (unless (and coverage-p (gethash system coverage-systems))
         (ensure-requested-system-visible system options)
-        (if (cli-options-coverage options)
+        (if coverage-p
             (asdf:load-system system :force t)
-            (asdf:load-system system))))
-    (dolist (file (nreverse source-files))
-      (load file))))
+            (asdf:load-system system))))))
+
+(defun load-cli-source-files (source-files)
+  (dolist (file source-files)
+    (load file)))
+
+(defun load-requested-inputs (options)
+  (multiple-value-bind (asd-files source-files)
+      (partition-cli-load-files options)
+    (load-cli-asd-files asd-files)
+    (load-cli-coverage-systems options)
+    (load-cli-requested-systems options)
+    (load-cli-source-files source-files)))
 
 (defun prepare-coverage-compilation (options)
   (when (cli-options-coverage options)
@@ -252,12 +273,16 @@ dynamic environment, so worker threads inherit them."
      (lambda (stream)
        (call-run-command options stream)))))
 
+(defparameter *command-plan-pure-query-kinds* '(:metadata :list)
+  "Command plan :KIND values whose stream callback always succeeds once it
+emits output. DOCTOR is a health check rather than a pure query, so it is
+intentionally excluded: its callback returns the pass/fail of the report and
+that result governs the process exit code.")
+
 (defun command-plan-success-kind-p (plan)
-  ;; METADATA and LIST are pure queries that always succeed once they emit
-  ;; output. DOCTOR is a health check: its callback returns the pass/fail of
-  ;; the report, so it is intentionally excluded here and its result governs
-  ;; the process exit code.
-  (member (getf plan :kind) '(:metadata :list) :test #'eq))
+  "PLAN succeeds as soon as its stream callback runs; see
+*COMMAND-PLAN-PURE-QUERY-KINDS* for which :KIND values that covers."
+  (member (getf plan :kind) *command-plan-pure-query-kinds* :test #'eq))
 
 (defun execute-command-plan (plan options)
   (let ((result
