@@ -422,3 +422,60 @@
         (expect (getf stats :expression-covered) :to-satisfy (lambda (value) (>= value 0)))
         (expect (getf stats :branch-total) :to-satisfy (lambda (value) (>= value 0)))
         (expect (getf stats :branch-covered) :to-satisfy (lambda (value) (>= value 0)))))))
+
+(describe "coverage internal SB-COVER interop gaps"
+  (it "resolves or rejects SB-COVER symbols by name without a global mock"
+    (expect (cl-weave::coverage-fbound-symbol "RESET-COVERAGE" t) :to-be-truthy)
+    (expect (cl-weave::coverage-fbound-symbol "NO-SUCH-CL-WEAVE-PROBE-FUNCTION" nil)
+            :to-be nil)
+    (expect (lambda ()
+              (cl-weave::coverage-fbound-symbol "NO-SUCH-CL-WEAVE-PROBE-FUNCTION" t))
+            :to-throw
+            "SB-COVER:NO-SUCH-CL-WEAVE-PROBE-FUNCTION is not available"))
+
+  (it "resolves or rejects SB-COVER internal symbols by name without a global mock"
+    (expect (cl-weave::coverage-internal-symbol "REFRESH-COVERAGE-BITS" t) :to-be-truthy)
+    (expect (cl-weave::coverage-internal-symbol "NO-SUCH-CL-WEAVE-PROBE-INTERNAL" nil)
+            :to-be nil)
+    (expect (lambda ()
+              (cl-weave::coverage-internal-symbol "NO-SUCH-CL-WEAVE-PROBE-INTERNAL" t))
+            :to-throw
+            "SB-COVER internal NO-SUCH-CL-WEAVE-PROBE-INTERNAL is not available"))
+
+  (it "wraps and re-signals require-coverage-support failures as coverage-unavailable"
+    (with-mocked-functions
+        (((symbol-function 'cl-weave::coverage-fbound-symbol)
+          (lambda (name &optional required-p)
+            (declare (ignore name required-p))
+            (error "boom from stub"))))
+      (expect (lambda () (cl-weave::require-coverage-support))
+              :to-throw
+              "boom from stub"))
+    (with-mocked-functions
+        (((symbol-function 'cl-weave::coverage-fbound-symbol)
+          (lambda (name &optional required-p)
+            (declare (ignore name required-p))
+            (error 'cl-weave:coverage-unavailable :reason "already-typed"))))
+      (expect (lambda () (cl-weave::require-coverage-support))
+              :to-throw
+              "already-typed")))
+
+  (it "treats any condition during availability probing as unsupported"
+    (with-mocked-functions
+        (((symbol-function 'cl-weave::require-coverage-support)
+          (lambda () (error "simulated probe failure"))))
+      (expect (cl-weave:coverage-support-available-p) :to-be nil)))
+
+  (it "rejects coverage data in an unsupported SB-COVER representation"
+    (let ((original (symbol-function (quote cl-weave::coverage-internal-symbol)))
+          (fake-info-symbol (make-symbol "FAKE-CODE-COVERAGE-INFO")))
+      (setf (symbol-value fake-info-symbol) (list 42))
+      (with-mocked-functions
+          (((symbol-function (quote cl-weave::coverage-internal-symbol))
+            (lambda (name &optional required-p)
+              (if (string= name "*CODE-COVERAGE-INFO*")
+                  fake-info-symbol
+                  (funcall original name required-p)))))
+        (expect (lambda () (cl-weave:coverage-statistics))
+                :to-throw
+                "unsupported representation")))))

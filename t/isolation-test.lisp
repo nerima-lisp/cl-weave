@@ -184,3 +184,64 @@
      #P"/opt/cl-weave/bin/cl-weave"
      (lambda ()
        (expect (cl-weave::isolated-sbcl-program) :to-equal "sbcl")))))
+
+(describe "isolation internal normalization and failure-signaling gaps"
+  (it "normalizes isolated systems across NIL, string, symbol, and list forms"
+    (expect (cl-weave::normalize-isolated-systems nil) :to-be nil)
+    (expect (cl-weave::normalize-isolated-systems "cl-weave") :to-equal '("cl-weave"))
+    (expect (cl-weave::normalize-isolated-systems 'cl-weave) :to-equal '("cl-weave"))
+    (expect (cl-weave::normalize-isolated-systems '(cl-weave "cl-weave/test"))
+            :to-equal
+            '("cl-weave" "cl-weave/test")))
+
+  (it "rejects an unsupported isolated systems designator"
+    (expect (lambda () (cl-weave::normalize-isolated-systems 42))
+            :to-throw
+            "isolated systems must be a string, symbol, or list"))
+
+  (it "rejects an unsupported isolated keep-files value"
+    (expect (lambda () (cl-weave::normalize-isolated-keep-files :always))
+            :to-throw
+            "isolated keep-files must be NIL, T, or :ON-FAILURE"))
+
+  (it "reads an absent isolated artifact file as an empty string"
+    (expect (cl-weave::read-file-string-or-empty
+             (merge-pathnames "no-such-isolated-artifact.txt"
+                              (uiop:temporary-directory)))
+            :to-equal
+            ""))
+
+  (it "reports temp directory exhaustion when every candidate collides"
+    (with-mocked-functions
+        (((symbol-function 'cl-weave::isolated-create-temp-directory)
+          (lambda (pathname) (declare (ignore pathname)) nil)))
+      (expect (lambda () (cl-weave::isolated-temp-directory "cl-weave-isolated-exhaustion"))
+              :to-throw
+              "failed to allocate isolated temp directory")))
+
+  (it "signals a structured assertion failure for a failed isolated result"
+    (let ((result (cl-weave::make-isolated-result
+                   :status :fail
+                   :exit-code 1
+                   :stdout "child stdout"
+                   :stderr "child stderr"
+                   :timed-out-p nil
+                   :elapsed-ms 12
+                   :script-path nil
+                   :stdout-path nil
+                   :stderr-path nil
+                   :home-path nil)))
+      (handler-case
+          (progn
+            (cl-weave::signal-isolated-failure result '(it-isolated "child"))
+            (expect nil :to-be-truthy))
+        (cl-weave:assertion-failure (condition)
+          (with-assertion-detail (detail condition actual expected)
+            (expect (cl-weave::assertion-detail-matcher detail) :to-be :isolated)
+            (expect (cl-weave::assertion-detail-negated detail) :to-be nil)
+            (expect (cl-weave::assertion-detail-pass detail) :to-be nil)
+            (expect (getf actual :status) :to-be :fail)
+            (expect (getf actual :exit-code) :to-be 1)
+            (expect (getf actual :stdout) :to-equal "child stdout")
+            (expect (getf actual :stderr) :to-equal "child stderr")
+            (expect expected :to-equal '(:status :pass :exit-code 0))))))))
