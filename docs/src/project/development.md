@@ -90,9 +90,12 @@ the timing statistics they report.
 
 The devShell provides
 [`paredit-cli`](https://github.com/nerima-lisp/paredit-cli) for structural
-S-expression edits. The `paredit-lint` flake check parses every source file, so
-an unbalanced form fails `nix flake check` rather than surfacing as a confusing
-compile error.
+S-expression edits, and its use is mandatory: any structural change to
+`src/*.lisp` or `t/*.lisp` -- renaming a scoped symbol, moving a definition,
+extracting or inlining a form, reshaping a binding list, a conditional, or a
+call -- goes through `paredit`, never through hand-editing parentheses. The
+`paredit-lint` flake check parses every source file, so an unbalanced form
+fails `nix flake check` rather than surfacing as a confusing compile error.
 
 `paredit inspect duplicates` and `paredit inspect unused-definitions` are
 worth running over `src/*.lisp` (add `t/*.lisp` to the latter to rule out
@@ -104,10 +107,22 @@ their output as candidates, not a worklist -- check `src/package.lisp`'s
 `:export` list and grep the whole tree before removing or merging anything
 they flag.
 
+`paredit-lint`'s platform-guard detection is text-level, not
+macroexpansion-aware: it recognizes a feature-dispatch pair such as
+`#+sbcl`/`#-sbcl` or `#+sb-thread`/`#-sb-thread` only when both reader
+conditionals are literally present at the call site (see the
+`#+sb-thread`/`#-sb-thread` split in `run-concurrent-test-cases`,
+`src/runner-concurrency.lisp`, and the `#+sbcl` blocks in
+`src/platform-sbcl.lisp`). Do not hide one half of such a pair behind a macro
+argument or a helper function -- even where a `define-conditional-lock-macro`
+style macro could parameterize it -- because the linter would then see only
+one branch and cannot verify the other implementation still has a path
+through the code.
+
 ## Source organization
 
-Two conventions keep individual files from growing into an unreadable mix of
-constants and control flow as the codebase grows:
+Three conventions keep individual files from growing into an unreadable mix
+of constants, control flow, and callback plumbing as the codebase grows:
 
 - **`*-data.lisp` companion files.** When a file's `defvar`/`defparameter`/
   `defconstant`/plain `defstruct` forms outgrow a handful of lines, move them
@@ -128,6 +143,21 @@ constants and control flow as the codebase grows:
   can macroexpand cleanly to code that never substitutes the caller's
   argument, and that only shows up in a runtime check that exercises the
   generated macro's actual effect.
+- **`/k` continuation-passing helpers.** A function named `name/k` takes its
+  continuation as an explicit trailing argument or arguments instead of
+  returning a value, and calls one of them rather than returning normally --
+  for example `call-with-snapshot-comparison/k` in `src/snapshots.lisp`,
+  which takes `on-match` and `on-mismatch` and funcalls whichever branch the
+  comparison resolves to, or `run-test-attempt/k` in
+  `src/runner-attempts.lisp` and `call-with-platform-timeout/k` in
+  `src/platform-protocol.lisp`, which take a single `continue`. Prefer the
+  paired `on-X`/`on-Y` naming (mirroring `on-match`/`on-mismatch`) when a
+  helper has a small fixed number of outcomes each needing different
+  handling at the call site, and a single `continue` when there is one
+  success path and failure propagates as a condition instead. The `/k`
+  suffix is the signal to a reader that the function does not return a
+  useful value on its own -- calling it and ignoring the result is a bug,
+  not a style choice.
 
 ## Contributing
 
