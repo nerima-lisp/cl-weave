@@ -117,6 +117,7 @@
    (:file "watch-suite-diff")
    (:file "watch")
    (:file "cli-options")
+   (:file "cli-options-parsers")
    (:file "cli-options-data")
    (:file "cli-metadata-project-data")
    (:file "cli-metadata-quality-data")
