@@ -15,25 +15,30 @@
   `(expect (lambda () ,@body) :not :to-throw))
 
 (defmacro fail (&optional (reason "explicit failure") &rest args)
-  `(let ((reason ,(if args
-                      `(format nil ,reason ,@args)
-                      reason)))
-     (record-assertion)
-     (signal-assertion-failure
-      (make-assertion-detail
-       :form '(fail)
-       :matcher :fail
-       :actual reason
-       :expected '(:no-explicit-failure)
-       :negated nil
-       :pass nil))))
+  `(signal-fail-assertion
+    ,(if args
+         `(format nil ,reason ,@args)
+         reason)))
+
+(defun signal-skip (reason)
+  (let ((restart (find-restart 'skip-test)))
+    (if restart
+        (invoke-restart restart reason)
+        (error "cl-weave: skip requested outside a running test: ~A" reason))))
+
+(defun signal-fail-assertion (reason)
+  (record-assertion)
+  (signal-assertion-failure
+   (make-assertion-detail
+    :form '(fail)
+    :matcher :fail
+    :actual reason
+    :expected '(:no-explicit-failure)
+    :negated nil
+    :pass nil)))
 
 (defmacro skip (&optional (reason "skipped"))
-  `(let ((reason ,reason))
-     (let ((restart (find-restart 'skip-test)))
-       (if restart
-           (invoke-restart restart reason)
-           (error "cl-weave: skip requested outside a running test: ~A" reason)))))
+  `(signal-skip ,reason))
 
 (defmacro expect-poll (thunk &body body)
   (multiple-value-bind (options expectation) (split-leading-option-plist body)
@@ -81,20 +86,28 @@
                   (unless (= (length stores) 1)
                     (error "WITH-MOCKED-FUNCTIONS supports only single-value places, got ~S."
                            place))
-                  (list temps values (first stores) writer reader replacement
-                        (gensym "SAVED-"))))))
-    `(let* (,@(loop for (temps values nil nil reader nil saved) in expansions
-                    append (append
-                            (loop for temp in temps
-                                  for value in values
-                                  collect `(,temp ,value))
-                            `((,saved ,reader)))))
+                  (list :temps temps
+                        :values values
+                        :store (first stores)
+                        :writer writer
+                        :reader reader
+                        :replacement replacement
+                        :saved (gensym "SAVED-"))))))
+    `(let* (,@(loop for expansion in expansions
+                    append (destructuring-bind (&key temps values reader saved &allow-other-keys)
+                               expansion
+                             (append (mapcar #'list temps values)
+                                     `((,saved ,reader))))))
        (unwind-protect
             (progn
-              ,@(loop for (nil nil store writer nil replacement nil) in expansions
-                      collect `(let ((,store ,replacement))
-                                 ,writer))
+              ,@(loop for expansion in expansions
+                      collect (destructuring-bind (&key store writer replacement &allow-other-keys)
+                                  expansion
+                                `(let ((,store ,replacement))
+                                   ,writer)))
               ,@body)
-         ,@(loop for (nil nil store writer nil nil saved) in expansions
-                 collect `(let ((,store ,saved))
-                            ,writer))))))
+         ,@(loop for expansion in expansions
+                 collect (destructuring-bind (&key store writer saved &allow-other-keys)
+                             expansion
+                           `(let ((,store ,saved))
+                              ,writer)))))))
