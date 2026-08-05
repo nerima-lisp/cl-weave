@@ -6,17 +6,24 @@
         collect current into suites
         finally (return (nreverse suites))))
 
+(defun effective-hooks/from-lineage (lineage hook-accessor &key reversed)
+  "Collect the hooks HOOK-ACCESSOR returns for each suite in LINEAGE, in
+lineage order, or, when REVERSED, leaf-to-root with each suite's own hook
+list reversed, matching after-each's LIFO cleanup order."
+  (if reversed
+      (loop for current in (reverse lineage)
+            append (reverse (funcall hook-accessor current)))
+      (loop for current in lineage
+            append (funcall hook-accessor current))))
+
 (defun effective-before-hooks/from-lineage (lineage)
-  (loop for current in lineage
-        append (suite-hook current before-each)))
+  (effective-hooks/from-lineage lineage #'suite-before-each))
 
 (defun effective-around-hooks/from-lineage (lineage)
-  (loop for current in lineage
-        append (suite-hook current around-each)))
+  (effective-hooks/from-lineage lineage #'suite-around-each))
 
 (defun effective-after-hooks/from-lineage (lineage)
-  (loop for current in (reverse lineage)
-        append (reverse (suite-hook current after-each))))
+  (effective-hooks/from-lineage lineage #'suite-after-each :reversed t))
 
 (defun call-hooks/collect-errors (hooks &optional phase)
   "Run each hook, collecting the conditions any of them signal. When PHASE is
@@ -60,6 +67,25 @@ appears on the time-travel timeline."
                        :phase :around-each
                        :causes (list condition))))))))
 
+(defun run-required-hooks (hooks phase)
+  "Run HOOKS and signal a HOOK-FAILURE for PHASE when any of them errors."
+  (let ((errors (call-hooks/collect-errors hooks phase)))
+    (when errors
+      (error 'hook-failure :phase phase :causes errors))))
+
+(defun call-test-case-body/k (lineage test continue)
+  "Run TEST's before-each and around-each hooks from LINEAGE, then TEST's body
+and CONTINUE. Signals HOOK-FAILURE when a before-each hook errors."
+  (run-required-hooks
+   (effective-before-hooks/from-lineage lineage)
+   :before-each)
+  (call-around-hooks/k
+   (effective-around-hooks/from-lineage lineage)
+   (lambda ()
+     (funcall (test-case-function test))
+     (verify-assertion-counts)
+     (funcall continue))))
+
 (defun call-test-case/k (suite test continue)
   (let ((*test-context* (make-hash-table :test #'equal))
         (*assertion-count* 0)
@@ -76,21 +102,7 @@ appears on the time-travel timeline."
       ;; UNWIND-PROTECT guarantees after-each cleanup runs even on non-local exit.
       (unwind-protect
            (handler-case
-               (setf result
-                     (let ((before-errors
-                             (call-hooks/collect-errors
-                              (effective-before-hooks/from-lineage lineage)
-                              :before-each)))
-                       (when before-errors
-                         (error 'hook-failure
-                                :phase :before-each
-                                :causes before-errors))
-                       (call-around-hooks/k
-                        (effective-around-hooks/from-lineage lineage)
-                        (lambda ()
-                          (funcall (test-case-function test))
-                          (verify-assertion-counts)
-                          (funcall continue)))))
+               (setf result (call-test-case-body/k lineage test continue))
              (serious-condition (condition)
                (setf primary-condition condition)))
         (setf cleanup-errors
