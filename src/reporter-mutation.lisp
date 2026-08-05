@@ -54,15 +54,18 @@
   (json-write-mutation (mutation-result-mutation result) stream)
   (write-string "}" stream))
 
+(defparameter *mutation-summary-field-specs*
+  (list (list :plist-key :killed :json-key "killed")
+        (list :plist-key :survived :json-key "survived")
+        (list :plist-key :errored :json-key "errored")))
+
 (defun report-mutations-json (results stream)
   (let ((summary (mutation-summary results)))
     (write-string "{" stream)
     (write-string "\"schemaVersion\":1" stream)
     (write-string ",\"kind\":\"mutations\"" stream)
     (format stream ",\"total\":~D" (getf summary :total))
-    (format stream ",\"killed\":~D" (getf summary :killed))
-    (format stream ",\"survived\":~D" (getf summary :survived))
-    (format stream ",\"errored\":~D" (getf summary :errored))
+    (json-write-summary-count-fields summary *mutation-summary-field-specs* stream)
     (format stream ",\"score\":~,6F" (getf summary :score))
     (write-string ",\"results\":" stream)
     (json-write-sequence results #'json-write-mutation-result stream)
