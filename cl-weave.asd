@@ -108,6 +108,7 @@
    (:file "runner-planning")
    (:file "runner-concurrency")
    (:file "runner-collection")
+   (:file "runner-collection-plan")
    (:file "runner-coverage")
    (:file "runner-api")
    (:file "watch-discovery")
