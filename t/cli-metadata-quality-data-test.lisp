@@ -181,8 +181,6 @@
     (let* ((metadata (cl-weave/metadata:framework-metadata))
            (gates (getf metadata :quality-gates))
            (flake-gate (find-metadata-entry :name "flake-check" gates))
-           (metadata-gate
-             (find-metadata-entry :name "ai-metadata-artifact" gates))
            (jsonl-gate
              (find-metadata-entry :name "jsonl-events-artifact" gates))
            (watch-once-gate
@@ -195,10 +193,6 @@
               :to-equal '("nix" "flake" "check" "--print-build-logs"))
       (expect (getf flake-gate :timeout-seconds) :to-be 900)
       (expect (getf flake-gate :artifacts) :to-equal '())
-      (expect metadata-gate :not :to-be nil)
-      (expect (getf metadata-gate :command) :to-contain "metadata")
-      (expect (getf metadata-gate :artifacts)
-              :to-contain "cl-weave-metadata.json")
       (expect jsonl-gate :not :to-be nil)
       (expect (getf jsonl-gate :command) :to-contain "jsonl")
       (expect (getf jsonl-gate :artifacts)
@@ -485,18 +479,13 @@
               (merge-pathnames #P"docs/src/project/distribution-policy.md"
                                (uiop:getcwd))))
            (distribution-document (normalize-markdown-text
-                                   distribution-document-raw))
-           (ai-contract (normalize-markdown-text
-                         (read-text-file
-                          (merge-pathnames #P"docs/src/reference/ai-contract.md"
-                                           (uiop:getcwd))))))
+                                   distribution-document-raw)))
       (expect (getf metadata :policy-documents)
               :to-contain "docs/src/project/distribution-policy.md")
       (expect readme :to-contain "docs/src/project/distribution-policy.md")
       (expect distribution-document :to-contain "# Distribution Policy")
       (expect distribution-document :to-contain "distributionChannels")
       (expect distribution-document :to-contain "README.md")
-      (expect distribution-document :to-contain "docs/src/reference/ai-contract.md")
       (expect distribution-document :to-contain "flake.nix")
       (expect distribution-document :to-contain "SBOMs")
       (expect distribution-document :to-contain "provenance attestations")
@@ -512,7 +501,7 @@
         (expect (markdown-contains-command-p distribution-document-raw
                                              (getf channel :run-command))
                 :to-be t))
-      (expect ai-contract :to-contain "docs/src/project/distribution-policy.md")))
+      ))
 
   (it "keeps the packaged CLI safe for parallel ASDF loads"
     ;; `--coverage` recompiles the system under test, and the sources a

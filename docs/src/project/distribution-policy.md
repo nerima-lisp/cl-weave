@@ -20,7 +20,7 @@ channels:
 
 ## Verification Expectations
 
-- Keep `README.md`, `docs/src/reference/ai-contract.md`, and metadata `distributionChannels`
+- Keep `README.md` and metadata `distributionChannels`
   synchronized when install or run commands change.
 - For a release or production deployment, consume an immutable Git revision
   rather than an unqualified branch reference. Record that revision alongside

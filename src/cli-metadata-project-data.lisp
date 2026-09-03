@@ -25,9 +25,6 @@
   '((:name "readme"
      :path "README.md"
      :description "Primary user-facing guide and CLI reference.")
-    (:name "ai-contract"
-     :path "docs/src/reference/ai-contract.md"
-     :description "Machine-readable contract and metadata normalization guide.")
     (:name "adoption-guide"
      :path "docs/src/guide/adoption.md"
      :description "Native adoption guide and downstream integration plan.")
@@ -216,7 +213,7 @@
      ,(concatenate 'string
                    "Keep distributionChannels, README.md, and docs/src/project/distribution-policy.md "
                    "synchronized when install paths change.")
-     "Update tests and docs/src/reference/ai-contract.md when a machine-readable contract changes.")))
+     "Update tests and documentation when a machine-readable contract changes.")))
 
 (defparameter *metadata-continuous-integration*
   '(:policy-document "docs/src/project/release-process.md"

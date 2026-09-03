@@ -64,7 +64,7 @@ using `=`, `/=`, `<`, `<=`, `>`, `>=`, `eql`, `equal`, `equalp`, `string=`, or
 
 The failure report includes the original predicate and a list of operand forms
 with their evaluated values, which is intended to be both REPL-friendly and
-AI-friendly. Any other bare form is checked as truthy.
+Convenient for command-line use. Any other bare form is checked as truthy.
 
 `with-snapshot-updates` enables deterministic external snapshot creation and
 updates inside a dynamic scope. For command-line usage,

@@ -47,11 +47,11 @@ An unmet gate exits nonzero even when no HTML report was requested.
 timeout 360s nix run . -- run cl-weave/test --coverage --coverage-system cl-weave --coverage-min-expression 80 --coverage-min-branch 70 --coverage-output cl-weave.coverage
 ```
 
-The `:sexp` reporter is the stable Lisp-native AI interface. The `:json`
+The `:sexp` reporter is the stable Lisp-native interface. The `:json`
 reporter is the stable external-tool interface. The `:jsonl` reporter emits one
 JSON object per line for streaming CI logs and agent ingestion. These structured
 reporters include failed and errored path summaries for focused reruns. See
-[AI Contract](../reference/ai-contract.md). The metadata root also advertises this canonical
+The metadata root also advertises this canonical
 non-policy path through `referenceDocuments`, plus support
 and lifecycle contracts through `supportChannels`, `securityContacts`,
 `lifecycle`, `runtimeSupport`, and `releaseProcess`.
@@ -114,7 +114,7 @@ The workflow runs on Linux (x86_64-linux), then uploads `cl-weave-results.json`,
 `cl-weave-cli-results.json`, `cl-weave-metadata.json`, `cl-weave-plan.json`,
 `cl-weave-watch-once.json`, `cl-weave-tap.txt`, and `cl-weave-junit.xml` as
 `cl-weave-test-reports-x86_64-linux` artifacts. JSON result
-schema v6 is intended for AI agents and external automation: the root object
+schema v6 is intended for external automation: the root object
 identifies itself with `kind: "test-results"`, and every event includes both a
 machine `path` and a stable Vitest-style `pathString`, while assertion payloads
 stay structurally typed for agent consumption. Ordered cleanup and hook failures

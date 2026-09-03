@@ -5,9 +5,6 @@
     (let* ((adoption-document (read-text-file
                                 (merge-pathnames #P"docs/src/guide/adoption.md"
                                                  (uiop:getcwd))))
-           (ai-discovery-document (read-text-file
-                                    (merge-pathnames #P"docs/src/guide/ai-discovery.md"
-                                                     (uiop:getcwd))))
            (ci-document (read-text-file
                          (merge-pathnames #P"docs/src/guide/reporters-and-ci.md"
                                           (uiop:getcwd))))
@@ -15,7 +12,6 @@
            (metadata (cl-weave/metadata:framework-metadata))
            (gates (getf metadata :quality-gates)))
       (expect adoption-document :to-contain "# Adoption Guide")
-      (expect ai-discovery-document :to-contain "# AI Discovery")
       (expect ci-document :to-contain "## CI")
       (dolist (gate gates)
         (expect normalized-ci-document
@@ -352,7 +348,6 @@
             (getf (cl-weave/metadata:framework-metadata) :capability-matrix)))
       (dolist (capability-name '("structured-reporting"
                                  "artifact-schemas"
-                                 "ai-discovery-metadata"
                                  "public-package-exports"))
         (let* ((entry (find-metadata-entry :name capability-name capability-matrix))
                (public-apis (getf entry :public-apis)))

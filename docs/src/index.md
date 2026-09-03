@@ -60,11 +60,10 @@ run in CI, embed in ASDF projects, and extend from the REPL.
     ---
 
     Filtering, sharding, sequencing, bail, and watch mode; spec/JSON/TAP/JUnit
-    reporters; SBCL coverage artifacts; and the machine-readable AI contract.
+    reporters and SBCL coverage artifacts.
 
     [:octicons-arrow-right-24: Test Execution](guide/test-execution.md) ·
     [Reporters & CI](guide/reporters-and-ci.md) ·
-    [AI Discovery](guide/ai-discovery.md)
 
 </div>
 
@@ -92,9 +91,9 @@ major version:
 - `describe-only` / `it-only` focused runs
 - `describe-todo` / `it-todo` todo suites and cases
 - Vitest-style test name filtering for focused local and CI runs
-- Vitest-style test discovery list mode for AI agents and CI tooling
+- Vitest-style test discovery list mode for CI tooling
 - declarative logic-query engine (`logic-program`, `logic-run`, `test-plan-where`, `journal-where`) for querying the test plan and time-travel journal as Prolog-style facts
-- AI-friendly CLI metadata for typed/enumerated options, artifact schemas with field maps, capability matrix, package exports, policy documents, matchers, mutations, and MOP architecture assertions
+- CLI metadata for typed/enumerated options, artifact schemas with field maps, capability matrix, package exports, policy documents, matchers, mutations, and MOP architecture assertions
 - source file metadata in structured reporters and test plans
 - Vitest-style deterministic sequence ordering for flaky-test reproduction
 - time-travel execution journal recording an assertion/mock-call/hook/shrink-step/note timeline per attempt, surfaced in the spec and JSON reporters
@@ -137,13 +136,11 @@ major version:
   query engine behind declarative test-plan queries.
 - [Reporters and CI](guide/reporters-and-ci.md) — reporter formats, coverage, and
   the GitHub Actions pipeline.
-- [AI Discovery](guide/ai-discovery.md) — the machine-readable metadata contract
   for agents and generators.
 
 ## Reference Map
 
 - [API Reference](reference/api.md) — every exported symbol, grouped by concept.
-- [AI Contract](reference/ai-contract.md) — the frozen artifact and metadata schemas.
 - [Runtime Support](reference/runtime-support.md) — supported implementations and
   platforms.
 - [Doctor Report](reference/doctor-report.md) — the `doctor` health checks.
@@ -185,7 +182,6 @@ for vulnerability reporting. Do not put exploit details in a public issue.
 ## Project Operations
 
 - Adoption guide: [docs/src/guide/adoption.md](guide/adoption.md)
-- AI contract: [docs/src/reference/ai-contract.md](reference/ai-contract.md)
 - Issue reporting guide: [docs/src/project/issue-reporting.md](project/issue-reporting.md)
 - Pull request guidance: [docs/src/project/pull-request-template.md](project/pull-request-template.md)
 - Pull request form: [.github/pull_request_template.md](https://github.com/nerima-lisp/cl-weave/blob/main/.github/pull_request_template.md)

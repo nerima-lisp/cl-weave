@@ -27,7 +27,6 @@
     "timeout"
     "mop-architecture-assertions"
     "logic-test-plan"
-    "ai-discovery-metadata"
     "public-package-exports"
     "cps-continuation-helpers"
     "time-travel-debugging"
@@ -37,7 +36,7 @@
     "journal-logic-queries"))
 
 (defparameter *metadata-standard-documentation*
-  '("README.md" "docs/src/reference/ai-contract.md"))
+  '("README.md"))
 
 (defparameter *metadata-quality-gates-json-results*
   '("flake-check" "json-results-artifact"))
@@ -222,10 +221,9 @@
      :status "implemented"
      :summary ,(concatenate 'string
                             "Artifact schema metadata defines machine-readable contracts for AI "
-                            "metadata, JSON results, JSONL events, and plan outputs.")
+                            "JSON results, JSONL events, and plan outputs.")
      :public-apis ("reporter-artifact-schemas" "framework-metadata")
-     :quality-gates ("ai-metadata-artifact" "json-results-artifact"
-                     "jsonl-events-artifact" "plan-artifact")
+     :quality-gates ("json-results-artifact" "jsonl-events-artifact" "plan-artifact")
      :documentation ,*metadata-standard-documentation*)
     (:name "sequence-ordering"
      :status "implemented"
@@ -258,7 +256,7 @@
                             "MOP-aware matcher metadata documents architecture assertions for "
                             "slots and specialized methods.")
      :public-apis ("list-matchers" "matcher-metadata")
-     :quality-gates ("flake-check" "ai-metadata-artifact")
+     :quality-gates ("flake-check")
      :documentation ,*metadata-standard-documentation*)
     (:name "logic-test-plan"
      :status "implemented"
@@ -269,15 +267,6 @@
                    "test-plan-where")
      :quality-gates ("plan-artifact" "flake-check")
      :documentation ,*metadata-standard-documentation*)
-    (:name "ai-discovery-metadata"
-     :status "implemented"
-     :summary ,(concatenate 'string
-                            "Machine-readable CLI discovery, package exports, matcher metadata, "
-                            "mutation operators, and quality gates.")
-     :public-apis ("reporter-artifact-schemas" "framework-metadata"
-                   "list-matchers" "list-mutation-operators")
-     :quality-gates ("ai-metadata-artifact" "flake-check")
-     :documentation ,*metadata-standard-documentation*)
     (:name "public-package-exports"
      :status "implemented"
      :summary ,(concatenate 'string
@@ -285,7 +274,7 @@
                             "both core and CLI packages.")
      :public-apis ("framework-metadata" "list-matchers"
                    "list-mutation-operators")
-     :quality-gates ("ai-metadata-artifact" "flake-check")
+     :quality-gates ("flake-check")
      :documentation ,*metadata-standard-documentation*)
     (:name "cps-continuation-helpers"
      :status "implemented"

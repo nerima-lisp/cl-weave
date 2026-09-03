@@ -62,7 +62,7 @@ framework readiness without guessing from examples. Every advertised
 capability has a corresponding readiness entry; highlighted areas include
 `vitest-dsl`, `expect-matchers`, `fixtures-and-restarts`, `mocks-and-spies`,
 `property-and-mutation`, `structured-reporting`, `watch-and-parallelism`,
-`isolation-and-cps`, and `ai-discovery-metadata`.
+`isolation-and-cps`.
 
 ## Quick Start
 
@@ -111,5 +111,5 @@ Lisp-side agents can read the full structured framework metadata with
 `(cl-weave:reporter-artifact-schemas)` without shelling out to the CLI.
 
 See the [Adoption Guide](guide/adoption.md) for integrating `cl-weave` into an
-existing ASDF project, and [AI Discovery](guide/ai-discovery.md) for how agents and
+existing ASDF project for how automation and
 generators should consume runtime metadata instead of scraping prose.

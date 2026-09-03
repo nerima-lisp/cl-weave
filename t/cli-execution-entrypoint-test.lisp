@@ -574,7 +574,7 @@
             message))))))
 
 (it
-  "prints AI-friendly command usage"
+  "prints clear command usage"
   (let ((usage (cl-weave/cli::cli-usage)))
     (expect usage :to-contain "cl-weave run [SYSTEM] [options]")
     (expect usage :to-contain "cl-weave doctor [SYSTEM] [options]")

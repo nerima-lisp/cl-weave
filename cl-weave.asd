@@ -192,8 +192,7 @@
    (:file "helpers-workflow")
    (:file "cli-options-test")
    (:file "cli-execution-test")
-   (:file "cli-metadata-json-schema-test")
-   (:file "cli-metadata-reporting-test")
+
    (:file "cli-metadata-doctor-test")
    (:file "cli-metadata-project-data-links-test")
    (:file "cli-metadata-reporting-artifact-test")
@@ -202,7 +201,6 @@
    (:file "cli-metadata-project-data-contracts-test")
    (:file "cli-execution-entrypoint-test")
    (:file "cli-image-test")
-   (:file "cli-metadata-project-data-community-health-test")
    (:file "watch-asdf-integration-test")
    (:file "watch-discovery-test")
    (:file "watch-scope-test")

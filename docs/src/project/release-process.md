@@ -18,7 +18,7 @@ For public-surface discipline and migration expectations, see
 
 1. Bump the version string in lockstep across `cl-weave.asd` (`:version`) and
    the `"version"` field in the embedded JSON contract in
-   `docs/src/reference/ai-contract.md`. (`flake.nix` derives its package version from the
+   metadata documentation. (`flake.nix` derives its package version from the
    `.asd` `:version`, so it needs no manual edit.) Choose the major/minor/patch
    increment per the [versioning policy](versioning-policy.md).
 2. Run the full test suite.
@@ -64,5 +64,5 @@ never reaches downstream.
   maintenance policy.
 - Keep `distributionChannels`, `README.md`, and
   `docs/src/project/distribution-policy.md` synchronized when install paths change.
-- Update tests and `docs/src/reference/ai-contract.md` when a machine-readable contract
+- Update tests and documentation when a machine-readable contract
   changes.

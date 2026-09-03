@@ -310,24 +310,6 @@
               ];
             };
 
-            ai-metadata-artifact = mkCheck {
-              name = "cl-weave-ai-metadata-artifact";
-              timeoutSeconds = 120;
-              command = [
-                packaged-cli
-                "metadata"
-                "cl-weave/test"
-                "--reporter"
-                "json"
-                "--output"
-                "cl-weave-metadata.json"
-              ];
-              artifacts = [ "cl-weave-metadata.json" ];
-              validationCommands = [
-                ''jq -e '.schemaVersion == 23 and .kind == "cl-weave-metadata"' cl-weave-metadata.json >/dev/null''
-              ];
-            };
-
             plan-artifact = mkCheck {
               name = "cl-weave-plan-artifact";
               timeoutSeconds = 120;

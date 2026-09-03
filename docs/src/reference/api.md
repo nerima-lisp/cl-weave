@@ -13,7 +13,6 @@ Two further packages are public. `cl-weave/metadata` exports
 `framework-metadata`, `*metadata-commands*`, `*metadata-cli-options*`,
 `metadata-cli-options`, `cli-option-usage-lines`, `cli-version` and
 `write-doctor-report-json`, which are the Lisp side of the contract described in
-[AI Discovery](../guide/ai-discovery.md) and [AI Contract](ai-contract.md).
 `cl-weave/cli` exports `main`, the entry point of the packaged executable.
 
 Anything not listed on this page is internal and may change without a major
@@ -186,7 +185,6 @@ dynamic variables that filter and order selection. See
 Entry points for running a suite, a system or a watch loop, the reporter
 inventory and artifact schemas, result status normalization, and the
 machine-readable framework metadata. See
-[Reporters and CI](../guide/reporters-and-ci.md) and [AI Discovery](../guide/ai-discovery.md).
 
 `run`, `run-all`, `run-system`, `watch-system`, `run-reporters`,
 `list-reporters`, `reporter-artifact-schemas`, `results-status`, `explain!`,

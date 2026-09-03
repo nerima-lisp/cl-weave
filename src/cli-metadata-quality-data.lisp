@@ -23,13 +23,6 @@
      :timeout-seconds 360
      :artifacts ("cl-weave-results.json")
      :description "Verify the ASDF test system can emit JSON results through the packaged CLI.")
-    (:name "ai-metadata-artifact"
-     :kind "cli"
-     :command ("nix" "run" "." "--" "metadata" "cl-weave/test"
-               "--reporter" "json" "--output" "cl-weave-metadata.json")
-     :timeout-seconds 120
-     :artifacts ("cl-weave-metadata.json")
-     :description "Verify agent discovery metadata through the packaged CLI.")
     (:name "jsonl-events-artifact"
      :kind "cli"
      :command ("nix" "run" "." "--" "run" "cl-weave/test"
