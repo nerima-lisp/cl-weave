@@ -10,7 +10,7 @@ reproducible Nix workflows. It is intentionally dependency-free at the core,
 and easy to run in CI, embed in ASDF projects, and extend from the REPL. It is
 the test framework used by every package in the nerima-lisp org.
 
-Full documentation, including the DSL guide, matcher reference, and AI
+Full documentation, including the DSL guide and matcher reference.
 discovery contract, is published at <https://nerima-lisp.github.io/cl-weave/>.
 The source for that site lives in [docs/src/](docs/src/).
 

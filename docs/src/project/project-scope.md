@@ -1,7 +1,7 @@
 # Project Scope
 
 `cl-weave` is a Common Lisp test framework that aims to provide a small,
-deterministic, AI-readable surface for test definition, execution, reporting,
+deterministic, machine-readable surface for test definition, execution, reporting,
 and migration from adjacent ecosystems.
 
 ## In Scope

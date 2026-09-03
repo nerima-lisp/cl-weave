@@ -220,7 +220,7 @@
     (:name "artifact-schemas"
      :status "implemented"
      :summary ,(concatenate 'string
-                            "Artifact schema metadata defines machine-readable contracts for AI "
+                            "Artifact schema metadata defines machine-readable contracts for tooling "
                             "JSON results, JSONL events, and plan outputs.")
      :public-apis ("reporter-artifact-schemas" "framework-metadata")
      :quality-gates ("json-results-artifact" "jsonl-events-artifact" "plan-artifact")

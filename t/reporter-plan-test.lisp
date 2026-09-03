@@ -1,7 +1,7 @@
 (in-package #:cl-weave/test)
 
 (describe "reporter test plans"
-  (it "prints AI-readable S-expression test plans"
+  (it "prints machine-readable S-expression test plans"
     (let ((output (with-output-to-string (stream)
                     (cl-weave::report-plan-sexp
                      (list (cl-weave::make-test-plan-entry
@@ -30,7 +30,7 @@
       (expect output :to-contain ":TIMEOUT-MS 250")
       (expect output :to-contain ":CONCURRENT T")))
 
-  (it "prints AI-readable JSON test plans"
+  (it "prints machine-readable JSON test plans"
     (let ((output (with-output-to-string (stream)
                     (cl-weave::report-plan-json
                      (list (cl-weave::make-test-plan-entry
@@ -61,7 +61,7 @@
       (expect output :to-contain "\"concurrent\":true")
       (expect output :to-contain "\"reason\":\"blocked\"")))
 
-  (it "prints AI-readable JSONL test plans"
+  (it "prints machine-readable JSONL test plans"
     (let ((output (with-output-to-string (stream)
                     (cl-weave::report-plan-jsonl
                      (list (cl-weave::make-test-plan-entry

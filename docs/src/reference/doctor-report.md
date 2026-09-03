@@ -130,7 +130,7 @@ Reports whether framework metadata advertises the `doctor` command.
 Interpretation:
 
 - `pass`: runtime metadata and command discovery remain aligned
-- `fail`: metadata drift exists and AI/CI discovery should be considered untrustworthy until fixed
+- `fail`: metadata drift exists and CI discovery should be considered untrustworthy until fixed
 
 ## Triage guidance
 

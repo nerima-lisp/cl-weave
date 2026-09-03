@@ -126,7 +126,7 @@ timeout 120s nix run . -- list cl-weave/test --reporter json --filter 'math'
 List mode supports `spec`, `sexp`, `json`, and `jsonl` reporters. `--output FILE`
 writes the plan payload to an artifact file.
 
-AI agents can also query plans as plain Lisp facts:
+Automation can also query plans as plain Lisp facts:
 
 ```lisp
 (cl-weave:test-plan-where

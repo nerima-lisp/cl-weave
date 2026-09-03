@@ -160,7 +160,7 @@ the repository root packages `cl-weave` as a Nix flake:
   `doctor`, `metadata`, `version`, `help`).
 - `nix run .#test` — the self-test suite through `run-tests.lisp`.
 - `nix flake check` — every CI entrypoint (test suite, reporters, coverage
-  gate, AI metadata, CLI smoke tests, `paredit-lint` structural parse check,
+  gate, CLI metadata, CLI smoke tests, `paredit-lint` structural parse check,
   the treefmt formatting gate, and the docs build) as reproducible derivations.
 - `nix build .#docs` — builds this documentation site with MkDocs (Material)
   in `--strict` mode, so broken links fail the build.

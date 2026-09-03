@@ -8,7 +8,7 @@
             :to-throw
             "cl-weave: run mode supports"))
 
-  (it "prints AI-readable S-expression results"
+  (it "prints machine-readable S-expression results"
     (let ((output (with-output-to-string (stream)
                       (cl-weave::report-sexp
                       (list (make-sample-event
@@ -60,7 +60,7 @@
       (expect output :to-contain
               (format nil "secondary condition: cleanup one~%    secondary condition: cleanup two"))))
 
-  (it "prints AI-readable JSON results"
+  (it "prints machine-readable JSON results"
     (let ((output (with-output-to-string (stream)
                     (cl-weave::report-json
                      (list (make-sample-event
@@ -134,7 +134,7 @@
       (expect output :to-contain "\"homePath\":\"\\/tmp\\/cl-weave-home\\/\"")
       (expect output :to-contain "\"expected\":{\"status\":\"pass\",\"exitCode\":0}")))
 
-  (it "prints AI-readable JSONL result streams"
+  (it "prints machine-readable JSONL result streams"
     (let ((output (with-output-to-string (stream)
                     (cl-weave::report-jsonl
                      (list (make-sample-event

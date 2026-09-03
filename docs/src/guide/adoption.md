@@ -11,7 +11,7 @@ Keep the integration surface small:
 2. Import only the symbols you use, usually `describe`, `it`, `expect`, and
    focused helpers such as `it-property`, `it-isolated`, or `with-snapshot-updates`.
 3. Keep one non-interactive command for local use and CI.
-4. Keep one machine-readable command for automation and AI tooling.
+4. Keep one machine-readable command for automation tooling.
 5. Expose both through Nix if the project already uses flakes.
 
 ## Minimal ASDF Wiring

@@ -159,7 +159,7 @@
     (expect-data-driven-custom-matcher-failure)))
 
 (describe "matcher metadata and smart assertions"
-  (it "exposes stable matcher metadata for AI tooling"
+  (it "exposes stable matcher metadata for automation tooling"
     (expect-stable-matcher-metadata)))
 
 (describe "smart assertions"

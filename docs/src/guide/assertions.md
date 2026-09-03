@@ -141,7 +141,7 @@ to 100,000 entries:
 ```
 
 Failures report `:value`, `:candidates`, `:test`, `:candidate-count`, and
-`:matched-index`, so CI and AI agents can distinguish "candidate missing" from
+`:matched-index`, so CI and automation can distinguish "candidate missing" from
 wrong matcher usage.
 
 `:to-throw` accepts an optional expected condition class designator, message
@@ -189,7 +189,7 @@ Macro-based bulk registration keeps related domain matchers together:
               '(:cache :hit)))))
 ```
 
-AI agents and generators can emit plain matcher data with `extend-expect`:
+Automation and generators can emit plain matcher data with `extend-expect`:
 
 ```lisp
 (cl-weave:extend-expect
@@ -205,7 +205,7 @@ AI agents and generators can emit plain matcher data with `extend-expect`:
         "Checks that a response plist has the expected HTTP status.")))
 ```
 
-Matcher metadata is first-class data for AI tools, documentation generators,
+Matcher metadata is first-class data for automation tools, documentation generators,
 and editor integrations:
 
 ```lisp
@@ -344,7 +344,7 @@ without ad-hoc reflection helpers:
 ```
 
 These matchers report normalized slot and method-specializer lists through the
-structured reporters, which keeps architecture tests AI-readable.
+structured reporters, which keeps architecture tests machine-readable.
 
 ## Soft Assertions
 

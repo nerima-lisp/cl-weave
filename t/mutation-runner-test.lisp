@@ -285,7 +285,7 @@
       (error (condition)
         (expect (princ-to-string condition) :to-contain "positive integer"))))
 
-  (it "prints AI-readable mutation reports"
+  (it "prints machine-readable mutation reports"
     (let* ((results (run-mutations '(+ 1 1)
                                    (lambda (form mutation)
                                      (declare (ignore mutation))

@@ -42,7 +42,7 @@ all present (descriptions elided here for brevity):
 
 The built-in operators cover arithmetic calls, comparison calls, boolean
 literals, and `if` branch swaps. `report-mutations-sexp` and
-`report-mutations-json` emit stable, AI-readable mutation reports with killed,
+`report-mutations-json` emit stable, machine-readable mutation reports with killed,
 survived, errored, and score fields. `mutation-summary` returns the same
 aggregate as a plist (`:total`, `:killed`, `:survived`, `:errored`, `:score`)
 for programmatic use, and each entry in the `run-mutations` result is a

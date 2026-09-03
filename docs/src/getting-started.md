@@ -18,7 +18,7 @@ Pick the path that matches how you want to use the framework.
     nix run github:nerima-lisp/cl-weave -- --help
     ```
 
-    Ideal for CI and AI agents that only need a single invocation.
+    Ideal for CI and automation that only need a single invocation.
 
 === "Install into your profile"
 
@@ -45,7 +45,7 @@ Pick the path that matches how you want to use the framework.
     command without the prefix, or provide GNU coreutils through your
     environment.
 
-The packaged CLI is intended for local use, CI, and AI agents.
+The packaged CLI is intended for local use, CI, and automation.
 
 ## Supported Runtime
 
