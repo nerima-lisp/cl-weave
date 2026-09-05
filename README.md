@@ -4,14 +4,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-MkDocs%20Material-0a7a5a)](https://nerima-lisp.github.io/cl-weave/)
 
-`cl-weave` is a modern Common Lisp testing framework inspired by Vitest and
-designed around Lisp's strengths: macros, conditions, dynamic bindings, and
-reproducible Nix workflows. It is intentionally dependency-free at the core,
-and easy to run in CI, embed in ASDF projects, and extend from the REPL. It is
-the test framework used by every package in the nerima-lisp org.
+`cl-weave` is a Common Lisp testing framework inspired by Vitest and designed
+around Lisp's strengths: macros, conditions, dynamic bindings, and reproducible
+Nix workflows. Its core has no dependencies; it runs in CI, embeds in ASDF
+projects, and can be extended from the REPL. It is the test framework used by
+every package in the nerima-lisp org.
 
-Full documentation, including the DSL guide and matcher reference.
-discovery contract, is published at <https://nerima-lisp.github.io/cl-weave/>.
+Full documentation, including the DSL guide, matcher reference, and discovery
+contract, is published at <https://nerima-lisp.github.io/cl-weave/>.
 The source for that site lives in [docs/src/](docs/src/).
 
 ## Quick Start

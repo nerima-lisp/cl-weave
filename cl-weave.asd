@@ -1,7 +1,7 @@
 (in-package #:asdf-user)
 
 (defsystem "cl-weave"
-  :description "A modern Common Lisp testing framework inspired by Vitest."
+  :description "A Common Lisp testing framework inspired by Vitest."
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"

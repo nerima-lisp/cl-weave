@@ -1,5 +1,5 @@
 {
-  description = "cl-weave: a modern Common Lisp testing framework";
+  description = "cl-weave: a Common Lisp testing framework";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -34,7 +34,7 @@
       ];
 
       meta = {
-        description = "A modern, Vitest-inspired Common Lisp testing framework";
+        description = "A Vitest-inspired Common Lisp testing framework";
         homepage = "https://github.com/nerima-lisp/cl-weave";
         license = lib.licenses.mit;
         platforms = lib.platforms.unix;

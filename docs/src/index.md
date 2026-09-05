@@ -1,15 +1,15 @@
 # cl-weave
 
-`cl-weave` is a modern Common Lisp testing framework inspired by Vitest and
-designed around Lisp's strengths: macros, conditions, dynamic bindings, and
-reproducible Nix workflows.
+`cl-weave` is a Common Lisp testing framework inspired by Vitest and designed
+around Lisp's strengths: macros, conditions, dynamic bindings, and reproducible
+Nix workflows.
 
-The project is intentionally dependency-free at the core. It should be easy to
-run in CI, embed in ASDF projects, and extend from the REPL.
+The core has no dependencies; it runs in CI, embeds in ASDF projects, and can be
+extended from the REPL.
 
 !!! tip "New to cl-weave?"
 
-    Install it in one command, then write your first suite in under a minute:
+    Install it in one command and continue with the quick start guide:
 
     ```sh
     nix run github:nerima-lisp/cl-weave -- --help   # run without installing
