@@ -11,7 +11,7 @@ Property generators are plain data objects. `it-property` runs generated example
 through the normal assertion engine, then reports the original failing values and
 the minimized values through the same structured `assertion-failure` path used by
 `expect`. Failure payloads also include the seed and zero-based generated case
-index, so CI and agents can reproduce the run with `CL_WEAVE_PROPERTY_SEED`.
+index, so CI can reproduce the run with `CL_WEAVE_PROPERTY_SEED`.
 
 ## Built-In Generators
 

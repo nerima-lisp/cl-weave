@@ -38,7 +38,7 @@
                "--fail-with-no-tests" "--output" "cl-weave-plan.json")
      :timeout-seconds 120
      :artifacts ("cl-weave-plan.json")
-     :description "Verify machine-readable test discovery output for agents.")
+     :description "Verify machine-readable test discovery output for CI tooling.")
     (:name "watch-once-artifact"
      :kind "cli"
      :command ("nix" "run" "." "--" "watch" "cl-weave/test"

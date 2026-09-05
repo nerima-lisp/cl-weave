@@ -1,7 +1,7 @@
 # Governance
 
 `cl-weave` is maintained as a small, review-driven project. This document makes
-the maintainer operating model explicit so contributors and agents can tell how
+the maintainer operating model explicit so contributors can tell how
 decisions, reviews, and release authority work.
 
 ## Maintainer Role

@@ -136,7 +136,6 @@ major version:
   query engine behind declarative test-plan queries.
 - [Reporters and CI](guide/reporters-and-ci.md) — reporter formats, coverage, and
   the GitHub Actions pipeline.
-  for agents and generators.
 
 ## Reference Map
 
@@ -207,7 +206,8 @@ for vulnerability reporting. Do not put exploit details in a public issue.
 Runtime metadata mirrors these operations surfaces through `policyDocuments`,
 `referenceDocuments`, `supportChannels`, `communityHealth`,
 `securityContacts`, `lifecycle`, `runtimeSupport`, and `releaseProcess` for
-agent-side OSS operations discovery.
+so maintainers and contributors can find project policies and support channels
+in one place.
 
 ## License
 

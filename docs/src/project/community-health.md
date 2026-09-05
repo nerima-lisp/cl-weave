@@ -37,5 +37,5 @@ entrypoints for bugs, feature proposals, and pull requests.
 - Review ownership and process authority are anchored to
   [docs/src/project/governance.md](governance.md).
 
-Keep these files synchronized with `cl-weave metadata` so agents can discover
+Keep these files synchronized with `cl-weave metadata` so contributors can find
 the same intake contract without scraping GitHub UI state.

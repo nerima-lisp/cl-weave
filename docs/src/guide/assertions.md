@@ -69,10 +69,10 @@ Convenient for command-line use. Any other bare form is checked as truthy.
 `with-snapshot-updates` enables deterministic external snapshot creation and
 updates inside a dynamic scope. For command-line usage,
 `CL_WEAVE_UPDATE_SNAPSHOTS=1`, `CL_WEAVE_SNAPSHOT_DIR`, and
-`CL_WEAVE_SNAPSHOT_FILE` provide the same dynamic settings for CI and agents.
+`CL_WEAVE_SNAPSHOT_FILE` provide the same dynamic settings for CI and automation.
 External snapshot failures report `:snapshot-key`, `:snapshot-file`, `:value`,
 `:reason`, and first-difference data through the normal structured assertion
-payload, so agents do not need to parse human-readable failure strings.
+payload, so callers do not need to parse human-readable failure strings.
 `:to-match-snapshot-sequence` stores a list or non-string vector of replay
 states as deterministic `prefix[n]` snapshot keys, for example `vm/run[0]` and
 `vm/run[1]`. Snapshot update mode replaces all entries for that prefix, which
@@ -81,7 +81,7 @@ extra stored states and adds `:snapshot-prefix`, `:snapshot-index`, and
 `:snapshot-count` to the structured payload.
 `snapshot-entries` returns the current external snapshot alist, and
 `snapshot-value` returns the serialized value plus a presence flag for one
-explicit key. These APIs are intended for replay tools and CI agents that need
+explicit key. These APIs are intended for replay tools and CI automation that need
 to inspect snapshot artifacts without depending on private file readers.
 
 ## Built-In Matchers
@@ -278,7 +278,7 @@ requiring object identity:
 ```
 
 Failures report the searched `:container`, expected `:value`, and comparison
-`:test`, allowing reporters and agents to explain whether the failure came from
+`:test`, allowing reporters to explain whether the failure came from
 membership or equality semantics.
 
 `:to-match-object` mirrors Vitest `toMatchObject(subset)` for Lisp records.
@@ -297,7 +297,7 @@ element-by-element with the same length and order:
 
 Failures report the original `:value`, requested `:subset`, and a normalized
 `:failure` payload with `:path`, `:reason`, `:actual-value`, and
-`:expected-value`. This gives humans and agents a stable explanation of the
+`:expected-value`. This gives callers a stable explanation of the
 first divergent property.
 
 `:to-have-property` is Vitest-style `toHaveProperty(path, value?)` for Lisp

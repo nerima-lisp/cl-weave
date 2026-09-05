@@ -110,7 +110,7 @@ nix run . -- run cl-weave/test --reporter json --output cl-weave-results.json
 If a project already has a flake, mirror those commands for the project's test
 system name so `nix develop` and CI execute the same path.
 
-## CI And Agents
+## CI And Automation
 
 Prefer the metadata command in automation instead of scraping README prose or
 reporter examples:

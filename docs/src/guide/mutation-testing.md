@@ -27,7 +27,7 @@ Mutation operators are data-backed and macro-extensible:
 
 The first string form in `defmutation-operator` becomes stable operator
 metadata. `list-mutation-operators` returns deterministic plist metadata for
-CI tools and agents — **every** registered operator, sorted by name. After the
+CI tools — **every** registered operator, sorted by name. After the
 `:keyword-toggle` definition above, the four built-ins and the new operator are
 all present (descriptions elided here for brevity):
 

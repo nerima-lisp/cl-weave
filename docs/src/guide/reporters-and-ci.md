@@ -49,7 +49,7 @@ timeout 360s nix run . -- run cl-weave/test --coverage --coverage-system cl-weav
 
 The `:sexp` reporter is the stable Lisp-native interface. The `:json`
 reporter is the stable external-tool interface. The `:jsonl` reporter emits one
-JSON object per line for streaming CI logs and agent ingestion. These structured
+JSON object per line for streaming CI logs and downstream tooling. These structured
 reporters include failed and errored path summaries for focused reruns. See
 The metadata root also advertises this canonical
 non-policy path through `referenceDocuments`, plus support
@@ -117,13 +117,13 @@ The workflow runs on Linux (x86_64-linux), then uploads `cl-weave-results.json`,
 schema v6 is intended for external automation: the root object
 identifies itself with `kind: "test-results"`, and every event includes both a
 machine `path` and a stable Vitest-style `pathString`, while assertion payloads
-stay structurally typed for agent consumption. Ordered cleanup and hook failures
+stay structurally typed for downstream tooling. Ordered cleanup and hook failures
 are retained as `secondaryConditions`. Each event also carries a `timeline`
 array (the execution-journal frames when `--journal` is enabled, otherwise
 empty) and a `replaySeed` (the per-test deterministic seed, or `null`), so
-agents can inspect the recorded lead-up to a failure and reproduce it. JSONL event schema v3 is intended
+tooling can inspect the recorded lead-up to a failure and reproduce it. JSONL event schema v3 is intended
 for streaming automation, coverage is intended for SBCL-side inspection,
-metadata is intended for agent discovery, one-shot watch output is intended for
+metadata is intended for project tooling, one-shot watch output is intended for
 automation that needs watch resolution without entering a polling loop, TAP is
 intended for portable smoke output, and JUnit is intended for CI test result
 ingestion.

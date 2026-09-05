@@ -63,7 +63,7 @@ and `it-todo-each`, and with the suite-level table variants
 `describe-only-each`, `describe-skip-each`, and `describe-todo-each`. Fixture
 hooks use the canonical Lisp names.
 The metadata output is the machine-readable normalization
-contract for agents. Runtime metadata also exposes `referenceDocuments`,
+contract for tooling. Runtime metadata also exposes `referenceDocuments`,
 `supportChannels`, `securityContacts`, `lifecycle`,
 `runtimeSupport`, and `releaseProcess` so external tools can discover
 canonical docs, support routing, disclosure paths,

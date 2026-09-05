@@ -81,7 +81,6 @@ jobs:
             ".#checks.x86_64-linux.json-results-artifact" \
             ".#checks.x86_64-linux.jsonl-events-artifact" \
             ".#checks.x86_64-linux.cli-json-results" \
-            ".#checks.x86_64-linux.ai-metadata-artifact" \
             ".#checks.x86_64-linux.plan-artifact" \
             ".#checks.x86_64-linux.watch-once-artifact" \
             ".#checks.x86_64-linux.tap-artifact" \

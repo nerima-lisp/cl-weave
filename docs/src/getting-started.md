@@ -57,8 +57,8 @@ pass there.
 
 ### Capability Matrix
 
-Runtime metadata exposes `capabilityMatrix` so humans and agents can evaluate
-framework readiness without guessing from examples. Every advertised
+Runtime metadata exposes `capabilityMatrix` so framework readiness is explicit
+instead of being inferred from examples. Every advertised
 capability has a corresponding readiness entry; highlighted areas include
 `vitest-dsl`, `expect-matchers`, `fixtures-and-restarts`, `mocks-and-spies`,
 `property-and-mutation`, `structured-reporting`, `watch-and-parallelism`,
@@ -106,7 +106,7 @@ timeout 360s nix run . -- watch cl-weave/test --filter parser
 timeout 120s nix run . -- watch cl-weave/test --once --reporter json --filter 'math > adds' --output cl-weave-watch-once.json
 ```
 
-Lisp-side agents can read the full structured framework metadata with
+Lisp code can read the full structured framework metadata with
 `(cl-weave:framework-metadata)` and the artifact-only contract with
 `(cl-weave:reporter-artifact-schemas)` without shelling out to the CLI.
 

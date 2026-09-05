@@ -1,6 +1,6 @@
 # doctor-report
 
-`cl-weave doctor` is the machine-readable self-diagnostic entrypoint for CI, agents, and local triage.
+`cl-weave doctor` is the machine-readable self-diagnostic entrypoint for CI and local triage.
 
 ## Purpose
 
@@ -147,7 +147,7 @@ When `workspace-asd-files` warns but `requested-system` passes, treat the warnin
 
 ## CI usage
 
-For CI and agent runs, prefer emitting `doctor-report` before deeper operations when environment drift is plausible. A minimal sequence is:
+For CI runs, prefer emitting `doctor-report` before deeper operations when environment drift is plausible. A minimal sequence is:
 
 1. Run `cl-weave doctor --reporter json --output doctor-report.json`
 2. Inspect `checks`
