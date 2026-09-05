@@ -1,55 +1,18 @@
 (in-package #:asdf-user)
 
 (defsystem "cl-weave"
-  ;; All eight metadata fields are mandatory across the org: :homepage,
-  ;; :bug-tracker and :source-control are what let a consumer find the project
-  ;; from an ASDF or Quicklisp listing alone.
-  :description "A modern Common Lisp testing framework inspired by Vitest."
+  :description "A Common Lisp testing framework inspired by Vitest."
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  ;; Single source of truth for the version. flake.nix reads this form, and
-  ;; release.yml refuses to publish a tag that disagrees with it.
   :version "1.3.0"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
-  ;; How the `cl-weave` executable is delivered belongs here, not in a build
-  ;; system: `(asdf:operate 'asdf:program-op "cl-weave")` and `nix build` must
-  ;; produce the same binary, and a save-lisp-and-die chain written out in Nix
-  ;; gives the two places to disagree about the entry point.
   :build-operation "program-op"
-  ;; `:build-pathname` is merged against this *system's own* :pathname, which
-  ;; is "src" below -- so a bare "cl-weave" here would land the executable at
-  ;; src/cl-weave, not at the project root where cl-nix-forge's packaging step
-  ;; (and a developer running `asdf:make` from this directory) expects it. The
-  ;; ".." walks back out of "src" to the .asd's own directory.
   :build-pathname "../cl-weave"
   :entry-point "cl-weave/cli::image-entry-point"
-  ;; sb-cover ships with SBCL, so this is not an external dependency; it is
-  ;; declared because `cl-weave run --coverage` needs it *inside* a dumped
-  ;; image, where REQUIRE can no longer reach SBCL's contrib directory.
-  ;; Saying it here rather than in the build makes the image, a plain
-  ;; `sbcl --script`, and a REPL all agree on what the system needs.
-  ;;
-  ;; Guarded `#+sbcl`: src/runner-coverage.lisp (this system's one consumer
-  ;; of SB-COVER) already handles its absence gracefully at runtime --
-  ;; every reference is a dynamic FIND-PACKAGE/FIND-SYSTEM lookup or sits
-  ;; inside its own `#+sbcl`/`#-sbcl` split in REQUIRE-COVERAGE-SUPPORT,
-  ;; which signals COVERAGE-UNAVAILABLE on a non-SBCL implementation rather
-  ;; than assuming SB-COVER exists. An unconditional `:depends-on` here
-  ;; overrode that portable design and made the whole system, needed just to
-  ;; use the test DSL, fail to load on any non-SBCL implementation at all --
-  ;; found when a downstream consumer (cl-cli) tried bumping past v1.0.0 and
-  ;; hit "Module error: Don't know how to REQUIRE sb-cover" building for
-  ;; ECL. `#+sbcl` here reproduces the exact same dependency on SBCL (so the
-  ;; dumped-image behavior above is unchanged) while producing an empty
-  ;; `:depends-on ()` everywhere else.
   :depends-on (#+sbcl (:require "sb-cover"))
-  ;; :pathname, not a (:module "src" ...) wrapper. The module added no nesting
-  ;; -- it named the same one directory :pathname names -- and cost every
-  ;; component an extra indent level. PACKAGE_STANDARD.md normalises that shape
-  ;; to :pathname so one structure has one spelling across the org.
   :pathname "src"
   :serial t
   :components
@@ -137,9 +100,6 @@
    (:file "cli-execution")
    (:file "cli-image"))
   :in-order-to ((test-op (test-op "cl-weave/test"))))
-
-;;; The test system is `cl-weave/test` (singular, slash-separated) with its
-;;; sources under t/. It is NOT `cl-weave-test` and NOT `cl-weave/tests`.
 (defsystem "cl-weave/test"
   :description "Self tests for cl-weave."
   :author "takeokunn <bararararatty@gmail.com>"
@@ -149,7 +109,6 @@
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
-  ;; cl-weave is its own test framework, so the suite depends on nothing else.
   :depends-on ("cl-weave")
   :pathname "t"
   :serial t

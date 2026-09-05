@@ -10,7 +10,7 @@ strict: true
 
 site_name: cl-weave
 site_description: >-
-  A modern Common Lisp testing framework inspired by Vitest — macros,
+  A Common Lisp testing framework inspired by Vitest — macros,
   conditions, dynamic bindings, and reproducible Nix workflows.
 site_author: cl-weave contributors
 site_url: https://nerima-lisp.github.io/cl-weave/

@@ -438,16 +438,6 @@
       ;; channel's documented commands installing and running something that
       ;; is not a command-line tool, so that is the property to hold.
       ;;
-      ;; What holds it has changed twice, and the assertion has followed it
-      ;; both times rather than the property being weakened. It was
-      ;; `packages = forAllSystems` while the flake emitted every output by
-      ;; hand; then `packages.default =`/`apps.default =` while the flake
-      ;; overrode the preset's two defaults itself; it is `executable` now,
-      ;; because cl-nix-forge's `mkPackageFlake` takes that argument and
-      ;; generates BOTH attributes from it. There is no override line left to
-      ;; find -- the guarantee moved from this file remembering to write one
-      ;; into the preset, which is strictly stronger. Removing `executable`
-      ;; is what would regress the channel, so that is the line to hold.
       (expect flake :to-contain "executable = {")
       ;; `mainProgram` is not decoration here. cl-nix-forge's `mkApp` derives
       ;; the app's `program` through `lib.getExe`, which reads exactly this
@@ -510,10 +500,6 @@
     ;; them back beside those sources -- two builds sharing one output
     ;; directory is how concurrent runs race on a FASL.
     ;;
-    ;; This used to grep flake.nix for a save-lisp-and-die string. The logic
-    ;; is src/cli-image.lisp's now, so the gate reads the configuration the
-    ;; .asd's own declared entry point actually installs instead of asserting
-    ;; that a build file still contains a particular sentence.
     (let ((translations (declared-image-output-translations "cl-weave")))
       (expect (first translations) :to-be :output-translations)
       (expect translations
