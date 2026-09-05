@@ -15,19 +15,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # One job on purpose. Granularity belongs in the flake's `checks.*`
-  # attributes, which `nix flake check` evaluates in parallel with build
-  # caching. Splitting these into separate GitHub jobs would duplicate that
-  # scheduling and lose cache sharing between them.
-  #
-  # Add a second job ONLY for work the Nix sandbox cannot do: network access,
-  # a real PTY/TTY, or artifact upload. "A different runner OS" is no longer
-  # one of them: as of the 2026-08-01 revision flake.nix declares x86_64-linux
-  # alone, so no other runner has an output to check.
-  #
-  # The one-element matrix that used to sit here is deleted rather than left in
-  # place. A one-element matrix signals an intent to add a second platform, and
-  # there is none. See PACKAGE_STANDARD.md "CI の粒度".
   check:
     name: nix flake check
     runs-on: ubuntu-latest
@@ -50,29 +37,12 @@ jobs:
           # keeps a same-repo PR from reading the secret. Empty token => pull-only.
           cachix-auth-token: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}
 
-      # Runs the SBCL self-test suite (checks.default), the treefmt formatting
-      # gate (checks.formatting), the mkdocs --strict build (checks.docs), and
-      # the reporter/artifact contract checks.
-      # No `--all-systems`. `systems` is a single element, so it would not
-      # widen the check; and it realises derivations rather than merely
-      # evaluating them, which is how a foreign attribute fails with "platform
-      # mismatch" instead of being skipped.
+      # Run the test, formatting, documentation, and artifact checks.
       - name: Run flake checks
         timeout-minutes: 15
-        # --max-jobs 2 tuned for the 16 GB GitHub-hosted runner: each SBCL check
-        # caps at a 4 GB dynamic space, so two in parallel stay well within RAM.
-        # Lower to 1 if OOM appears on a smaller runner.
-        #
-        # 900s, not 600s: pull_request runs never push to Cachix (see the
-        # cachix-auth-token gating above), so every PR compiles paredit-cli's
-        # Rust workspace from scratch. That release-profile LTO build alone
-        # can take 6+ minutes on a cold cache, which pushed total step time
-        # past 600s and timed out two consecutive PR runs after the v1.3.0
-        # bump in PR #34.
         run: timeout 900s nix flake check --print-build-logs --max-jobs 2
 
-      # Artifact upload is the one thing the Nix sandbox cannot do, so the
-      # reporter outputs are realised here and handed to upload-artifact.
+      # Materialize outputs outside the Nix sandbox for upload.
       - name: Materialize check artifacts
         timeout-minutes: 2
         run: |
