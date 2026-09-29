@@ -5,7 +5,7 @@
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "1.3.0"
+  :version "1.4.0"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
@@ -105,7 +105,7 @@
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "1.3.0"
+  :version "1.4.0"
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")

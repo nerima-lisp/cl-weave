@@ -180,44 +180,25 @@ coverage-systems list, so it stays O(1) per requested system."
           (funcall callback stream))
         (funcall callback *standard-output*))))
 
-(defun shared-execution-argument-pairs (options)
-  (list :reporter (cli-options-reporter options)
-        :name-filter (cli-options-name-filter options)
-        :shard (cli-options-shard options)
-        :order (cli-options-order options)
-        :seed (cli-options-seed options)))
-
 (defun run-execution-argument-pairs (options)
   (let ((system-pathnames
           (loop for system in (cli-options-coverage-systems options)
                 do (ensure-requested-system-visible system options)
                 append (cl-weave::asdf-system-files system))))
-  (append (shared-execution-argument-pairs options)
-          (list :bail (cli-options-bail options)
-                :coverage (cli-options-coverage options)
-                :coverage-output (cli-options-coverage-output options)
-                :coverage-report-directory
-                (cli-options-coverage-report-directory options)
-                :coverage-include-pathnames
-                (append system-pathnames
-                        (cli-options-coverage-include-pathnames options))
-                :coverage-exclude-pathnames
-                (cli-options-coverage-exclude-pathnames options)
-                :coverage-minimum-expression
-                (cli-options-coverage-minimum-expression options)
-                :coverage-minimum-branch
-                (cli-options-coverage-minimum-branch options)
-                :pass-with-no-tests (cli-options-pass-with-no-tests options)
-                :retry (cli-options-retry options)
-                :timeout-ms (cli-options-test-timeout-ms options)
-                :max-workers (cli-options-max-workers options)))))
+    (let ((arguments (run-all-options-from-environment options)))
+      (setf (getf arguments :coverage-include-pathnames)
+            (append system-pathnames
+                    (getf arguments :coverage-include-pathnames)))
+      arguments)))
 
 (defun call-list-command (options stream)
-  (apply #'cl-weave:list-tests
-         (append (shared-execution-argument-pairs options)
-                 (list :retry (cli-options-retry options)
-                       :timeout-ms (cli-options-test-timeout-ms options)
-                       :stream stream))))
+  (let ((run-options (run-all-options-from-environment options)))
+    (apply #'cl-weave:list-tests
+           (append
+            (loop for key in '(:reporter :name-filter :shard :order :seed
+                               :retry :timeout-ms)
+                  append (list key (getf run-options key)))
+            (list :stream stream)))))
 
 (defun call-run-command (options stream)
   (apply #'cl-weave:run-all

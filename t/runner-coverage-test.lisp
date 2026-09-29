@@ -26,12 +26,14 @@
       (expect (funcall matcher included) :to-be-truthy)
       (expect (funcall matcher excluded) :to-be nil)))
 
-  (it "accepts zero-item coverage and rejects unmet thresholds"
-    (expect (cl-weave::check-coverage-thresholds
-             '(:expression-covered 0 :expression-total 0
-               :branch-covered 0 :branch-total 0)
-             100 100)
-            :to-be-truthy)
+  (it "signals dedicated no-data coverage conditions and rejects unmet thresholds"
+    (expect (lambda ()
+              (cl-weave::check-coverage-thresholds
+               '(:expression-covered 0 :expression-total 0
+                 :branch-covered 0 :branch-total 0)
+               100 100))
+            :to-throw
+            "Coverage did not measure any executable forms")
     (expect (lambda ()
               (cl-weave::check-coverage-thresholds
                '(:expression-covered 7 :expression-total 10
@@ -412,16 +414,57 @@
   (it "saves and reports coverage data through the real SB-COVER hooks when available"
     (when (cl-weave:coverage-support-available-p)
       (let ((output (test-temporary-pathname "coverage-save-real.out"))
-            (stats (cl-weave:coverage-statistics)))
-        (unwind-protect
-             (progn
-               (expect (cl-weave:save-coverage output) :to-equal output)
-               (expect (probe-file output) :to-be-truthy))
-          (ignore-errors (delete-file output)))
-        (expect (getf stats :expression-total) :to-satisfy (lambda (value) (>= value 0)))
-        (expect (getf stats :expression-covered) :to-satisfy (lambda (value) (>= value 0)))
-        (expect (getf stats :branch-total) :to-satisfy (lambda (value) (>= value 0)))
-        (expect (getf stats :branch-covered) :to-satisfy (lambda (value) (>= value 0)))))))
+            (stats (handler-case (cl-weave:coverage-statistics)
+                     (cl-weave:coverage-no-data (condition) condition))))
+        (if (typep stats 'cl-weave:coverage-no-data)
+            (expect stats :to-be-truthy)
+            (progn
+              (unwind-protect
+                   (progn
+                     (expect (cl-weave:save-coverage output) :to-equal output)
+                     (expect (probe-file output) :to-be-truthy))
+                (ignore-errors (delete-file output)))
+              (expect (getf stats :expression-total)
+                      :to-satisfy (lambda (value) (>= value 0)))
+              (expect (getf stats :expression-covered)
+                      :to-satisfy (lambda (value) (>= value 0)))
+              (expect (getf stats :branch-total)
+                      :to-satisfy (lambda (value) (>= value 0)))
+              (expect (getf stats :branch-covered)
+                      :to-satisfy (lambda (value) (>= value 0)))))))))
+
+#+sbcl
+(it "reports real per-file counts and uncovered form locations"
+  (with-test-temporary-directory (directory "coverage-real-file-statistics")
+    (let* ((source (merge-pathnames #P"fixture.lisp" directory))
+           (fasl (compile-file-pathname source)))
+      (with-open-file (stream source :direction :output :if-exists :supersede
+                                      :if-does-not-exist :create)
+        (write-line "(declaim (optimize (sb-cover:store-coverage-data 3)))" stream)
+        (write-line "(in-package #:cl-user)" stream)
+        (write-line "(defun cl-weave-coverage-fixture-branch (value)" stream)
+        (write-line "  (if (evenp value) (identity :covered) (identity :uncovered)))" stream)
+        (write-line "(defun cl-weave-coverage-fixture-never-called () (identity :never-called))" stream))
+      (cl-weave:reset-coverage)
+      (compile-file source)
+      (load fasl)
+      (cl-user::cl-weave-coverage-fixture-branch 2)
+      (let* ((files (cl-weave:coverage-file-statistics
+                     :include-pathnames (list source)))
+             (file (first files)))
+        (expect files :to-have-length 1)
+        (expect (getf file :pathname) :to-equal (pathname source))
+        (expect (list (getf file :expression-covered)
+                      (getf file :expression-total)
+                      (getf file :branch-covered)
+                      (getf file :branch-total))
+                :to-equal '(7 9 1 2))
+        (expect (getf file :uncovered-forms)
+                :to-equal
+                '((:kind :expression :start 165 :end 186
+                   :line 4 :column 41 :end-line 4 :end-column 62)
+                  (:kind :expression :start 238 :end 262
+                   :line 5 :column 50 :end-line 5 :end-column 74))))))
 
 (describe "coverage internal SB-COVER interop gaps"
   (it "resolves or rejects SB-COVER symbols by name without a global mock"
@@ -478,4 +521,4 @@
                   (funcall original name required-p)))))
         (expect (lambda () (cl-weave:coverage-statistics))
                 :to-throw
-                "unsupported representation")))))
+                "unsupported representation"))))))
