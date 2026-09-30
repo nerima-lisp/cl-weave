@@ -41,9 +41,10 @@
     (multiple-value-bind (within-p ratio)
         (cl-weave:benchmark-scaling-within-p
          (lambda (size)
-           (loop for index below size sum index))
-         1000 2 4
-         :warmup 1 :samples 5 :iterations 10)
+           (loop repeat size
+                 do (loop for index below 64 sum index)))
+         100000 2 4
+         :warmup 1 :samples 5 :iterations 1)
       (expect within-p :to-be-truthy)
       (expect ratio :to-be-greater-than-or-equal 0)))
 
