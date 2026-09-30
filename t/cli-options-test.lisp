@@ -576,6 +576,45 @@
                  ("--update-snapshots" . (("CL_WEAVE_UPDATE_SNAPSHOTS" . "1")))))
         (expect (options-from (cdr sample)) :not :to-be nil))))
 
+  (it "exports the complete run-all plist for environment-backed options"
+    (with-mocked-functions
+        (((symbol-function 'uiop:getenv)
+          (lambda (name)
+            (cdr (assoc name
+                        '(("CL_WEAVE_REPORTER" . "json")
+                          ("CL_WEAVE_TEST_FILTER" . "focus")
+                          ("CL_WEAVE_BAIL" . "2")
+                          ("CL_WEAVE_RETRY" . "3")
+                          ("CL_WEAVE_TEST_TIMEOUT" . "250")
+                          ("CL_WEAVE_MAX_WORKERS" . "4")
+                          ("CL_WEAVE_SHARD" . "1/2")
+                          ("CL_WEAVE_SEQUENCE" . "random")
+                          ("CL_WEAVE_SEQUENCE_SEED" . "11")
+                          ("CL_WEAVE_COVERAGE" . "1")
+                          ("CL_WEAVE_COVERAGE_FILE" . "coverage.out")
+                          ("CL_WEAVE_COVERAGE_REPORT_DIRECTORY" . "coverage/")
+                          ("CL_WEAVE_PASS_WITH_NO_TESTS" . "false"))
+                        :test #'string=)))))
+      (expect (cl-weave/cli:run-all-options-from-environment)
+              :to-equal
+              '(:reporter :json
+                :name-filter "focus"
+                :shard (1 2)
+                :order :random
+                :seed 11
+                :bail 2
+                :coverage t
+                :coverage-output "coverage.out"
+                :coverage-report-directory "coverage/"
+                :coverage-include-pathnames nil
+                :coverage-exclude-pathnames nil
+                :coverage-minimum-expression nil
+                :coverage-minimum-branch nil
+                :pass-with-no-tests nil
+                :retry 3
+                :timeout-ms 250
+                :max-workers 4))))
+
   (it "binds snapshot settings during CLI execution"
     (let ((observed nil)
           (options (cl-weave/cli::make-cli-options

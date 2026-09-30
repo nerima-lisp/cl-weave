@@ -48,12 +48,18 @@ command line can do stays reachable from a REPL.")
    #:benchmark-result-iterations
    #:benchmark-result-samples
    #:benchmark-result-warmup
+   #:benchmark-scaling-within-p
    #:clear-tests
    #:collect-test-plan
    #:collect-mutations
    #:continue-test
    #:coverage-support-available-p
+   #:coverage-file-statistics
+   #:coverage-no-data
+   #:coverage-no-data-exclude-pathnames
+   #:coverage-no-data-include-pathnames
    #:coverage-statistics
+   #:coverage-uncovered-form-locations
    #:coverage-unavailable
    #:coverage-unavailable-reason
    #:defmutation-operator
@@ -309,8 +315,8 @@ command line can do stays reachable from a REPL.")
 list, watch, doctor, metadata, version and help commands, and the process exit
 status they produce. It is a thin translation layer -- every command resolves
 to calls into #:cl-weave and #:cl-weave/metadata -- so a behaviour that only
-the CLI can reach would be a bug. Exports only #:main; the command internals
-stay unexported because their shape is not something downstream should pin.")
+the CLI can reach would be a bug. Exports the environment-backed RUN-ALL
+option translation and #:main; other command internals stay unexported.")
   (:import-from #:cl-weave/metadata
    #:*metadata-commands*
    #:*metadata-cli-options*
@@ -319,4 +325,5 @@ stay unexported because their shape is not something downstream should pin.")
    #:cli-version
    #:write-doctor-report-json)
   (:export
+   #:run-all-options-from-environment
    #:main))

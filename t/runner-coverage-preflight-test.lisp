@@ -159,8 +159,8 @@
             (declare (ignore exclude-pathnames))
             (incf coverage-cleanup)
             (setf observed-source-pathnames include-pathnames)
-            '(:expression-covered 0 :expression-total 0
-              :branch-covered 0 :branch-total 0)))
+            '(:expression-covered 1 :expression-total 1
+              :branch-covered 1 :branch-total 1)))
          ((symbol-function 'cl-weave:root-suite)
           (lambda ()
             (incf suite-root)
@@ -287,8 +287,8 @@
                        (lambda (&key include-pathnames exclude-pathnames)
                          (declare (ignore include-pathnames exclude-pathnames))
                          (incf coverage-cleanup)
-                         '(:expression-covered 0 :expression-total 0
-                           :branch-covered 0 :branch-total 0)))
+                         '(:expression-covered 1 :expression-total 1
+                           :branch-covered 1 :branch-total 1)))
                       ((symbol-function 'cl-weave::save-coverage-report)
                        (lambda (path &key include-pathnames exclude-pathnames)
                          (declare (ignore path include-pathnames exclude-pathnames))

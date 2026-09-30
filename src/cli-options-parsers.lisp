@@ -196,3 +196,32 @@ argument and returns (TRANSFORM VALUE)."
 (define-passthrough-option-parser parse-sequence-order-option parse-sequence-order)
 (define-passthrough-option-parser parse-pathname-option pathname)
 (define-passthrough-option-parser parse-system-list-option list)
+
+(defun run-all-options-from-environment (&optional (options (options-from-environment)))
+  "Return the RUN-ALL keyword plist represented by CLI environment defaults.
+
+When OPTIONS is supplied, it must be a CLI options object, typically one that
+has already received command-line overrides.  This keeps environment parsing
+and the CLI's RUN-ALL translation on the same option interpretation path."
+  (list :reporter (cli-options-reporter options)
+        :name-filter (cli-options-name-filter options)
+        :shard (cli-options-shard options)
+        :order (cli-options-order options)
+        :seed (cli-options-seed options)
+        :bail (cli-options-bail options)
+        :coverage (cli-options-coverage options)
+        :coverage-output (cli-options-coverage-output options)
+        :coverage-report-directory
+        (cli-options-coverage-report-directory options)
+        :coverage-include-pathnames
+        (cli-options-coverage-include-pathnames options)
+        :coverage-exclude-pathnames
+        (cli-options-coverage-exclude-pathnames options)
+        :coverage-minimum-expression
+        (cli-options-coverage-minimum-expression options)
+        :coverage-minimum-branch
+        (cli-options-coverage-minimum-branch options)
+        :pass-with-no-tests (cli-options-pass-with-no-tests options)
+        :retry (cli-options-retry options)
+        :timeout-ms (cli-options-test-timeout-ms options)
+        :max-workers (cli-options-max-workers options)))

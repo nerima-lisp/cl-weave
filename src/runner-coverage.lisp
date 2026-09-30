@@ -6,6 +6,16 @@
              (format stream "Coverage support is unavailable: ~A"
                      (coverage-unavailable-reason condition)))))
 
+(define-condition coverage-no-data (error)
+  ((include-pathnames :initarg :include-pathnames
+                      :reader coverage-no-data-include-pathnames)
+   (exclude-pathnames :initarg :exclude-pathnames
+                      :reader coverage-no-data-exclude-pathnames))
+  (:report (lambda (condition stream)
+             (format stream "Coverage did not measure any executable forms~@[ matching ~S~]~@[ and excluding ~S~]."
+                     (coverage-no-data-include-pathnames condition)
+                     (coverage-no-data-exclude-pathnames condition)))))
+
 ;; The base is a plain CONDITION, not an ERROR: during unwinds the cleanup
 ;; failure is SIGNALed as a notification, and an ERROR subtype would be
 ;; captured by enclosing ERROR handlers (matchers, the runner), replacing
@@ -110,6 +120,12 @@ per-source counts plist (see COVERAGE-STATISTICS), and COVERED-KEY/TOTAL-KEY
 are the matching keys in both the accumulated statistics plist and the
 threshold-check plist (see CHECK-COVERAGE-THRESHOLDS).")
 
+;; SB-COVER's GET-RECORDS in contrib/sb-cover/cover.lisp encodes an
+;; unexecuted expression as state 2 and a branch whose then and else paths
+;; were both unexecuted as state 10 (#b1010).
+(defconstant +coverage-state-unexecuted-expression+ 2)
+(defconstant +coverage-state-branch-neither-taken+ 10)
+
 (defun coverage-info-hash-table (coverage-info)
   "Validate and return the per-source coverage hash table bound to the
 SB-COVER symbol COVERAGE-INFO."
@@ -118,6 +134,111 @@ SB-COVER symbol COVERAGE-INFO."
       (error 'coverage-unavailable
              :reason "SB-COVER coverage data has an unsupported representation."))
     (car value)))
+
+(defun coverage-no-data-p (statistics)
+  (zerop (+ (getf statistics :expression-total 0)
+            (getf statistics :branch-total 0))))
+
+(defun signal-coverage-no-data (include-pathnames exclude-pathnames)
+  (error 'coverage-no-data
+         :include-pathnames include-pathnames
+         :exclude-pathnames exclude-pathnames))
+
+(defun coverage-compute-file-info (source compute)
+  (multiple-value-bind (counts states source-string)
+      (funcall compute source :default)
+    (declare (ignore states source-string))
+    counts))
+
+(defun coverage-counts-plist (counts)
+  (loop for (kind covered-key total-key) in *coverage-count-kinds*
+        append (list covered-key (funcall (coverage-internal-symbol "OK-OF" t)
+                                          (getf counts kind))
+                      total-key (funcall (coverage-internal-symbol "ALL-OF" t)
+                                         (getf counts kind)))))
+
+(defun coverage-form-position (source start end)
+  (labels ((line-column (position)
+             (let ((line (1+ (count #\Newline source :end position)))
+                   (line-start (or (position #\Newline source :end position :from-end t)
+                                   -1)))
+               (list line (1+ (- position line-start 1))))))
+    (destructuring-bind (line column) (line-column start)
+      (destructuring-bind (end-line end-column) (line-column end)
+        (list :start start :end end
+              :line line :column column
+              :end-line end-line :end-column end-column)))))
+
+(defun coverage-uncovered-form-locations-for-file (source)
+  (let ((get-records (coverage-internal-symbol "GET-RECORDS" t))
+        (read-source (coverage-internal-symbol "READ-SOURCE" t))
+        (read-maps (coverage-internal-symbol "READ-AND-RECORD-SOURCE-MAPS" t))
+        (source-position (coverage-internal-symbol "SOURCE-PATH-SOURCE-POSITION" t))
+        (counts (list :branch (funcall (coverage-internal-symbol "MAKE-SAMPLE-COUNT" t)
+                                       :branch)
+                      :expression (funcall (coverage-internal-symbol "MAKE-SAMPLE-COUNT" t)
+                                           :expression))))
+    (let ((source-text (funcall read-source source :default)))
+      (let ((source-maps (funcall read-maps source-text))
+          (locations nil))
+      (dolist (record (funcall get-records source counts))
+        (destructuring-bind (path state . ignored) record
+          (declare (ignore ignored))
+          (when (or (= state +coverage-state-unexecuted-expression+)
+                    (= state +coverage-state-branch-neither-taken+))
+            (let* ((path (reverse path))
+                   (tlf (nth (car path) source-maps))
+                   (form (car tlf))
+                   (source-map (cdr tlf)))
+              (when source-map
+                (multiple-value-bind (start end)
+                    (funcall source-position (cons 0 (cdr path)) form source-map)
+                  (when (and start end)
+                    (push (append
+                           (list :kind
+                                 (if (= state +coverage-state-unexecuted-expression+)
+                                     :expression
+                                     :branch))
+                          (coverage-form-position source-text start end))
+                          locations))))))))
+        (nreverse locations)))))
+
+(defun coverage-file-statistics (&key include-pathnames exclude-pathnames)
+  "Return per-source-file coverage statistics and uncovered form locations.
+Each result is a plist with :PATHNAME, expression/branch counts, and
+:UNCOVERED-FORMS containing zero-based character offsets and one-based lines."
+  (let ((refresh (coverage-internal-symbol "REFRESH-COVERAGE-BITS" t))
+        (coverage-info (coverage-internal-symbol "*CODE-COVERAGE-INFO*" t))
+        (compute (coverage-internal-symbol "COMPUTE-FILE-INFO" t))
+        (matcher (coverage-source-matcher include-pathnames exclude-pathnames))
+        (files nil))
+    (funcall refresh)
+    (maphash
+     (lambda (source ignored)
+       (declare (ignore ignored))
+       (when (and (funcall matcher source) (probe-file source))
+         (let ((counts (coverage-compute-file-info source compute)))
+           (push (append (list :pathname (pathname source))
+                         (coverage-counts-plist counts)
+                         (list :uncovered-forms
+                               (coverage-uncovered-form-locations-for-file
+                                source)))
+                 files))))
+     (coverage-info-hash-table coverage-info))
+    (let ((files (sort files #'string< :key (lambda (file)
+                                             (namestring (getf file :pathname))))))
+      (when (or (null files)
+                (every #'coverage-no-data-p files))
+        (signal-coverage-no-data include-pathnames exclude-pathnames))
+      files)))
+
+(defun coverage-uncovered-form-locations (&key include-pathnames exclude-pathnames)
+  "Return an alist of source pathnames and their uncovered form positions."
+  (mapcar (lambda (file)
+            (cons (getf file :pathname) (getf file :uncovered-forms)))
+          (coverage-file-statistics
+           :include-pathnames include-pathnames
+           :exclude-pathnames exclude-pathnames)))
 
 (defun coverage-statistics (&key include-pathnames exclude-pathnames)
   (let ((refresh (coverage-internal-symbol "REFRESH-COVERAGE-BITS" t))
@@ -140,12 +261,16 @@ SB-COVER symbol COVERAGE-INFO."
                     (incf (getf totals total-key)
                           (funcall all-of (getf counts kind)))))))
      (coverage-info-hash-table coverage-info))
+    (when (coverage-no-data-p totals)
+      (signal-coverage-no-data include-pathnames exclude-pathnames))
     totals))
 
 (defun coverage-percentage (covered total)
   (if (zerop total) 100.0 (* 100.0 (/ covered total))))
 
 (defun check-coverage-thresholds (statistics minimum-expression minimum-branch)
+  (when (coverage-no-data-p statistics)
+    (signal-coverage-no-data nil nil))
   (let ((minimums (list :expression minimum-expression :branch minimum-branch)))
     (loop for (kind covered-key total-key) in *coverage-count-kinds*
           for minimum = (getf minimums kind)

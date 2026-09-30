@@ -26,3 +26,38 @@
       (expect (lambda ()
                 (apply #'cl-weave:measure (lambda () nil) arguments))
               :to-throw "must be a"))))
+
+(describe "benchmark scaling API"
+  (it "uses median samples for a scaling ratio"
+    (let ((base (make-instance 'cl-weave::benchmark-result
+                               :samples '(1d0 100d0 1d0)))
+          (scaled (make-instance 'cl-weave::benchmark-result
+                                 :samples '(2d0 200d0 2d0))))
+      (expect (/ (cl-weave::median-ms scaled)
+                 (cl-weave::median-ms base))
+              :to-be 2d0)))
+
+  (it "judges scaled input by the median ratio, not absolute time"
+    (multiple-value-bind (within-p ratio)
+        (cl-weave:benchmark-scaling-within-p
+         (lambda (size)
+           (loop repeat size
+                 do (loop for index below 64 sum index)))
+         100000 2 4
+         :warmup 1 :samples 5 :iterations 1)
+      (expect within-p :to-be-truthy)
+      (expect ratio :to-be-greater-than-or-equal 0)))
+
+  (it "rejects invalid scaling ratio options"
+    (expect (lambda ()
+              (cl-weave:benchmark-scaling-within-p
+               (lambda (size) size) 0 2 4))
+            :to-throw "must be a")
+    (expect (lambda ()
+              (cl-weave:benchmark-scaling-within-p
+               (lambda (size) size) 10 0 4))
+            :to-throw "must be a")
+    (expect (lambda ()
+              (cl-weave:benchmark-scaling-within-p
+               (lambda (size) size) 10 2 0))
+            :to-throw "positive real")))
