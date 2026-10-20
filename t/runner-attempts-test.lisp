@@ -743,3 +743,130 @@
               (declare (ignore arguments))
               (error "generic collection context invoked"))))
         (expect (cl-weave::collect-events suite) :to-be nil)))))
+
+(describe "attempt completion observer"
+  (it "notifies after cleanup for every executed attempt and does not leak"
+    (let* ((observations nil)
+           (retry-attempts 0)
+           (root
+             (cl-weave::make-suite
+              :name "observer root"
+              :after-each
+              (list (lambda ()
+                      (expect :cleanup :to-be :cleanup)))))
+           (cl-weave::*root-suite* root))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "passes"
+        :function (lambda ()
+                    (expect t :to-be t))))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "fails"
+        :function (lambda ()
+                    (expect :actual :to-be :expected))))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "times out"
+        :timeout-ms 25
+        :function (lambda ()
+                    (sleep 0.05))))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "retries"
+        :retry 1
+        :function (lambda ()
+                    (incf retry-attempts)
+                    (expect retry-attempts :to-be 2))))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "skipped"
+        :skip-reason "not run"
+        :function (lambda ()
+                    (error "skip body ran"))))
+      (cl-weave::add-child
+       root
+       (cl-weave::make-test-case
+        :name "todo"
+        :todo-reason "not implemented"
+        :function (lambda ()
+                    (error "todo body ran"))))
+      (with-output-to-string (stream)
+        (expect
+         (cl-weave:run-all
+          :reporter :sexp
+          :stream stream
+          :max-workers 1
+          :on-test-attempt-complete
+          (lambda (path assertion-count)
+            (push (list path assertion-count) observations)))
+         :to-be nil))
+      (labels ((counts-for (name)
+                 (mapcar #'second
+                         (remove-if-not
+                           (lambda (entry)
+                             (equal name (car (last (first entry)))))
+                           observations))))
+        (expect (length observations) :to-be 5)
+        (expect
+         (every (lambda (entry)
+                  (and (every #'stringp (first entry))
+                       (integerp (second entry))))
+                observations)
+         :to-be t)
+        (expect (counts-for "passes") :to-equal '(2))
+        (expect (counts-for "fails") :to-equal '(2))
+        (expect (counts-for "times out") :to-equal '(1))
+        (expect (counts-for "retries") :to-equal '(2 2))
+        (expect (counts-for "skipped") :to-be-null)
+        (expect (counts-for "todo") :to-be-null)
+        (let ((observation-count (length observations)))
+          (with-output-to-string (stream)
+            (cl-weave:run-all
+             :reporter :sexp
+             :stream stream
+             :name-filter "passes"
+             :max-workers 1))
+          (expect (length observations) :to-be observation-count)))))
+  (it "calls observer once after failing after-each cleanup and preserves hook failure"
+    (let* ((events nil)
+           (observations nil)
+           (root
+             (cl-weave::make-suite
+              :name "observer hook failure"
+              :after-each
+              (list (lambda ()
+                      (push :cleanup events)
+                      (error "after-each failed")))))
+           (test
+             (cl-weave::make-test-case
+              :name "cleanup fails"
+              :function (lambda ()
+                          (expect :body :to-be :body))))
+           (cl-weave::*root-suite* root))
+      (cl-weave::add-child root test)
+      (let ((output nil)
+            (passed nil))
+        (setf output
+              (with-output-to-string (stream)
+                (setf passed
+                      (cl-weave:run-all
+                       :reporter :sexp
+                       :stream stream
+                       :max-workers 1
+                       :on-test-attempt-complete
+                       (lambda (path assertion-count)
+                         (push (list path assertion-count) observations)
+                         (push :observer events))))))
+        (expect passed :to-be nil)
+        (expect output :to-contain "after-each failed"))
+      (expect (length observations) :to-be 1)
+      (expect (first (first observations))
+              :to-equal (cl-weave::test-path root test))
+      (expect (second (first observations)) :to-be 1)
+      (expect (reverse events) :to-equal (list :cleanup :observer)))))

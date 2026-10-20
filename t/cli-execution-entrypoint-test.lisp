@@ -604,3 +604,177 @@
           :to-contain
           (if argument (format nil "~A ~A" name argument)
             name))))))
+
+(describe "run-coverage API"
+  (it "returns statuses 0, 1, and 2 without exiting"
+    (let ((command-result t)
+          (status nil)
+          (error-output nil))
+      (with-mocked-functions
+          (((symbol-function 'cl-weave/cli::run-command)
+            (lambda (options)
+              (declare (ignore options))
+              command-result)))
+        (expect (cl-weave/cli:run-coverage '("run")) :to-be 0)
+        (setf command-result nil)
+        (expect (cl-weave/cli:run-coverage '("run")) :to-be 1)
+        (setf error-output
+              (with-output-to-string (*error-output*)
+                (setf status
+                      (cl-weave/cli:run-coverage '("--unknown-option")))))
+        (expect status :to-be 2)
+        (expect error-output :to-contain "cl-weave: Unknown option: --unknown-option")
+        (expect error-output :to-contain "Usage:"))))
+
+  (it "overlays run options and calls each around thunk once"
+    (let ((input-callback-calls 0)
+          (input-loader-calls 0)
+          (coverage-kinds nil)
+          (report-calls 0)
+          (statistics-calls 0)
+          (data-calls 0)
+          (observed-options nil)
+          (status nil))
+      (with-mocked-functions
+          (((symbol-function 'cl-weave/cli::prepare-coverage-compilation)
+            (lambda (options)
+              (declare (ignore options))
+              t))
+           ((symbol-function 'cl-weave/cli::load-requested-inputs)
+            (lambda (options)
+              (declare (ignore options))
+              (incf input-loader-calls)))
+           ((symbol-function 'cl-weave::require-coverage-support)
+            (lambda () t))
+           ((symbol-function 'cl-weave:reset-coverage)
+            (lambda () t))
+           ((symbol-function 'cl-weave::save-coverage-report)
+            (lambda (path)
+              (declare (ignore path))
+              (incf report-calls)
+              t))
+           ((symbol-function 'cl-weave:coverage-statistics)
+            (lambda (&key include-pathnames exclude-pathnames)
+              (declare (ignore include-pathnames exclude-pathnames))
+              (incf statistics-calls)
+              '(:expression-covered 1 :expression-total 1
+                :branch-covered 1 :branch-total 1)))
+           ((symbol-function 'cl-weave:save-coverage)
+            (lambda (path)
+              (declare (ignore path))
+              (incf data-calls)
+              t))
+           ((symbol-function 'cl-weave:run-all)
+            (lambda (&rest arguments)
+              (setf observed-options arguments)
+              (cl-weave::call-with-coverage
+               (getf arguments :coverage)
+               (getf arguments :coverage-output)
+               (getf arguments :coverage-report-directory)
+               t
+               (lambda () t)
+               :minimum-expression
+               (getf arguments :coverage-minimum-expression)))))
+        (with-output-to-string (*standard-output*)
+          (setf status
+                (cl-weave/cli:run-coverage
+                 '("run" "--retry" "2")
+                 :run-options
+                 '(:retry 7
+                   :coverage t
+                   :coverage-output "coverage.dat"
+                   :coverage-report-directory "coverage-report/"
+                   :coverage-minimum-expression 100)
+                 :around-input-loading
+                 (lambda (thunk)
+                   (incf input-callback-calls)
+                   (funcall thunk))
+                 :around-coverage-consumer
+                 (lambda (kind thunk)
+                   (push kind coverage-kinds)
+                   (funcall thunk)))))
+        (expect status :to-be 0)
+        (expect (getf observed-options :retry) :to-be 7)
+        (expect (getf observed-options :coverage) :to-be t)
+        (expect input-callback-calls :to-be 1)
+        (expect input-loader-calls :to-be 1)
+        (expect (reverse coverage-kinds) :to-equal '(:report :statistics :data))
+        (expect report-calls :to-be 1)
+        (expect statistics-calls :to-be 1)
+        (expect data-calls :to-be 1))))
+
+  (it "propagates callback exceptions"
+    (with-mocked-functions
+        (((symbol-function 'cl-weave/cli::prepare-coverage-compilation)
+          (lambda (options)
+            (declare (ignore options))
+            t))
+         ((symbol-function 'cl-weave/cli::load-requested-inputs)
+          (lambda (options)
+            (declare (ignore options))
+            t))
+         ((symbol-function 'cl-weave::require-coverage-support)
+          (lambda () t))
+         ((symbol-function 'cl-weave:reset-coverage)
+          (lambda () t))
+         ((symbol-function 'cl-weave::save-coverage-report)
+          (lambda (path)
+            (declare (ignore path))
+            t))
+         ((symbol-function 'cl-weave:coverage-statistics)
+          (lambda (&key include-pathnames exclude-pathnames)
+            (declare (ignore include-pathnames exclude-pathnames))
+            '(:expression-covered 1 :expression-total 1
+              :branch-covered 1 :branch-total 1)))
+         ((symbol-function 'cl-weave:save-coverage)
+          (lambda (path)
+            (declare (ignore path))
+            t))
+         ((symbol-function 'cl-weave:run-all)
+          (lambda (&rest arguments)
+            (let ((observer (getf arguments :on-test-attempt-complete)))
+              (when observer
+                (funcall observer '("sample") 1)))
+            (if (getf arguments :coverage)
+                (cl-weave::call-with-coverage
+                 t
+                 (getf arguments :coverage-output)
+                 (getf arguments :coverage-report-directory)
+                 t
+                 (lambda () t)
+                 :minimum-expression
+                 (getf arguments :coverage-minimum-expression))
+                t))))
+      (expect
+        (lambda ()
+          (cl-weave/cli:run-coverage
+           '("run")
+           :around-input-loading
+           (lambda (thunk)
+             (declare (ignore thunk))
+             (error "input callback failed"))))
+        :to-throw "input callback failed")
+      (expect
+        (lambda ()
+          (cl-weave/cli:run-coverage
+           '("run")
+           :run-options
+           '(:coverage t
+             :coverage-output "coverage.dat"
+             :coverage-report-directory "coverage-report/")
+           :around-coverage-consumer
+           (lambda (kind thunk)
+             (if (eq kind :report)
+                 (error "coverage callback failed")
+                 (funcall thunk)))))
+        :to-throw "coverage callback failed")
+      (expect
+        (lambda ()
+          (cl-weave/cli:run-coverage
+           '("run")
+           :run-options
+           (list :on-test-attempt-complete
+                 (lambda (path assertion-count)
+                   (declare (ignore path assertion-count))
+                   (error "observer callback failed")))))
+        :to-throw "observer callback failed"))))

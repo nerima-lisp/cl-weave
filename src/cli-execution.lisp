@@ -1,5 +1,16 @@
 (in-package #:cl-weave/cli)
 
+(eval-when
+  (:compile-toplevel :load-toplevel :execute)
+  (defvar *run-coverage-context* nil)
+  (defstruct run-coverage-context
+    run-options
+    around-input-loading
+    around-coverage-consumer
+    callback-condition)
+  (define-condition cli-callback-failure (error)
+    ((condition :initarg :condition :reader cli-callback-failure-condition))))
+
 (defmacro with-cli-snapshot-settings ((options) &body body)
   `(let ((cl-weave:*update-snapshots* (cli-options-update-snapshots ,options))
          (cl-weave:*snapshot-directory*
@@ -181,37 +192,44 @@ coverage-systems list, so it stays O(1) per requested system."
         (funcall callback *standard-output*))))
 
 (defun run-execution-argument-pairs (options)
-  (let ((system-pathnames
-          (loop for system in (cli-options-coverage-systems options)
-                do (ensure-requested-system-visible system options)
-                append (cl-weave::asdf-system-files system))))
-    (let ((arguments (run-all-options-from-environment options)))
-      (setf (getf arguments :coverage-include-pathnames)
-            (append system-pathnames
-                    (getf arguments :coverage-include-pathnames)))
-      arguments)))
+  (let* ((system-pathnames
+           (loop for system in (cli-options-coverage-systems options)
+                 do (ensure-requested-system-visible system options)
+                 append (cl-weave::asdf-system-files system)))
+         (arguments (run-all-options-from-environment options)))
+    (setf (getf arguments :coverage-include-pathnames)
+          (append system-pathnames
+                  (getf arguments :coverage-include-pathnames)))
+    (run-options-with-attempt-observer
+     (merge-run-option-plists arguments (run-option-overrides)))))
 
 (defun call-list-command (options stream)
-  (let ((run-options (run-all-options-from-environment options)))
+  (let ((arguments
+          (merge-run-option-plists
+           (append (run-all-options-from-environment options)
+                   (list :stream stream))
+           (run-option-overrides))))
     (apply #'cl-weave:list-tests
-           (append
-            (loop for key in '(:reporter :name-filter :shard :order :seed
-                               :retry :timeout-ms)
-                  append (list key (getf run-options key)))
-            (list :stream stream)))))
+           (loop for key in '(:reporter :name-filter :shard :order :seed
+                              :retry :timeout-ms :stream)
+                 append (list key (getf arguments key))))))
 
 (defun call-run-command (options stream)
-  (apply #'cl-weave:run-all
-         (append (run-execution-argument-pairs options)
-                 (list :stream stream))))
+  (let ((arguments (run-execution-argument-pairs options)))
+    (unless (member :stream arguments)
+      (setf arguments (append arguments (list :stream stream))))
+    (apply #'cl-weave:run-all arguments)))
 
 (defun watch-command-call-arguments (options)
-  (values
-   (first (cli-options-systems options))
-   (append (run-execution-argument-pairs options)
-           (list :include-dependencies t
-                 :once (cli-options-watch-once options)
-                 :interval (cli-options-watch-interval options)))))
+  (let ((arguments
+          (run-execution-argument-pairs options)))
+    (values
+     (first (cli-options-systems options))
+     (merge-run-option-plists
+      arguments
+      (list :include-dependencies t
+            :once (cli-options-watch-once options)
+            :interval (cli-options-watch-interval options))))))
 
 (defun command-execution-plan (options)
   (case (command-dispatch-kind options)
@@ -245,11 +263,13 @@ coverage-systems list, so it stays O(1) per requested system."
      (let ((system (getf plan :system))
            (arguments (getf plan :arguments)))
        (lambda (stream)
-         (apply #'cl-weave:watch-system
-                system
-                (append arguments
-                        (list :stream stream
-                              :status-stream *error-output*))))))
+         (let ((arguments (copy-list arguments)))
+           (unless (member :stream arguments)
+             (setf arguments (append arguments (list :stream stream))))
+           (unless (member :status-stream arguments)
+             (setf arguments
+                   (append arguments (list :status-stream *error-output*))))
+           (apply #'cl-weave:watch-system system arguments)))))
     (:run
      (lambda (stream)
        (call-run-command options stream)))))
@@ -275,14 +295,31 @@ that result governs the process exit code.")
         result)))
 
 (defun run-command (options)
-  (ensure-valid-reporter-for-command options)
-  (ensure-watch-command-system options)
-  (unless (eq (command-dispatch-kind options) :doctor)
-    (prepare-coverage-compilation options)
-    (load-requested-inputs options))
-  (with-cli-snapshot-settings (options)
-    (with-cli-journal-settings (options)
-      (execute-command-plan (command-execution-plan options) options))))
+  (let* ((options (cli-options-with-run-overrides options))
+         (context *run-coverage-context*)
+         (input-callback
+           (and context
+                (run-coverage-context-around-input-loading context)))
+         (coverage-callback
+           (and context
+                (run-coverage-context-around-coverage-consumer context)))
+         (cl-weave::*coverage-consumer-wrapper*
+           (when coverage-callback
+             (lambda (kind thunk)
+               (call-with-cli-callback
+                context coverage-callback thunk kind)))))
+    (ensure-valid-reporter-for-command options)
+    (ensure-watch-command-system options)
+    (unless (eq (command-dispatch-kind options) :doctor)
+      (prepare-coverage-compilation options)
+      (if input-callback
+          (call-with-cli-callback
+           context input-callback
+           (lambda () (load-requested-inputs options)))
+          (load-requested-inputs options)))
+    (with-cli-snapshot-settings (options)
+      (with-cli-journal-settings (options)
+        (execute-command-plan (command-execution-plan options) options)))))
 
 #+sbcl
 (defun process-arguments ()
@@ -304,19 +341,123 @@ that result governs the process exit code.")
   (uiop:quit code))
 
 (defun main (&optional (argv (process-arguments)))
-  (handler-case
-      (let ((options (parse-cli-arguments argv)))
-        (cond
-          ((cli-options-version options)
-           (format *standard-output* "cl-weave ~A~%" (cli-version))
-           (exit-process 0))
-          ((cli-options-help options)
-           (write-string (cli-usage) *standard-output*)
-           (exit-process 0))
-          ((run-command options)
-           (exit-process 0))
-          (t
-           (exit-process 1))))
-    (cli-error (condition)
-      (format *error-output* "cl-weave: ~A~%~%~A" condition (cli-usage))
-      (exit-process 2))))
+  (exit-process (run-coverage argv)))
+
+(defun call-with-cli-callback (context callback thunk &optional (kind nil kind-supplied-p))
+  (if (null callback)
+      (funcall thunk)
+      (let ((calls 0)
+            (thunk-condition nil))
+        (labels ((guarded-thunk ()
+                   (incf calls)
+                   (unless (= calls 1)
+                     (error "A cl-weave callback must invoke its thunk exactly once."))
+                   (handler-case
+                       (funcall thunk)
+                     (serious-condition (condition)
+                       (setf thunk-condition condition)
+                       (error condition)))))
+          (handler-case
+              (let ((result
+                      (if kind-supplied-p
+                          (funcall callback kind #'guarded-thunk)
+                          (funcall callback #'guarded-thunk))))
+                (unless (= calls 1)
+                  (error "A cl-weave callback must invoke its thunk exactly once."))
+                result)
+            (serious-condition (condition)
+              (if (eq condition thunk-condition)
+                  (error condition)
+                  (progn
+                    (setf (run-coverage-context-callback-condition context)
+                          condition)
+                    (error 'cli-callback-failure :condition condition)))))))))
+
+(defun run-option-overrides ()
+  (and *run-coverage-context*
+       (run-coverage-context-run-options *run-coverage-context*)))
+
+(defun merge-run-option-plists (base overrides)
+  (let ((result (copy-list base)))
+    (loop for (key value) on overrides by #'cddr
+          for position = (position key result :test #'eq)
+          do (if position
+                 (setf (nth (1+ position) result) value)
+                 (setf result (append result (list key value)))))
+    result))
+
+(defun cli-options-with-run-overrides (options)
+  (let ((effective (copy-cli-options options)))
+    (loop for (key value) on (run-option-overrides) by #'cddr
+          for field = (case key
+                        (:reporter :reporter)
+                        (:name-filter :name-filter)
+                        (:shard :shard)
+                        (:order :order)
+                        (:seed :seed)
+                        (:bail :bail)
+                        (:coverage :coverage)
+                        (:coverage-output :coverage-output)
+                        (:coverage-report-directory :coverage-report-directory)
+                        (:coverage-include-pathnames :coverage-include-pathnames)
+                        (:coverage-exclude-pathnames :coverage-exclude-pathnames)
+                        (:coverage-minimum-expression :coverage-minimum-expression)
+                        (:coverage-minimum-branch :coverage-minimum-branch)
+                        (:pass-with-no-tests :pass-with-no-tests)
+                        (:retry :retry)
+                        (:timeout-ms :test-timeout-ms)
+                        (:max-workers :max-workers))
+          when field
+            do (set-cli-option-field effective field value))
+    effective))
+
+(defun run-options-with-attempt-observer (arguments)
+  (let ((observer (getf arguments :on-test-attempt-complete))
+        (context *run-coverage-context*))
+    (if observer
+        (progn
+          (setf (getf arguments :on-test-attempt-complete)
+                (lambda (path assertion-count)
+                  (handler-case
+                      (funcall observer path assertion-count)
+                    (serious-condition (condition)
+                      (when context
+                        (setf
+                         (run-coverage-context-callback-condition context)
+                         condition))
+                      (error 'cli-callback-failure :condition condition)))))
+          arguments)
+        arguments)))
+
+(defun run-coverage (argv &key run-options around-input-loading around-coverage-consumer)
+  (let* ((context
+           (make-run-coverage-context
+            :run-options run-options
+            :around-input-loading around-input-loading
+            :around-coverage-consumer around-coverage-consumer))
+         (*run-coverage-context* context))
+    (handler-case
+        (let ((options (parse-cli-arguments argv)))
+          (cond
+            ((cli-options-version options)
+             (format *standard-output* "cl-weave ~A~%" (cli-version))
+             0)
+            ((cli-options-help options)
+             (write-string (cli-usage) *standard-output*)
+             0)
+            (t
+             (handler-bind
+                 ((cl-weave::coverage-cleanup-failure
+                    (lambda (condition)
+                      (declare (ignore condition))
+                      (let ((callback-condition
+                              (run-coverage-context-callback-condition context)))
+                        (when callback-condition
+                          (error 'cli-callback-failure
+                                 :condition callback-condition))))))
+               (if (run-command options) 0 1)))))
+      (cli-callback-failure (condition)
+        (error (cli-callback-failure-condition condition)))
+      (cli-error (condition)
+        (format *error-output* "cl-weave: ~A~%~%~A" condition (cli-usage))
+        2))))
