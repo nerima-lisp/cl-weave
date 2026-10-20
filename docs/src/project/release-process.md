@@ -16,11 +16,10 @@ For public-surface discipline and migration expectations, see
 
 ## Suggested Release Checklist
 
-1. Bump the version string in lockstep across `cl-weave.asd` (`:version`) and
-   the `"version"` field in the embedded JSON contract in
-   metadata documentation. (`flake.nix` derives its package version from the
-   `.asd` `:version`, so it needs no manual edit.) Choose the major/minor/patch
-   increment per the [versioning policy](versioning-policy.md).
+1. Bump the version string in `cl-weave.asd` (`:version`). The metadata JSON
+   `"version"` field and the `flake.nix` package version derive from it, so
+   neither needs a separate manual edit. Choose the major/minor/patch increment
+   per the [versioning policy](versioning-policy.md).
 2. Run the full test suite.
 3. Run `nix flake check --print-build-logs` when Nix is available.
 4. Summarize user-visible changes in the release notes.
