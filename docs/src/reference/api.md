@@ -1,28 +1,37 @@
 # API Reference
 
-Every symbol exported by the `cl-weave` package, grouped by concept. The groups
-match the sections of the guide, and each group links to the page that explains
-how and why the symbols are used.
+This page lists the public APIs exported by `cl-weave`, `cl-weave/cli`, and
+`cl-weave/metadata`, grouped by concept. The `cl-weave` groups match the sections
+of the guide, and each group links to the page that explains how and why the
+symbols are used.
 
 `cl-weave` shadows `cl:describe`. Import it with
 `(:shadowing-import-from #:cl-weave #:describe)` or qualify it as
 `cl-weave:describe`; see [Quick Start](../getting-started.md) for the usual
 `defpackage` form.
 
-Two further packages are public. `cl-weave/metadata` exports
-`framework-metadata`, `*metadata-commands*`, `*metadata-cli-options*`,
+`cl-weave/metadata` exports `framework-metadata`, `*metadata-commands*`,
+`*metadata-cli-options*`,
 `metadata-cli-options`, `cli-option-usage-lines`, `cli-version` and
 `write-doctor-report-json`, which are the Lisp side of the contract described in
-`cl-weave/cli` exports `main`, the entry point of the packaged executable.
+the [Doctor Report](doctor-report.md). `framework-metadata` is also exported by
+`cl-weave`. `cl-weave/cli` exports `main`, the packaged executable's entry
+point, `run-all-options-from-environment`, and `run-coverage`, the programmatic
+coverage entry point. Unless a package is named, the symbol inventories below
+list exports from `cl-weave`.
 
 Anything not listed on this page is internal and may change without a major
 version bump. See [Versioning Policy](../project/versioning-policy.md).
 
 ## Suites and test cases
 
-Registration macros. `describe` groups, `it` (and `test`) declares a case, and
-the suffixes compose orthogonally: `-only` focuses, `-skip` and `-todo` mark,
-`-each` drives a table, `-if` and `-run-if` gate on a runtime value,
+Registration macros. `describe` groups, and `it` declares a case. The suffixes
+compose orthogonally: `-only` focuses, `-skip` and `-todo` mark,
+`-each` drives a table, and `-run-if` and `-skip-if` gate on a runtime value.
+Their conditions are evaluated while the test file registers cases. `-run-if`
+registers a skipped case or suite when its condition is false; `-skip-if` does
+so when its condition is true. A skipped branch emits a `:skip` event, and its
+hooks and body do not execute.
 `-concurrent` and `-sequential` set the execution mode, `-fails` expects a
 failure, `-isolated` runs in a subprocess, `-property` and `-fuzz` generate
 inputs. See [DSL Guide](../guide/dsl-guide.md).
@@ -136,7 +145,7 @@ streams, on-disk artifacts and timeout state. See
 `isolated-result-home-path`, `isolated-result-elapsed-ms`,
 `isolated-result-timed-out-p`, `*isolated-timeout-seconds*`
 
-## Execution journal, replay and soft assertions
+## Execution journal and replay
 
 The opt-in timeline of assertions, mocks, hooks, notes and shrink steps; its
 frame accessors and plist round trip; the CLOS hook for custom frame kinds;
@@ -184,11 +193,34 @@ dynamic variables that filter and order selection. See
 
 Entry points for running a suite, a system or a watch loop, the reporter
 inventory and artifact schemas, result status normalization, and the
-machine-readable framework metadata. See
+machine-readable framework metadata. See the
+[Test Execution](../guide/test-execution.md) guide for test selection and
+execution.
 
 `run`, `run-all`, `run-system`, `watch-system`, `run-reporters`,
 `list-reporters`, `reporter-artifact-schemas`, `results-status`, `explain!`,
 `asdf-system-files`, `framework-metadata`, `*max-workers*`
+
+### Observing test attempts
+
+`run-all` accepts `:on-test-attempt-complete`, a function of two arguments:
+the test path as a list of strings and the assertion count for that attempt as
+an integer. It calls the function after the attempt's `after-each` cleanup,
+including after failed and timed-out attempts. Each retry is a separate
+attempt and produces another call. Tests skipped or marked todo without being
+run do not produce a call.
+
+The callback is scoped to that `run-all` invocation and does not change suite
+hooks. A serious condition signaled by the callback propagates to the caller.
+
+```lisp
+(cl-weave:run-all
+ :max-workers 1
+ :on-test-attempt-complete
+ (lambda (path assertion-count)
+   (format *trace-output* "~&~{~A~^ > ~}: ~D assertions~%"
+           path assertion-count)))
+```
 
 ## Retries, timeouts and control flow
 
@@ -209,6 +241,78 @@ coverage is unavailable on the running implementation. See
 
 `coverage-statistics`, `coverage-support-available-p`, `reset-coverage`,
 `save-coverage`, `coverage-unavailable`, `coverage-unavailable-reason`
+
+### Running coverage from Lisp
+
+`cl-weave/cli:run-coverage` accepts the same CLI token list and command
+dispatch as `main`. For a test coverage run, pass `"run"` as the command:
+
+```lisp
+(cl-weave/cli:run-coverage '("run" "cl-weave/test" "--coverage"))
+```
+
+`cl-weave/test` is this repository's self-test system. Replace it with the
+ASDF system that contains your tests.
+
+Its signature is:
+
+```lisp
+(cl-weave/cli:run-coverage argv
+                           &key run-options
+                                around-input-loading
+                                around-coverage-consumer)
+```
+
+`argv` is a list of CLI argument strings. `run-options` is a keyword plist
+that overlays the options derived from `argv` and the CLI environment; when a
+key appears in both, the value in `run-options` takes precedence.
+For a test run, `run-coverage` returns `0` when the tests pass and `1` when
+they fail. It returns `2` for CLI parsing or validation errors, writing the
+CLI diagnostic to `*error-output*`, as `main` does. Help and version requests
+return `0`. For other commands, success returns `0` and failure returns `1`.
+This matches the CLI's existing status mapping. Other operational errors and
+serious conditions signaled by either callback propagate to the caller.
+
+`around-input-loading`, when supplied, wraps input loading when the dispatched
+command reaches that step. The callback receives the default input-loading
+thunk and must call it exactly once to load the requested inputs. Forwarding
+the thunk's value is conventional but optional; the command dispatcher ignores
+whatever value the callback returns, so it does not affect `run-coverage`'s
+result. Help and version
+requests, parse or validation errors, and the `doctor` command do not invoke
+this callback:
+
+```lisp
+(cl-weave/cli:run-coverage
+ '("run" "cl-weave/test" "--coverage")
+ :around-input-loading
+ (lambda (load-inputs)
+   (format *trace-output* "Loading test inputs.~%")
+   (funcall load-inputs)))
+```
+
+`around-coverage-consumer`, when supplied, is called with a kind and a consumer
+thunk. The kind is `:report`, `:statistics`, or `:data`. Call the supplied
+thunk exactly once to run that consumer, and return its value from the callback.
+The `:statistics` value is passed to threshold checks, so the callback must
+return the statistics thunk's value for those checks to use its plist. The
+`:report` and `:data` return values are discarded after their output side
+effects:
+
+```lisp
+(cl-weave/cli:run-coverage
+ '("run" "cl-weave/test" "--coverage")
+ :around-coverage-consumer
+ (lambda (kind consume)
+   (format *trace-output* "Coverage consumer: ~A~%" kind)
+   (funcall consume)))
+```
+
+Consumers run only during an enabled coverage run. The `:report` consumer is
+called when a coverage report directory is configured, `:statistics` when a
+minimum coverage threshold is configured, and `:data` when a coverage output
+path is configured. A consumer whose corresponding setting is absent is not
+called.
 
 ## Dynamic-state helpers
 

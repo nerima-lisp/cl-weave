@@ -14,6 +14,11 @@ Full documentation, including the DSL guide, matcher reference, and discovery
 contract, is published at <https://nerima-lisp.github.io/cl-weave/>.
 The source for that site lives in [docs/src/](docs/src/).
 
+For a Lisp-driven coverage run, `cl-weave/cli:run-coverage` lets you wrap CLI
+input loading and coverage consumers. Pass `:on-test-attempt-complete` to
+`cl-weave:run-all` when you need each executed attempt's path and assertion
+count.
+
 ## Quick Start
 
 ```lisp
@@ -32,8 +37,11 @@ The source for that site lives in [docs/src/](docs/src/).
     (expect (list :ok 42) :to-equal (list :ok 42))))
 ```
 
+From the `cl-weave` checkout root, save these forms in `quick-start.lisp`, then
+load the file and run its tests:
+
 ```sh
-nix run . -- run cl-weave/test
+nix run . -- run --load quick-start.lisp
 ```
 
 See [Getting Started](https://nerima-lisp.github.io/cl-weave/getting-started/) for
@@ -61,7 +69,8 @@ inputs.cl-weave = {
 
 - [Getting Started](https://nerima-lisp.github.io/cl-weave/getting-started/)
 - [DSL Guide](https://nerima-lisp.github.io/cl-weave/guide/dsl-guide/)
-- [API Reference](https://nerima-lisp.github.io/cl-weave/reference/api/)
+- [API Reference](https://nerima-lisp.github.io/cl-weave/reference/api/):
+  programmatic coverage and attempt callback contracts.
 
 ## Development
 
