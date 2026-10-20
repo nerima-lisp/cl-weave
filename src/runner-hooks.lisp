@@ -105,10 +105,17 @@ and CONTINUE. Signals HOOK-FAILURE when a before-each hook errors."
                (setf result (call-test-case-body/k lineage test continue))
              (serious-condition (condition)
                (setf primary-condition condition)))
-        (setf cleanup-errors
-              (call-hooks/collect-errors
-               (effective-after-hooks/from-lineage lineage)
-               :after-each)))
+        (unwind-protect
+             (setf cleanup-errors
+                   (call-hooks/collect-errors
+                    (effective-after-hooks/from-lineage lineage)
+                    :after-each))
+          (when *on-test-attempt-complete*
+            ;; Keep observer errors outside the runner's attempt-condition handlers.
+            (let ((*runner-default-condition-handler-disabled* t))
+              (funcall *on-test-attempt-complete*
+                       (test-path suite test)
+                       *assertion-count*)))))
       (cond
         (primary-condition
          (setf *attempt-secondary-conditions* cleanup-errors)

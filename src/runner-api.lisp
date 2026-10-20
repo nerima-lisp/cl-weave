@@ -171,26 +171,28 @@ never consume the control stack."
                   (name-filter *test-name-filter*)
                   location-filter test-path-filter include-tags exclude-tags shard order seed bail retry timeout-ms max-workers
                   coverage coverage-output coverage-report-directory coverage-include-pathnames coverage-exclude-pathnames
-                  coverage-minimum-expression coverage-minimum-branch (pass-with-no-tests t) (coverage-reset t))
+                  coverage-minimum-expression coverage-minimum-branch (pass-with-no-tests t) (coverage-reset t)
+                  on-test-attempt-complete)
   (ensure-run-reporter reporter)
   (ensure-output-stream stream)
-  (call-with-snapshot-session
-   (lambda ()
-     (let ((collection-options
-             (normalize-collection-options
-              :name-filter name-filter :location-filter location-filter :test-path-filter test-path-filter
-              :include-tags include-tags :exclude-tags exclude-tags :shard shard :order order :seed seed
-              :bail bail :retry retry :timeout-ms timeout-ms :max-workers max-workers)))
-       (call-with-coverage
-        coverage coverage-output coverage-report-directory coverage-reset
-        (lambda ()
-          (let ((events (collect-events-with-options (root-suite) collection-options)))
-            (emit-run-report reporter events stream)
-            (and (or pass-with-no-tests events) (every #'passed-event-p events))))
-        :include-pathnames coverage-include-pathnames
-        :exclude-pathnames coverage-exclude-pathnames
-        :minimum-expression coverage-minimum-expression
-        :minimum-branch coverage-minimum-branch)))))
+  (let ((*on-test-attempt-complete* on-test-attempt-complete))
+    (call-with-snapshot-session
+     (lambda ()
+       (let ((collection-options
+               (normalize-collection-options
+                :name-filter name-filter :location-filter location-filter :test-path-filter test-path-filter
+                :include-tags include-tags :exclude-tags exclude-tags :shard shard :order order :seed seed
+                :bail bail :retry retry :timeout-ms timeout-ms :max-workers max-workers)))
+         (call-with-coverage
+          coverage coverage-output coverage-report-directory coverage-reset
+          (lambda ()
+            (let ((events (collect-events-with-options (root-suite) collection-options)))
+              (emit-run-report reporter events stream)
+              (and (or pass-with-no-tests events) (every #'passed-event-p events))))
+          :include-pathnames coverage-include-pathnames
+          :exclude-pathnames coverage-exclude-pathnames
+          :minimum-expression coverage-minimum-expression
+          :minimum-branch coverage-minimum-branch))))))
 
 (defun split-path-string (string)
   "Split a ' > '-joined Vitest-style path into its component strings."

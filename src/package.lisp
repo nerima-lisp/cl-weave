@@ -311,12 +311,12 @@ command line can do stays reachable from a REPL.")
 (defpackage #:cl-weave/cli
   (:use #:cl)
   (:documentation
-   "The `cl-weave` executable: argument parsing, environment defaults, the run,
-list, watch, doctor, metadata, version and help commands, and the process exit
-status they produce. It is a thin translation layer -- every command resolves
-to calls into #:cl-weave and #:cl-weave/metadata -- so a behaviour that only
-the CLI can reach would be a bug. Exports the environment-backed RUN-ALL
-option translation and #:main; other command internals stay unexported.")
+   "The `cl-weave` executable interface. MAIN reads process arguments and exits
+with the status returned by RUN-COVERAGE. RUN-COVERAGE executes an argv list
+in-process and returns its status, with optional run options and input-loading
+and coverage-consumer callbacks. RUN-ALL-OPTIONS-FROM-ENVIRONMENT translates
+environment defaults to cl-weave:run-all options. Other command internals stay
+unexported.")
   (:import-from #:cl-weave/metadata
    #:*metadata-commands*
    #:*metadata-cli-options*
@@ -326,4 +326,4 @@ option translation and #:main; other command internals stay unexported.")
    #:write-doctor-report-json)
   (:export
    #:run-all-options-from-environment
-   #:main))
+   #:main #:run-coverage))

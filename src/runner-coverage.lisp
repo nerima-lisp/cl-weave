@@ -1,5 +1,12 @@
 (in-package #:cl-weave)
 
+(defvar *coverage-consumer-wrapper* nil)
+
+(defun call-with-coverage-consumer (kind thunk)
+  (if *coverage-consumer-wrapper*
+      (funcall *coverage-consumer-wrapper* kind thunk)
+      (funcall thunk)))
+
 (define-condition coverage-unavailable (error)
   ((reason :initarg :reason :reader coverage-unavailable-reason))
   (:report (lambda (condition stream)
@@ -305,21 +312,31 @@ Each result is a plist with :PATHNAME, expression/branch counts, and
   (loop for (kind pathname saver)
             in `((:report ,coverage-report-directory
                           ,(lambda (path)
-                             (if (or include-pathnames exclude-pathnames)
-                                 (save-coverage-report
-                                  path
-                                  :include-pathnames include-pathnames
-                                  :exclude-pathnames exclude-pathnames)
-                                 (save-coverage-report path))))
+                             (call-with-coverage-consumer
+                              :report
+                              (lambda ()
+                                (if (or include-pathnames exclude-pathnames)
+                                    (save-coverage-report
+                                     path
+                                     :include-pathnames include-pathnames
+                                     :exclude-pathnames exclude-pathnames)
+                                    (save-coverage-report path))))))
                  (:threshold ,(or minimum-expression minimum-branch)
                              ,(lambda (ignored)
                                 (declare (ignore ignored))
                                 (check-coverage-thresholds
-                                 (coverage-statistics
-                                  :include-pathnames include-pathnames
-                                  :exclude-pathnames exclude-pathnames)
+                                 (call-with-coverage-consumer
+                                  :statistics
+                                  (lambda ()
+                                    (coverage-statistics
+                                     :include-pathnames include-pathnames
+                                     :exclude-pathnames exclude-pathnames)))
                                  minimum-expression minimum-branch)))
-                 (:data ,coverage-output ,#'save-coverage))
+                 (:data ,coverage-output
+                        ,(lambda (path)
+                           (call-with-coverage-consumer
+                            :data
+                            (lambda () (save-coverage path))))))
         when pathname
           append (handler-case
                      (progn

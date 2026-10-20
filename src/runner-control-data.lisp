@@ -5,6 +5,8 @@
 (defvar *test-sequence-seed* 0)
 (defvar *default-retry* 0)
 (defvar *default-timeout-ms* nil)
+
+(defvar *on-test-attempt-complete* nil)
 (defconstant +default-max-workers-cap+ 32)
 
 (defconstant +default-max-workers-floor+ 2)
@@ -44,7 +46,8 @@
     *property-seed*
     *recursive-generator-depth*
     *journal-enabled*
-    *test-random-seed*))
+    *test-random-seed*
+    *on-test-attempt-complete*))
 
 (defconstant +stable-hash-modulus+ 4294967296)
 (defconstant +stable-hash-offset+ 2166136261)
