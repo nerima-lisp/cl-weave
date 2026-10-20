@@ -128,7 +128,8 @@ gate, and the JSON and S-expression mutation reporters. See
 The micro-benchmark helper and the timing statistics it records. See
 [Benchmarking](../guide/benchmarking.md).
 
-`benchmark`, `measure`, `benchmark-result`, `benchmark-result-iterations`,
+`benchmark`, `benchmark-scaling-within-p`, `measure`, `benchmark-result`,
+`benchmark-result-iterations`,
 `benchmark-result-samples`, `benchmark-result-warmup`, `mean-ms`, `median-ms`,
 `minimum-ms`, `maximum-ms`
 
@@ -235,12 +236,16 @@ helpers. See [DSL Guide](../guide/dsl-guide.md).
 
 ## Coverage
 
-The `sb-cover` integration, its statistics, and the condition raised when
-coverage is unavailable on the running implementation. See
+The `sb-cover` integration, aggregate and per-file statistics, uncovered form
+locations, and the conditions raised when coverage is unavailable or measures
+no executable forms. See
 [Reporters and CI](../guide/reporters-and-ci.md).
 
-`coverage-statistics`, `coverage-support-available-p`, `reset-coverage`,
-`save-coverage`, `coverage-unavailable`, `coverage-unavailable-reason`
+`coverage-file-statistics`, `coverage-no-data`,
+`coverage-no-data-exclude-pathnames`, `coverage-no-data-include-pathnames`,
+`coverage-statistics`, `coverage-support-available-p`,
+`coverage-uncovered-form-locations`, `reset-coverage`, `save-coverage`,
+`coverage-unavailable`, `coverage-unavailable-reason`
 
 ### Running coverage from Lisp
 
@@ -266,6 +271,34 @@ Its signature is:
 `argv` is a list of CLI argument strings. `run-options` is a keyword plist
 that overlays the options derived from `argv` and the CLI environment; when a
 key appears in both, the value in `run-options` takes precedence.
+For a `"run"` command, `run-options` accepts the keyword arguments of
+`cl-weave:run-all`:
+
+```lisp
+:reporter :stream :name-filter :location-filter :test-path-filter
+:include-tags :exclude-tags :shard :order :seed :bail :retry
+:timeout-ms :max-workers :coverage :coverage-output
+:coverage-report-directory :coverage-include-pathnames
+:coverage-exclude-pathnames :coverage-minimum-expression
+:coverage-minimum-branch :pass-with-no-tests :coverage-reset
+:on-test-attempt-complete
+```
+
+For `"run"`, any other key reaches `run-all` and signals its normal
+keyword-argument error. Other commands use their own option handling:
+`"list"` forwards only `:reporter`, `:name-filter`, `:shard`, `:order`, `:seed`,
+`:retry`, `:timeout-ms`, and `:stream` to `list-tests`; other keys are not
+passed to `list-tests`. `"watch"` forwards the merged plist to `watch-system`,
+which signals its normal keyword-argument error for unsupported keys. Doctor
+and metadata translate only `:reporter`,
+`:name-filter`, `:shard`, `:order`, `:seed`, `:bail`, `:coverage`,
+`:coverage-output`, `:coverage-report-directory`,
+`:coverage-include-pathnames`, `:coverage-exclude-pathnames`,
+`:coverage-minimum-expression`, `:coverage-minimum-branch`,
+`:pass-with-no-tests`, `:retry`, `:timeout-ms`, and `:max-workers` to CLI
+option fields; other keys are ignored, and neither command forwards
+`run-options` to `run-all`.
+
 For a test run, `run-coverage` returns `0` when the tests pass and `1` when
 they fail. It returns `2` for CLI parsing or validation errors, writing the
 CLI diagnostic to `*error-output*`, as `main` does. Help and version requests
@@ -311,13 +344,13 @@ effects:
 Consumers run only during an enabled coverage run. The `:report` consumer is
 called when a coverage report directory is configured, `:statistics` when a
 minimum coverage threshold is configured, and `:data` when a coverage output
-path is configured. A consumer whose corresponding setting is absent is not
-called.
+path is configured.
 
 ## Dynamic-state helpers
 
 Scoped restoration of bindings, function definitions and hash-table contents,
-so a test that mutates global state cannot leak into the next one.
+so a test that mutates global state cannot leak into the next one. See
+[Adoption Guide](../guide/adoption.md).
 
 `with-restored-binding`, `with-restored-bindings`, `with-replaced-function`,
 `with-restored-hash-table`, `with-cleared-hash-table`
