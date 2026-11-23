@@ -162,3 +162,100 @@
       (expect (spec-result-mode result) :to-be :linearizability)
       (expect (spec-result-passed-p result) :to-be t)
       (expect (spec-result-truncated result) :to-be nil))))
+
+(defspec concurrent-parameterized ()
+  (:variables x)
+  (:init (x 0))
+  (:action set-value (:for (v (list 1 2))) (:next (x v))))
+
+(defspec concurrent-read ()
+  (:variables x)
+  (:init (x 0))
+  (:action read-value (:next (x x)) (:output x)))
+
+(describe "spec concurrent conformance R11"
+  (it "rejects an operation whose parameters do not match a transition"
+    (let ((operation (make-history-operation :id 0 :thread 0 :action 'set-value
+                                             :params '(3) :invoked 0 :returned 1)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (concurrent-parameterized) (list operation))
+        (expect linearizable :to-be nil)
+        (expect prefix :to-equal nil)
+        (expect exceeded :to-be nil))))
+
+  (it "accepts an operation whose parameters match a transition"
+    (let ((operation (make-history-operation :id 0 :thread 0 :action 'set-value
+                                             :params '(2) :invoked 0 :returned 1)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (concurrent-parameterized) (list operation))
+        (expect linearizable :to-be t)
+        (expect prefix :to-equal (list operation))
+        (expect exceeded :to-be nil))))
+
+  (it "decides nine overlapping reads within the default budget"
+    (let ((history (loop for id below 9
+                         collect (make-history-operation
+                                  :id id :thread id :action 'read-value :params nil
+                                  :output (if (= id 8) 1 0)
+                                  :invoked id :returned (+ 10 id)))))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (concurrent-read) history)
+        (expect linearizable :to-be nil)
+        (expect exceeded :to-be nil)
+        (expect prefix :to-equal (subseq history 0 8)))))
+
+  #+sb-thread
+  (it "reports a forced lost update from two real threads"
+    (let* ((readers (sb-thread:make-semaphore :count 0))
+           (result
+             (check-linearizability
+              (concurrent-counter) :reset (lambda () (list 0))
+              :operations
+              (list (cons 'inc
+                          (lambda (sut)
+                            (let ((old (car sut)))
+                              (sb-thread:signal-semaphore readers)
+                              (sb-thread:wait-on-semaphore readers :n 2)
+                              (sb-thread:signal-semaphore readers 2)
+                              (setf (car sut) (1+ old))))))
+              :threads 2 :operations-per-thread 1 :runs 1 :seed 42))
+           (violation (spec-result-violation result))
+           (detail (spec-violation-detail violation)))
+      (expect (spec-violation-kind violation) :to-be :linearizability)
+      (expect (length (getf detail :history)) :to-be 2)
+      (expect (length (getf detail :longest-prefix)) :to-be 1)))
+
+  #+sb-thread
+  (it "reports an operation condition as a conformance failure"
+    (let* ((result (check-linearizability
+                    (concurrent-counter) :reset (lambda () nil)
+                    :operations (list (cons 'inc (lambda (sut)
+                                                   (declare (ignore sut))
+                                                   (error "forced operation failure"))))
+                    :threads 1 :operations-per-thread 1 :runs 1 :seed 42))
+           (violation (spec-result-violation result))
+           (condition (getf (spec-violation-detail violation) :condition)))
+      (expect (spec-result-passed-p result) :to-be nil)
+      (expect (spec-violation-kind violation) :to-be :conformance)
+      (expect (typep condition 'simple-error) :to-be t)
+      (expect (simple-condition-format-control condition) :to-equal "forced operation failure"))))
+
+(defspec concurrent-write-read ()
+  (:variables x)
+  (:init (x 0))
+  (:action set-value (:for (v (list 1 2))) (:next (x v)))
+  (:action read-value (:next (x x)) (:output x)))
+
+(describe "spec concurrent conformance memoization"
+  (it "distinguishes states reached by the same completed operations"
+    (let* ((first (make-history-operation :id 0 :thread 0 :action 'set-value
+                                          :params '(1) :invoked 0 :returned 3))
+           (second (make-history-operation :id 1 :thread 1 :action 'set-value
+                                           :params '(2) :invoked 1 :returned 4))
+           (read (make-history-operation :id 2 :thread 2 :action 'read-value
+                                         :params nil :output 1 :invoked 5 :returned 6)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (concurrent-write-read) (list first second read))
+        (expect linearizable :to-be t)
+        (expect prefix :to-equal (list second first read))
+        (expect exceeded :to-be nil)))))
