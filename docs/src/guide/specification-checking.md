@@ -82,14 +82,13 @@ The clauses are:
 Inside guards, updates, outputs and predicates, each state variable and each
 constant is an ordinary lexical variable holding its current value. In an
 action, the `:for` clause quantifies over lists (`\E x \in S` in TLA+). An action
-takes one `:for` clause, and that clause holds one `(parameter domain-form)` binding
-for each parameter, so several quantifications go into the same clause. A later
+takes exactly one `:for` clause. To quantify over several parameters, write one
+`(parameter domain-form)` binding per parameter inside that clause. A later
 domain can use an earlier parameter. `:next` lists only the variables that
 change, and every variable not listed is unchanged. An action without `:guard` is
 always enabled, one without `:next` changes nothing, and one without `:output`
-returns no output. The `next` form reads a
-variable in the next state, and it is available only in `:output` and
-`:action-property` forms.
+returns no output. The `next` form reads a variable in the next state, and it is
+available only in `:output` and `:action-property` forms.
 
 Two rules from TLA+ apply without being written. The next-state relation is the
 disjunction of the actions, and a stuttering step, which leaves every variable
@@ -806,11 +805,10 @@ states with `(next items)`.
 
 The checker shrank the failing run to three calls and reports the expected and
 the actual state at the failing step. The unshrunk trace is under
-`:original-trace`, and its length is the original length. It counts the initial
-state, so the 16 entries above are 15 calls and the shrunk trace's four entries
-are three calls. Conformance checking records no `:original-length` or
-`:shrunk-length` key, which only `simulate-spec` adds, so take the length of the
-trace.
+`:original-trace`. Take the original length as the length of that list. The list
+starts with the initial state, so the 16 entries above are 15 calls and the
+shrunk trace's four entries are three calls. Only `simulate-spec` adds
+`:original-length` and `:shrunk-length` keys; conformance checking does not.
 
 `:tree` mode does not draw random sequences. It walks the specification's
 reachable states breadth-first up to `:depth`, and for each transition it finds it
@@ -1176,10 +1174,9 @@ An operation that signals an error during a concurrent run is reported as a
 `:step` (the one-based position of the call in the generated sequence), `:action`,
 `:params` and `:condition`.
 
-A failed test carries a payload, a property list whose keys, together with
-`format-spec-trace` and `report-spec-result`, [Reporting and
-registration](../reference/api.md#reporting-and-registration) describes. In the
-payload, `:values` holds the unshrunk trace when there was one, and `:minimal`
+A failed test carries a payload, a property list. [Reporting and
+registration](../reference/api.md#reporting-and-registration) lists its keys and
+describes `format-spec-trace` and `report-spec-result`. In the payload, `:values` holds the unshrunk trace when there was one, and `:minimal`
 holds the trace that is reported.
 
 The `:condition` string of the payload holds the violated property, its kind, every
@@ -1202,8 +1199,7 @@ In a test run, the spec reporter shows the payload. With the journal enabled
 (bind `cl-weave:*journal-enabled*` or pass `--journal`, see [Time-Travel
 Debugging](time-travel-debugging.md)), it also shows a timeline of `:spec-step`
 frames, one per trace step, ending in a `:spec-stats` frame. A concurrent failure
-adds a `:spec-history` frame for each recorded operation. The reporter schema is
-unchanged. This is the report for
+adds a `:spec-history` frame for each recorded operation. This is the report for
 `(it-spec "without the lock check (broken)" (explore-spec (mutex :checked-lock nil) :max-states 500 :max-depth 20))`
 in a suite named `mutex`. It is abbreviated: `actual:` carries the payload, and
 the `condition:`, `form:` and `negated:` lines are left out.

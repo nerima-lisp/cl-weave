@@ -558,7 +558,7 @@ of a trace has no action.
 | `:deadlock` | `nil` | `:state` |
 | `:temporal` | temporal property name | `:kind` |
 | `:refinement` | `nil` | `:phase` (`:init` or `:step`) `:low-from` `:low-to` `:mapped-from` `:mapped-to` |
-| `:conformance` | `nil` | `:step` `:action` `:params` `:expected` `:actual` `:what`, and `:condition` when an operation signalled |
+| `:conformance` | `nil` | `:step` `:action` `:params` `:expected` `:actual` `:what`, `:original-trace` when the violation was shrunk, and `:condition` when an operation signalled |
 | `:linearizability` | `nil` | `:history` `:longest-prefix` |
 
 Supporting types, each with a `-p` predicate and a `make-` constructor:
