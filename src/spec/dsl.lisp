@@ -89,8 +89,7 @@
                                                  name quantifier))
                                     (first quantifier))
                                   quantifiers)))
-          progn
-            (when (intersection parameters variables)
+          (when (intersection parameters variables)
               (dsl-error "Action ~S: parameters ~S shadow state variables."
                          name (intersection parameters variables)))
             (unless (= (length parameters) (length (remove-duplicates parameters)))
@@ -184,8 +183,7 @@ CLAUSES are :variables, :init, :action, :invariant, :action-property,
              (unless (eql (proper-length value) size)
                (dsl-error "~A must have ~D elements, got ~S." context size value))))
     (dolist (clause clauses)
-      progn
-        (unless (and (consp clause) (proper-length clause)
+      (unless (and (consp clause) (proper-length clause)
                      (member (first clause) *specification-clause-heads*))
           (dsl-error "Specification ~S: invalid clause ~S." name clause))
         (when (member (first clause) (quote (:variables :symmetry)))
