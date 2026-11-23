@@ -10,26 +10,33 @@
             (if (consp dependency) (second dependency) dependency))
           (asdf:system-depends-on (asdf:find-system name))))
 
-(defun cl-weave-source-files ()
-  "Pathnames of the source files of the cl-weave system that exist on disk."
+(defun component-source-files (root)
   (let ((files '()))
     (labels ((walk (component)
-               (if (typep component 'asdf:cl-source-file)
-                   (let ((path (asdf:component-pathname component)))
-                     (when (probe-file path) (push path files)))
-                   (when (typep component 'asdf:parent-component)
-                     (mapc #'walk (asdf:component-children component))))))
-      (walk (asdf:find-system "cl-weave")))
-    files))
+               (cond ((typep component 'asdf:cl-source-file)
+                      (push (asdf:component-pathname component) files))
+                     ((typep component 'asdf:parent-component)
+                      (mapc #'walk (asdf:component-children component))))))
+      (walk root))
+    (nreverse files)))
+
+(defun stream-defines-spec-package-p (stream)
+  (let ((package (make-package (string (gensym "SPEC-READER-")) :use '(:cl)))
+        (eof (gensym "EOF")))
+    (unwind-protect
+         (let ((*package* package) (*read-eval* nil))
+           (loop for form = (read stream nil eof)
+                 until (eq form eof)
+                 thereis (and (consp form)
+                              (eq (first form) 'cl:defpackage)
+                              (consp (rest form))
+                              (typep (second form) '(or symbol string))
+                              (string= (string (second form)) "CL-WEAVE/SPEC"))))
+      (delete-package package))))
 
 (defun file-defines-spec-package-p (path)
-  "True when a line of PATH is a package definition naming cl-weave/spec."
   (with-open-file (stream path :external-format :utf-8)
-    (loop for line = (read-line stream nil)
-          while line
-          thereis (and (or (search "defpackage" line) (search "define-package" line))
-                       (search "cl-weave/spec" (string-downcase line))
-                       t))))
+    (stream-defines-spec-package-p stream)))
 
 (describe "cl-weave/spec system"
   (it "depends only on cl-weave"
@@ -47,18 +54,30 @@
             :to-be nil))
 
   (it "has no source file inside the cl-weave system"
-    (expect (remove-if-not (lambda (component)
-                             (member "spec" (pathname-directory
-                                             (asdf:component-pathname component))
-                                     :test #'string=))
-                           (asdf:component-children (asdf:find-system "cl-weave")))
-            :to-be nil))
+    (flet ((spec-path-p (path)
+             (member "spec" (pathname-directory path) :test #'string=)))
+      (let* ((files (component-source-files (asdf:find-system "cl-weave")))
+             (parent (make-instance 'asdf:system :name "fixture"
+                                    :pathname (asdf:system-source-directory "cl-weave")))
+             (nested (asdf::parse-component-form
+                      parent '(:module "src" :components
+                               ((:module "spec" :components ((:file "package"))))))))
+        (expect (plusp (length files)) :to-be t)
+        (expect (remove-if-not #'spec-path-p files) :to-be nil)
+        (expect (length (remove-if-not #'spec-path-p (component-source-files nested)))
+                :to-be 1))))
 
   (it "defines the cl-weave/spec package in no source file of the cl-weave system"
-    (let ((files (cl-weave-source-files)))
+    (let ((files (component-source-files (asdf:find-system "cl-weave"))))
       (expect (plusp (length files)) :to-be t)
       (expect (remove-if-not #'file-defines-spec-package-p files) :to-be nil))
     ;; Known-positive input: the detector must see the real definition.
     (expect (file-defines-spec-package-p
              (asdf:system-relative-pathname "cl-weave/spec" "src/spec/package.lisp"))
-            :to-be t)))
+            :to-be t)
+    (expect (with-input-from-string (stream (format nil "(DEFPACKAGE~%  #:cl-weave/spec (:use #:cl))"))
+              (stream-defines-spec-package-p stream))
+            :to-be t)
+    (expect (with-input-from-string (stream "; (defpackage #:cl-weave/spec)")
+              (stream-defines-spec-package-p stream))
+            :to-be nil)))
