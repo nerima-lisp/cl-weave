@@ -100,6 +100,35 @@
    (:file "cli-execution")
    (:file "cli-image"))
   :in-order-to ((test-op (test-op "cl-weave/test"))))
+(defsystem "cl-weave/spec"
+  :description "TLA+-style specifications, exhaustive and random state-space checks, refinement and conformance checking for cl-weave."
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
+  :license "MIT"
+  :version "1.5.0"
+  :homepage "https://github.com/nerima-lisp/cl-weave"
+  :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
+  :depends-on ("cl-weave")
+  :pathname "src/spec"
+  :serial t
+  :components
+  ((:file "package")
+   (:file "conditions")
+   (:file "values")
+   (:file "state")
+   (:file "spec")
+   (:file "dsl")
+   (:file "symmetry")
+   (:file "liveness")
+   (:file "explore")
+   (:file "random")
+   (:file "refinement")
+   (:file "conformance-sequential")
+   (:file "conformance-concurrent")
+   (:file "report")
+   (:file "registration")))
+
 (defsystem "cl-weave/test"
   :description "Self tests for cl-weave."
   :author "takeokunn <bararararatty@gmail.com>"
@@ -109,7 +138,7 @@
   :homepage "https://github.com/nerima-lisp/cl-weave"
   :bug-tracker "https://github.com/nerima-lisp/cl-weave/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-weave.git")
-  :depends-on ("cl-weave")
+  :depends-on ("cl-weave" "cl-weave/spec")
   :pathname "t"
   :serial t
   :components
@@ -178,6 +207,20 @@
    (:file "journal-test")
    (:file "replay-test")
    (:file "soft-test")
+   (:file "spec-package")
+   (:file "spec-helpers")
+   (:file "spec-system-test")
+   (:file "spec-values-test")
+   (:file "spec-core-test")
+   (:file "spec-explore-test")
+   (:file "spec-random-test")
+   (:file "spec-liveness-test")
+   (:file "spec-symmetry-test")
+   (:file "spec-refinement-test")
+   (:file "spec-conformance-sequential-test")
+   (:file "spec-conformance-concurrent-test")
+   (:file "spec-report-test")
+   (:file "spec-registration-test")
    (:file "runner-api-test"))
   :perform (test-op (op c)
              (declare (ignore op c))
