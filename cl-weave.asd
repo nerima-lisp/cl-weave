@@ -224,6 +224,7 @@
    (:file "spec-self-attempt-test")
    (:file "spec-self-worker-test")
    (:file "spec-self-watch-test")
+   (:file "spec-self-snapshot-mock-test")
    (:file "runner-api-test"))
   :perform (test-op (op c)
              (declare (ignore op c))
