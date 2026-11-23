@@ -32,14 +32,16 @@
       (trace-step-payloads trace)))
 
 (defun write-trace-steps (steps stream)
-  (loop for rest on steps for index from 0
-        do (when (= index 20)
-             (write-line "  ... (remaining steps omitted)" stream) (return))
-           (let ((step (car rest)))
-             (format stream "  ~D: ~A ~A => ~A~%" index
-                     (report-value-string (trace-step-action step))
-                     (report-value-string (trace-step-params step))
-                     (report-value-string (trace-step-state step))))))
+  (let ((count (length steps)))
+    (loop for step in steps for index from 0
+          do (cond
+               ((and (> count 20) (= index 10))
+                (format stream "  ... (~D steps omitted)~%" (- count 20)))
+               ((or (<= count 20) (< index 10) (>= index (- count 10)))
+                (format stream "  ~D: ~A ~A => ~A~%" index
+                        (report-value-string (trace-step-action step))
+                        (report-value-string (trace-step-params step))
+                        (report-value-string (trace-step-state step))))))))
 
 (defun format-spec-trace (trace &optional stream)
   (flet ((emit (out)

@@ -212,3 +212,38 @@
     (let* ((trace (report-test-trace))
            (rendered (with-output-to-string (stream) (format-spec-trace trace stream))))
       (expect rendered :to-equal (format-spec-trace trace)))))
+
+(describe "FR-013 spec report long traces"
+  (it "includes the final safety state and omitted count in the trace and failure message"
+    (let* ((trace (loop for i below 50
+                        collect (make-trace-step :action (unless (zerop i) 'advance)
+                                                 :state (list 'position i))))
+           (result (report-test-result :trace trace))
+           (message (getf (cl-weave::assertion-detail-actual (report-test-detail result))
+                          :condition)))
+      (dolist (output (list (format-spec-trace trace) message))
+        (expect (report-test-contains-p "POSITION 0" output) :to-be t)
+        (expect (report-test-contains-p "POSITION 49" output) :to-be t)
+        (expect (report-test-contains-p "30 steps omitted" output) :to-be t))))
+
+  (it "retains the lasso entry and closing state with separate prefix and cycle counts"
+    (let* ((prefix (loop for i below 25
+                         collect (make-trace-step :action (unless (zerop i) 'advance)
+                                                  :state (list 'position i))))
+           (cycle (append (loop for i from 25 below 59
+                                collect (make-trace-step :action 'advance
+                                                         :state (list 'position i)))
+                          (list (make-trace-step :action 'return
+                                                 :state '(position 24)))))
+           (trace (make-lasso :prefix prefix :cycle cycle))
+           (output (format-spec-trace trace))
+           (cycle-start (search "Cycle:" output :test #'char-equal))
+           (prefix-output (subseq output 0 cycle-start))
+           (cycle-output (subseq output cycle-start)))
+      (expect (report-test-contains-p "POSITION 0" prefix-output) :to-be t)
+      (expect (report-test-contains-p "POSITION 24" prefix-output) :to-be t)
+      (expect (report-test-contains-p "5 steps omitted" prefix-output) :to-be t)
+      (expect (report-test-contains-p "POSITION 25" cycle-output) :to-be t)
+      (expect (report-test-contains-p "RETURN" cycle-output) :to-be t)
+      (expect (report-test-contains-p "POSITION 24" cycle-output) :to-be t)
+      (expect (report-test-contains-p "15 steps omitted" cycle-output) :to-be t))))
