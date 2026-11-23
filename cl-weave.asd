@@ -221,6 +221,7 @@
    (:file "spec-conformance-concurrent-test")
    (:file "spec-report-test")
    (:file "spec-registration-test")
+   (:file "spec-self-attempt-test")
    (:file "runner-api-test"))
   :perform (test-op (op c)
              (declare (ignore op c))
