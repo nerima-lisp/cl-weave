@@ -23,27 +23,29 @@
 (defmacro it-spec-only (name &body body)
   (spec-registration-form 'it-spec-only name body 'cl-weave:it-only))
 
-;;; The skip and todo forms keep the check form inside the test body, so it is
-;;; never evaluated while the test is registered or run. IT-SKIP and IT-TODO
-;;; cannot take a body, so this builds the same registration form they do.
-;;; Syntax: (it-spec-skip name [reason] [options-plist] check-form), where the
-;;; reason defaults to the same string as IT-SKIP or IT-TODO.
+;;; The skip and todo forms take the same arguments as IT-SKIP and IT-TODO, plus
+;;; a check form last: (name [reason] [options-plist] check-form). The reason is
+;;; a form evaluated at registration, as IT-SKIP evaluates its reason. The check
+;;; form is only counted, never placed in the generated code, so no part of it
+;;; is expanded or evaluated, at compile time or at run time. The test body is
+;;; (nil), the same body IT-SKIP and IT-TODO register.
 (defun spec-skipped-registration-form (macro-name name body reason-key default-reason)
-  (multiple-value-bind (reason rest-body)
-      (cl-weave::split-reasoned-body body default-reason)
-    (multiple-value-bind (options forms)
-        (cl-weave::split-leading-option-plist rest-body)
-      (unless (and forms (null (rest forms)))
-        (cl-weave::registration-syntax-error
-         "~S requires exactly one check form after an optional reason and options plist, got ~S."
-         macro-name forms))
-      (let* ((check-form (first forms))
-             (test-body `(report-spec-result ,check-form :form ',check-form)))
-        (cl-weave::test-registration-form
-         name
-         (list test-body)
-         (cl-weave::test-options-with-registration-options
-          options (list reason-key reason)))))))
+  (let* ((check-form (car (last body)))
+         (head (butlast body))
+         (reason-given-p (and head (not (cl-weave::option-plist-form-p (first head)))))
+         (reason (if reason-given-p (first head) default-reason))
+         (option-forms (if reason-given-p (rest head) head)))
+    (unless (and (consp check-form)
+                 (<= (length option-forms) 1)
+                 (every #'cl-weave::option-plist-form-p option-forms))
+      (cl-weave::registration-syntax-error
+       "~S requires a name, an optional reason, an optional options plist, and one check form, got ~S."
+       macro-name body))
+    (cl-weave::test-registration-form
+     name
+     '(nil)
+     (cl-weave::test-options-with-registration-options
+      (first option-forms) (list reason-key reason)))))
 
 (defmacro it-spec-skip (name &body body)
   (spec-skipped-registration-form 'it-spec-skip name body :skip-reason "skipped"))

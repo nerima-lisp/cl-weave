@@ -40,6 +40,14 @@
 ;;; Counts how often a probe check form is evaluated.
 (defvar *registration-probe-count* 0)
 
+;;; Counts how often a probe check form is macroexpanded. Expanding it inside
+;;; generated code runs this at compile time, which the runtime probe misses.
+(defvar *expansion-probe-count* 0)
+
+(defmacro expansion-probe ()
+  (incf *expansion-probe-count*)
+  nil)
+
 (describe "spec registration"
   (it "expands it-spec to it with the check form reported through report-spec-result"
     (expect (macroexpand-1 '(it-spec "counter explores clean" (explore-spec (counter))))
@@ -161,6 +169,34 @@
         (expect (length todo) :to-be 1)
         (expect *registration-probe-count* :to-be 0))))
 
+  (it "never expands the check form of a skipped or todo test at compile time"
+    (let ((*expansion-probe-count* 0))
+      (compile nil '(lambda () (it-spec-skip "expansion skip" (expansion-probe))))
+      (compile nil '(lambda () (it-spec-todo "expansion todo" (expansion-probe))))
+      (expect *expansion-probe-count* :to-be 0)))
+
+  (it "expands the probe for a plain it-spec, so the compile-time probe is not vacuous"
+    (let ((*expansion-probe-count* 0))
+      (compile nil '(lambda () (it-spec "expansion pass" (expansion-probe))))
+      (expect *expansion-probe-count* :to-be 1)))
+
+  (it "reports a reason given as an expression, evaluated at registration"
+    (let ((events (registration-events
+                   (lambda ()
+                     (it-spec-skip "expression reason" (format nil "why ~A" "not")
+                       (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+      (expect (mapcar #'cl-weave::test-event-status events) :to-equal '(:skip))
+      (expect (mapcar #'cl-weave::test-event-reason events) :to-equal '("why not"))))
+
+  (it "accepts a reason expression followed by an options plist"
+    (let ((test (registered-test
+                 (lambda ()
+                   (it-spec-todo "reason and tags" (format nil "later")
+                     (:tags '("slow"))
+                     (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+      (expect (cl-weave::test-case-tags test) :to-equal '("SLOW"))
+      (expect (cl-weave::test-case-todo-reason test) :to-equal "later")))
+
   (it "evaluates the probe check form for a plain it-spec, so the probe is not vacuous"
     (let ((*registration-probe-count* 0))
       (registration-events
@@ -177,7 +213,8 @@
 
   (it "rejects a body with no check form, with or without options"
     (expect (registration-error-p '(it-spec "no check")) :to-be t)
-    (expect (registration-error-p '(it-spec "options only" (:tags '("slow")))) :to-be t))
+    (expect (registration-error-p '(it-spec "options only" (:tags '("slow")))) :to-be t)
+    (expect (registration-error-p '(it-spec-skip "string as check" "why")) :to-be t))
 
   (it "leaves an unknown option to it"
     (expect (registration-error-p
