@@ -94,6 +94,18 @@
                      (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
       (expect (cl-weave::test-case-tags test) :to-equal '("SLOW"))))
 
+  (it "filters it-spec tests by name, so a filtered-out check does not run"
+    (let ((root (cl-weave::make-suite :name "root")))
+      (let ((cl-weave::*root-suite* root)
+            (cl-weave::*current-suite* nil))
+        (it-spec "wanted check"
+          (explore-spec (counter) :check-deadlock nil :symmetry nil))
+        (it-spec "other check"
+          (explore-spec (small-invariant-fails) :symmetry nil)))
+      (expect (mapcar #'cl-weave::test-event-path
+                      (cl-weave::collect-events root :name-filter "wanted"))
+              :to-equal '(("wanted check")))))
+
   (it "rejects a body with two check forms"
     (expect (registration-error-p
              '(it-spec "two checks" (explore-spec (counter)) (explore-spec (counter))))
