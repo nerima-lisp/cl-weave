@@ -229,3 +229,32 @@
       (expect (lasso-p (spec-violation-trace (spec-result-violation result))) :to-be t)
       (expect (spec-result-checked-properties result) :to-equal '(never))
       (expect (spec-result-limits result) :to-equal '(:max-states 7 :max-depth 3)))))
+
+(describe "spec exhaustive exploration temporal selection"
+  (it "rejects an unknown temporal name before evaluating Init"
+    (let* ((init-called nil)
+           (spec (make-spec :name 'temporal-selection :variables '(x)
+                            :init (lambda () (setf init-called t) '((x 0)))
+                            :temporal-properties (list (make-spec-temporal-property
+                                                        :name 'known :kind :always
+                                                        :predicate (constantly t))))))
+      (exploration-signals-error spec-configuration-error
+        (explore-spec spec :symmetry nil :temporal '(missing)))
+      (expect init-called :to-be nil)
+      (exploration-signals-error spec-configuration-error
+        (explore-spec spec :symmetry nil :temporal '(known missing)))
+      (expect init-called :to-be nil)))
+
+  (it "checks a declared name without checking unselected properties"
+    (let* ((spec (make-spec :name 'selected-temporal :variables '(x)
+                            :init (lambda () '((x 0)))
+                            :temporal-properties (list (make-spec-temporal-property
+                                                        :name 'good :kind :always
+                                                        :predicate (constantly t))
+                                                       (make-spec-temporal-property
+                                                        :name 'bad :kind :eventually
+                                                        :predicate (constantly nil)))
+                            :check-deadlock nil))
+           (result (explore-spec spec :symmetry nil :temporal '(good))))
+      (expect (spec-result-passed-p result) :to-be t)
+      (expect (spec-result-checked-properties result) :to-equal '(good)))))
