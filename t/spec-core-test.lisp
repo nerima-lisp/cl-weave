@@ -411,3 +411,15 @@
                         :variables (quote (x)) :init (lambda () (list (list (quote x) 0)))
                         :symmetry (quote (a))))
             :to-equal (quote (a)))))
+
+(describe "spec DSL name validation"
+  (it "rejects malformed names during macroexpansion"
+    (dolist (form (quote ((specification bad () (:variables (x)) (:init (x 0)))
+                          (specification bad () (:variables x) (:init (x 0)) (:invariant 42 t))
+                          (specification bad () (:variables x) (:init (x 0)) (:symmetry 42))
+                          (specification bad () (:variables x) (:init (x 0)) (:fairness (:weak 42)))
+                          (specification bad () (:variables x) (:init (x 0)) (:action a (:for (nil (list 1)))))
+                          (specification bad () (:variables x) (:init (x 0)) (:action a (:for (v (list 1)) (v (list 2))))))))
+      (expect (handler-case (progn (macroexpand-1 form) :no-error)
+                (spec-definition-error () :signalled))
+              :to-be :signalled))))

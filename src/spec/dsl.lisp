@@ -89,9 +89,12 @@
                                                  name quantifier))
                                     (first quantifier))
                                   quantifiers)))
-          (when (intersection parameters variables)
-            (dsl-error "Action ~S: parameters ~S shadow state variables."
-                       name (intersection parameters variables)))
+          progn
+            (when (intersection parameters variables)
+              (dsl-error "Action ~S: parameters ~S shadow state variables."
+                         name (intersection parameters variables)))
+            (unless (= (length parameters) (length (remove-duplicates parameters)))
+              (dsl-error "Action ~S: duplicate parameters ~S." name parameters))
           (loop for (variable) in updates
                 do (unless (member variable variables)
                      (dsl-error "Action ~S assigns ~S, which is not a declared variable."
@@ -181,12 +184,19 @@ CLAUSES are :variables, :init, :action, :invariant, :action-property,
              (unless (eql (proper-length value) size)
                (dsl-error "~A must have ~D elements, got ~S." context size value))))
     (dolist (clause clauses)
-      (unless (and (consp clause) (proper-length clause)
-                   (member (first clause) *specification-clause-heads*))
-        (dsl-error "Specification ~S: invalid clause ~S." name clause))
+      progn
+        (unless (and (consp clause) (proper-length clause)
+                     (member (first clause) *specification-clause-heads*))
+          (dsl-error "Specification ~S: invalid clause ~S." name clause))
+        (when (member (first clause) (quote (:variables :symmetry)))
+          (unless (every (lambda (value) (and value (symbolp value))) (rest clause))
+            (dsl-error "~S requires symbol names, got ~S." (first clause) clause)))
       (case (first clause)
         ((:invariant :action-property :temporal)
-         (require-size clause 3 (first clause))
+         (progn
+           (require-size clause 3 (first clause))
+           (unless (symbolp (second clause))
+             (dsl-error "~S needs a symbol name, got ~S." (first clause) (second clause))))
          (when (eq (first clause) :temporal)
            (let* ((form (third clause))
                   (kind (and (consp form) (first form))))
@@ -213,10 +223,15 @@ CLAUSES are :variables, :init, :action, :invariant, :action-property,
                 (dsl-error "Action ~S: ~S needs a form." (second clause) (first part))))
              ((:for :next)
               (dolist (entry (rest part))
-                (require-size entry 2 (first part)))))))
+                (progn
+                  (require-size entry 2 (first part))
+                  (unless (and (first entry) (symbolp (first entry)))
+                    (dsl-error "Action ~S: ~S needs a symbol name, got ~S."
+                               (second clause) (first part) entry))))))))
         (:fairness
          (dolist (entry (rest clause))
-           (unless (and (consp entry) (proper-length entry) (rest entry))
+           (unless (and (consp entry) (proper-length entry) (rest entry)
+                        (every (lambda (action) (and action (symbolp action))) (rest entry)))
              (dsl-error "Invalid fairness entry ~S." entry)))))))
   (let* ((bindings (normalize-constant-bindings constants))
          (constant-names (mapcar #'first bindings))
