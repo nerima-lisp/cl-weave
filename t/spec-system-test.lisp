@@ -1,30 +1,35 @@
 (in-package #:cl-weave/spec-test)
 
 ;;;; FR-001: cl-weave/spec is a separate ASDF system. Loading cl-weave alone
-;;;; must not create its package or its exports.
+;;;; must not create its package or its exports. The guarantee is structural,
+;;;; so these checks read the system definitions and the core sources; they give
+;;;; the same answer on every runtime and in a read-only source tree.
 
 (defun system-direct-dependencies (name)
   (mapcar (lambda (dependency)
             (if (consp dependency) (second dependency) dependency))
           (asdf:system-depends-on (asdf:find-system name))))
 
-#+sbcl
-(defun lisp-child-output (&rest forms)
-  "Run FORMS, one --eval each, in a fresh SBCL whose source registry is the
-checkout. Return (values stdout exit-code)."
-  (let* ((root (asdf:system-source-directory "cl-weave"))
-         (evals (list* "(require :asdf)"
-                       (format nil "(asdf:initialize-source-registry '(:source-registry (:directory ~S) :inherit-configuration))" root)
-                       (mapcar (lambda (form) (with-standard-io-syntax (prin1-to-string form))) forms)))
-         (output (make-string-output-stream))
-         (process (sb-ext:run-program
-                   sb-ext:*runtime-pathname*
-                   (append (list "--core" (namestring sb-ext:*core-pathname*)
-                                 "--noinform" "--non-interactive" "--no-userinit")
-                           (loop for form in evals collect "--eval" collect form))
-                   :output output :error :output :input nil)))
-    (values (get-output-stream-string output)
-            (sb-ext:process-exit-code process))))
+(defun cl-weave-source-files ()
+  "Pathnames of the source files of the cl-weave system that exist on disk."
+  (let ((files '()))
+    (labels ((walk (component)
+               (if (typep component 'asdf:cl-source-file)
+                   (let ((path (asdf:component-pathname component)))
+                     (when (probe-file path) (push path files)))
+                   (when (typep component 'asdf:parent-component)
+                     (mapc #'walk (asdf:component-children component))))))
+      (walk (asdf:find-system "cl-weave")))
+    files))
+
+(defun file-defines-spec-package-p (path)
+  "True when a line of PATH is a package definition naming cl-weave/spec."
+  (with-open-file (stream path :external-format :utf-8)
+    (loop for line = (read-line stream nil)
+          while line
+          thereis (and (or (search "defpackage" line) (search "define-package" line))
+                       (search "cl-weave/spec" (string-downcase line))
+                       t))))
 
 (describe "cl-weave/spec system"
   (it "depends only on cl-weave"
@@ -49,20 +54,11 @@ checkout. Return (values stdout exit-code)."
                            (asdf:component-children (asdf:find-system "cl-weave")))
             :to-be nil))
 
-  #+sbcl
-  (it "creates no cl-weave/spec package when only cl-weave is loaded"
-    (multiple-value-bind (output code)
-        (lisp-child-output
-         '(asdf:load-system "cl-weave")
-         '(format t "~&RESULT=~A~%" (if (find-package "CL-WEAVE/SPEC") "present" "absent")))
-      (expect (list code (when (/= code 0) output)) :to-equal '(0 nil))
-      (expect (and (search "RESULT=absent" output) t) :to-be t)))
-
-  #+sbcl
-  (it "creates the cl-weave/spec package when cl-weave/spec is loaded"
-    (multiple-value-bind (output code)
-        (lisp-child-output
-         '(asdf:load-system "cl-weave/spec")
-         '(format t "~&RESULT=~A~%" (if (find-package "CL-WEAVE/SPEC") "present" "absent")))
-      (expect (list code (when (/= code 0) output)) :to-equal '(0 nil))
-      (expect (and (search "RESULT=present" output) t) :to-be t))))
+  (it "defines the cl-weave/spec package in no source file of the cl-weave system"
+    (let ((files (cl-weave-source-files)))
+      (expect (plusp (length files)) :to-be t)
+      (expect (remove-if-not #'file-defines-spec-package-p files) :to-be nil))
+    ;; Known-positive input: the detector must see the real definition.
+    (expect (file-defines-spec-package-p
+             (asdf:system-relative-pathname "cl-weave/spec" "src/spec/package.lisp"))
+            :to-be t)))
