@@ -33,7 +33,8 @@
     "deterministic-replay"
     "soft-assertions"
     "interactive-breakpoints"
-    "journal-logic-queries"))
+    "journal-logic-queries"
+    "specification-checking"))
 
 (defparameter *metadata-standard-documentation*
   '("README.md"))
@@ -337,4 +338,23 @@
      :public-apis ("journal-facts" "journal-where" "query-journal")
      :quality-gates ,*metadata-quality-gates-json-results*
      :documentation ("README.md" "docs/src/guide/time-travel-debugging.md"
-                     "docs/src/guide/logic-programming.md"))))
+                     "docs/src/guide/logic-programming.md"))
+    (:name "specification-checking"
+     :status "implemented"
+     :summary ,(concatenate 'string
+                            "The separate cl-weave/spec system checks TLA+-style specifications "
+                            "written in Lisp: exhaustive and random state-space exploration, "
+                            "liveness under fairness, symmetry reduction, refinement, and "
+                            "sequential and concurrent conformance of an implementation to a "
+                            "specification. Its symbols are exported from the cl-weave/spec "
+                            "package, not from cl-weave.")
+     :public-apis ("specification" "defspec" "make-spec"
+                   "explore-spec" "simulate-spec" "replay-action-sequence"
+                   "shrink-action-sequence" "check-temporal-properties"
+                   "spec-state-canonicalizer" "check-refinement"
+                   "check-sequential-conformance" "check-linearizability"
+                   "linearizable-history-p" "make-history-operation"
+                   "spec-result-passed-p" "report-spec-result" "format-spec-trace"
+                   "it-spec" "it-spec-only" "it-spec-skip" "it-spec-todo")
+     :quality-gates ,*metadata-quality-gates-json-results*
+     :documentation ("README.md" "docs/src/guide/specification-checking.md"))))
