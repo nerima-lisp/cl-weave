@@ -247,3 +247,41 @@
       (expect (report-test-contains-p "RETURN" cycle-output) :to-be t)
       (expect (report-test-contains-p "POSITION 24" cycle-output) :to-be t)
       (expect (report-test-contains-p "15 steps omitted" cycle-output) :to-be t))))
+
+(describe "FR-013 linearizability report"
+  (it "prints history and the longest linearizable prefix and records history frames"
+    (let* ((first (make-history-operation :id 1 :thread 0 :action :inc :params nil
+                                          :output 1 :invoked 1 :returned 3))
+           (second (make-history-operation :id 2 :thread 1 :action :inc :params nil
+                                           :output 1 :invoked 2 :returned 4))
+           (result (make-spec-result
+                    :spec-name (quote counter) :mode :linearizability
+                    :violation (make-spec-violation
+                                :kind :linearizability :property nil
+                                :detail (list :history (list first second)
+                                              :longest-prefix (list first)))))
+           (message (getf (spec-result-payload result) :condition))
+           (history-start (search "History:" message))
+           (prefix-start (search "Longest prefix:" message))
+           (history-text (subseq message history-start prefix-start))
+           (prefix-text (subseq message prefix-start))
+           (frames (cl-weave:with-execution-journal
+                     (ignore-errors (report-spec-result result))))
+           (history-frames (remove :spec-history frames
+                                   :key (function cl-weave:journal-frame-kind)
+                                   :test-not (function eq))))
+      (expect (report-test-contains-p ":ID 1" history-text) :to-be t)
+      (expect (report-test-contains-p ":ID 2" history-text) :to-be t)
+      (expect (report-test-contains-p ":ID 1" prefix-text) :to-be t)
+      (expect (report-test-contains-p ":ID 2" prefix-text) :to-be nil)
+      (dolist (part (list ":THREAD 0" ":ACTION :INC" ":PARAMS NIL"
+                          ":OUTPUT 1" ":INVOKED 1" ":RETURNED 3"))
+        (expect (report-test-contains-p part prefix-text) :to-be t))
+      (expect (length history-frames) :to-be 2)
+      (expect (mapcar (function cl-weave:journal-frame-form) history-frames)
+              :to-equal (quote ((:inc) (:inc))))
+      (expect (mapcar (function cl-weave:journal-frame-actual) history-frames)
+              :to-equal (quote (1 1)))
+      (expect (mapcar (function cl-weave:journal-frame-expected) history-frames)
+              :to-equal (quote ((:invoked 1 :returned 3 :thread 0)
+                                (:invoked 2 :returned 4 :thread 1)))))))
