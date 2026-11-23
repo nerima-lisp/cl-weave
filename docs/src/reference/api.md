@@ -487,10 +487,19 @@ Arguments of the conformance checks:
 `check-sequential-conformance` drives the implementation through action
 sequences of the specification and compares the abstracted state, and the output
 when the action declares one, after each step. `mode` is `:random` or `:tree`.
-`:random` uses `seed`, `runs` and `max-steps`; `:tree` walks every path of the
-specification to `depth`, within `max-states`, and needs a deterministic `reset`.
-A violation has kind `:conformance`, is shrunk, and reports `:expected`,
-`:actual` and `:what` (`:state` or `:output`). An error signalled by an
+`:random` uses `seed`, `runs` and `max-steps`. `:tree` explores the
+specification breadth-first and per state, to `depth` and within `max-states`,
+and needs a deterministic `reset`. It runs every transition on a fresh
+implementation from `reset`, including a transition that reaches an already
+known state, but it explores the successors of a state once, from the first path
+that reaches it. An implementation that keeps history internally can therefore
+have a mismatch that goes unnoticed, because the successors of a state reached by
+a second path are not tried. When a `reset` returns a different valid initial
+state than the first one, `:tree` signals `spec-configuration-error`.
+
+A violation has kind `:conformance` and reports `:expected`, `:actual` and
+`:what` (`:state` or `:output`). It is shrunk, except a violation at the initial
+state (`:step` 0), which is reported as found. An error signalled by an
 operation is reported as a violation, not swallowed.
 
 `check-linearizability` runs `operations-per-thread` operations on each of
@@ -607,8 +616,9 @@ evaluate it.
 
 `spec-error` is the base class and has the reader `spec-error-message`.
 `spec-definition-error` signals a malformed specification, `spec-configuration-error`
-a check requested with options it cannot honor (signalled before the search
-starts), `spec-value-error` a value-model operation outside its domain, and
+a check requested with options it cannot honor (signalled before exploration
+begins for a problem detected up front, and also during a `:tree` conformance
+check when a `reset` returns a different valid initial state), `spec-value-error` a value-model operation outside its domain, and
 `spec-state-error` a state variable that `equal` cannot compare, with readers
 `spec-state-error-variable` and `spec-state-error-value`. The other
 subclasses add no slots.
