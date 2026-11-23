@@ -1,1 +1,65 @@
 (in-package #:cl-weave/spec)
+
+(defun symmetry-elements (spec name)
+  (let* ((value (spec-constant spec name))
+         (elements (cond ((spec-set-p value) (spec-set-elements value))
+                         ((and (listp value)
+                               (not (or (spec-function-p value) (spec-record-p value)
+                                        (spec-sequence-p value)))
+                               (handler-case (integerp (list-length value))
+                                 (type-error () nil)))
+                          (remove-duplicates value :test (function equal)))
+                         (t (error (quote spec-definition-error)
+                                   :message (format nil "Symmetric constant ~S must be a set or list." name))))))
+    (when (member nil elements)
+      (error (quote spec-definition-error)
+             :message (format nil "Symmetric constant ~S must not contain NIL." name)))
+    elements))
+
+(defun symmetry-groups (spec)
+  ;; Intersecting symmetric sets generate the full group on their union.
+  (let ((groups nil))
+    (dolist (name (spec-symmetry spec))
+      (let ((group (symmetry-elements spec name)))
+        (loop for overlap = (find-if (lambda (other)
+                                      (intersection group other :test #'equal))
+                                    groups)
+              while overlap
+              do (setf group (union group overlap :test #'equal)
+                       groups (remove overlap groups :test #'eq)))
+        (push group groups)))
+    groups))
+
+(defun symmetry-permutations (elements)
+  (if (endp elements)
+      (list nil)
+      (loop for element in elements
+            append (mapcar (lambda (tail) (cons element tail))
+                           (symmetry-permutations
+                            (remove element elements :test #'equal :count 1))))))
+
+(defun spec-state-canonicalizer (spec)
+  (when (spec-symmetry spec)
+    (let* ((groups (symmetry-groups spec))
+           (choices (mapcar #'symmetry-permutations groups)))
+      (lambda (state)
+        (let ((best nil))
+          (labels ((visit (remaining-groups remaining-choices mapping)
+                     (if (endp remaining-groups)
+                         (let* ((mapped
+                                  (loop for (variable value) on state by #'cddr
+                                        collect variable
+                                        collect (map-value-atoms
+                                                 (lambda (atom)
+                                                   (let ((pair (assoc atom mapping :test #'equal)))
+                                                     (if pair (cdr pair) atom)))
+                                                 value)))
+                                (candidate (make-state spec mapped)))
+                           (when (or (null best) (value< candidate best))
+                             (setf best candidate)))
+                         (dolist (permutation (first remaining-choices))
+                           (visit (rest remaining-groups) (rest remaining-choices)
+                                  (append (pairlis (first remaining-groups) permutation)
+                                          mapping))))))
+            (visit groups choices nil)
+            best))))))
