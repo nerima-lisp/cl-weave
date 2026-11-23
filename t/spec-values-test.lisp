@@ -142,3 +142,17 @@
                          :no-error)
                 (spec-value-error () :signalled))
               :to-be :signalled))))
+
+(describe "spec value atom mapping regressions"
+  (it "preserves record field names while mapping their values"
+    (let ((record (make-spec-record 'field 'old)))
+      (expect (map-value-atoms (lambda (x) (case x (field 'other) (old 'new) (t x)))
+                               record)
+              :to-equal (make-spec-record 'field 'new))))
+
+  (it "preserves list terminators while mapping nil elements"
+    (expect (map-value-atoms (lambda (x) (if (null x) :mapped x))
+                             (list 'a nil 'b))
+            :to-equal '(a :mapped b))))
+
+(describe "spec value pathname ordering" (it "normalizes distinct pathnames with identical namestrings independently of insertion order" (let ((a (make-pathname :name "a" :type "txt")) (b (make-pathname :device :unspecific :name "a" :type "txt"))) (expect (equal a b) :to-be nil) (expect (namestring a) :to-equal (namestring b)) (expect (spec-set a b) :to-equal (spec-set b a)))))
