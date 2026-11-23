@@ -388,9 +388,6 @@ on exit."
     (:next (fn id)
            (stack (cons id stack))
            (spies (selfv-put-spy spies id :active fn))))
-  ;; Outputs depend only on constants: the sequential conformance check
-  ;; evaluates an output with the wrong "from" state after the first step
-  ;; (see the report notes), so each outcome is its own action.
   (:action restore-spy
     (:for (id spy-ids))
     (:guard (member (selfv-spy-status spies id) '(:active :restored)))
