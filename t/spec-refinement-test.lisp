@@ -15,9 +15,6 @@
                                                :update (lambda (s) (declare (ignore s)) '(x 0)))))
              :temporal-properties temporal :fairness-conditions fairness))
 
-(defmacro refinement-signals-error (type form)
-  `(expect (handler-case (progn ,form :no-error) (,type () :signalled)) :to-be :signalled))
-
 (describe "spec refinement"
   (it "accepts identity and records limits"
     (let* ((spec (refinement-cycle))
@@ -63,14 +60,12 @@
       (expect (spec-result-checked-properties result) :to-equal '(reaches-one :deadlock))))
 
   (it "rejects an ineligible mapping value"
-    (refinement-signals-error spec-state-error
-      (check-refinement (refinement-cycle) (refinement-cycle)
-                        (lambda (s) (declare (ignore s)) (list 'x (make-hash-table))))))
+    (expect (lambda () (check-refinement (refinement-cycle) (refinement-cycle)
+                        (lambda (s) (declare (ignore s)) (list 'x (make-hash-table))))) :to-throw 'spec-state-error))
 
   (it "rejects a mapping missing a high variable"
-    (refinement-signals-error spec-definition-error
-      (check-refinement (refinement-cycle) (refinement-cycle)
-                        (lambda (s) (declare (ignore s)) nil))))
+    (expect (lambda () (check-refinement (refinement-cycle) (refinement-cycle)
+                        (lambda (s) (declare (ignore s)) nil))) :to-throw 'spec-definition-error))
 
   (it "detects a high temporal violation in the mapped graph"
     (let* ((property (make-spec-temporal-property :name 'reaches-one :kind :eventually
@@ -98,10 +93,8 @@
 
   (it "rejects unknown temporal names before truncation or safety violations"
     (let ((spec (refinement-cycle)))
-      (refinement-signals-error spec-configuration-error
-        (check-refinement spec spec #'identity :max-states 1 :temporal '(missing)))
-      (refinement-signals-error spec-configuration-error
-        (check-refinement spec spec (lambda (s) (declare (ignore s)) '(x 1)) :temporal '(missing))))))
+      (expect (lambda () (check-refinement spec spec #'identity :max-states 1 :temporal '(missing))) :to-throw 'spec-configuration-error)
+      (expect (lambda () (check-refinement spec spec (lambda (s) (declare (ignore s)) '(x 1)) :temporal '(missing))) :to-throw 'spec-configuration-error))))
 
 (describe "spec refinement mapped liveness"
   (it "does not create a cycle by merging low states with the same image"
@@ -146,7 +139,32 @@
       (expect (spec-violation-kind violation) :to-be :temporal)
       (expect (spec-violation-property violation) :to-be 'reaches-one)
       (expect (lasso-p (spec-violation-trace violation)) :to-be t)
-      (expect (spec-result-passed-p result) :to-be nil))))
+      (expect (spec-result-passed-p result) :to-be nil)))
+
+  (it "checks recurrent high liveness through a low back edge"
+    (let* ((low (make-spec :name (quote back-edge) :variables (quote (x))
+                           :init (lambda () (quote ((x 0))))
+                           :actions (list (make-spec-action :name (quote first-step)
+                                            :guard (lambda (s) (= (state-ref s (quote x)) 0))
+                                            :update (lambda (s) (declare (ignore s)) (quote (x 1))))
+                                          (make-spec-action :name (quote second-step)
+                                            :guard (lambda (s) (= (state-ref s (quote x)) 1))
+                                            :update (lambda (s) (declare (ignore s)) (quote (x 2))))
+                                          (make-spec-action :name (quote back)
+                                            :guard (lambda (s) (= (state-ref s (quote x)) 2))
+                                            :update (lambda (s) (declare (ignore s)) (quote (x 1)))))
+                           :fairness-conditions
+                           (mapcar (lambda (action) (make-spec-fairness-condition :kind :weak :action action))
+                                   (quote (first-step second-step back)))))
+           (high (make-spec :name (quote high) :variables (spec-variables low)
+                            :init (spec-init low) :actions (spec-actions low)
+                            :temporal-properties
+                            (list (make-spec-temporal-property :name (quote recurring-one) :kind :infinitely-often
+                                    :predicate (lambda (s) (= (state-ref s (quote x)) 1))))))
+           (result (check-refinement low high (function identity))))
+      (expect (spec-result-passed-p result) :to-be t)
+      (expect (spec-result-states-found result) :to-be 3)
+      (expect (spec-result-checked-properties result) :to-equal (quote (recurring-one :deadlock))))))
 
 (describe "spec refinement temporal predicates"
   (it "preserves each distinct temporal predicate when selecting properties"
@@ -184,5 +202,4 @@
 
 (describe "spec refinement temporal configuration"
   (it "rejects a dotted property list before exploring"
-    (refinement-signals-error spec-configuration-error
-      (check-refinement (refinement-cycle) (refinement-cycle :temporal (list (make-spec-temporal-property :name 'known :kind :always :predicate (constantly t)))) #'identity :temporal '(known . tail)))))
+    (expect (lambda () (check-refinement (refinement-cycle) (refinement-cycle :temporal (list (make-spec-temporal-property :name 'known :kind :always :predicate (constantly t)))) #'identity :temporal '(known . tail))) :to-throw 'spec-configuration-error)))
