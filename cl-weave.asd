@@ -222,6 +222,7 @@
    (:file "spec-report-test")
    (:file "spec-registration-test")
    (:file "spec-self-attempt-test")
+   (:file "spec-self-worker-test")
    (:file "runner-api-test"))
   :perform (test-op (op c)
              (declare (ignore op c))
