@@ -368,3 +368,17 @@
     (let ((graph (make-state-graph :spec (counter) :initial-states '((x 0)))))
       (expect (state-graph-complete-p graph) :to-be nil)
       (expect (state-table-count (state-graph-edges graph)) :to-be 0))))
+
+(describe "spec DSL clause shape validation"
+  (it "rejects malformed clauses during macroexpansion"
+    (dolist (form (quote ((specification bad () (:variables x) (:init (x 0)) (:action a (:next (x 1 2))))
+                          (specification bad () (:variables x) (:init (x (:in (list 1) ignored))))
+                          (specification bad () (:variables x) (:init (x 0)) (:deadlock-check nil ignored))
+                          (specification bad () (:variables x) (:init (x 0)) (:invariant p))
+                          (specification bad () (:variables x) (:init (x 0)) (:action-property p))
+                          (specification bad () (:variables x) (:init (x 0)) (:temporal p (:leads-to t)))
+                          (specification bad () (:variables x) (:init (x 0)) (:action a (:for (v (list 1) extra))))
+                          (specification bad () (:variables x) (:init (x 0)) (:action a (:guard))))))
+      (expect (handler-case (progn (macroexpand-1 form) :no-error)
+                (spec-definition-error () :signalled))
+              :to-be :signalled))))
