@@ -18,8 +18,9 @@
                          "Tree reset changed initial state from ~S to ~S."
                          (trace-step-state (first trace)) actual))
     (return-from conformance-run nil))
-  (loop for step in (rest trace)
-        for previous = (first trace) then step
+  ;; PREVIOUS walks TRACE in lockstep with STEP so it is always the prior step.
+  (loop for previous in trace
+        for step in (rest trace)
         for index from 1
         for action-name = (trace-step-action step)
         for params = (trace-step-params step)

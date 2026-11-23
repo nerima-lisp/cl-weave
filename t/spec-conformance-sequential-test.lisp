@@ -44,6 +44,25 @@
       (expect (getf detail :actual) :to-be :wrong)
       (expect (conformance-trace-summary (spec-violation-trace violation))
               :to-equal '((nil nil (x 0)) (inc nil (x 1))))))
+  (it "passes the pre-transition state to output on every step"
+    (let ((spec (specification previous-output ()
+                  (:variables x) (:init (x 0))
+                  (:action inc (:guard (< x 5)) (:next (x (1+ x))) (:output x)))))
+      (flet ((run (operation)
+               (check-sequential-conformance
+                spec :reset #'conformance-reset
+                :operations (list (cons 'inc operation))
+                :abstraction #'conformance-abstraction
+                :mode :random :seed 1 :runs 5 :max-steps 4)))
+        (let ((correct (run (lambda (sut) (prog1 (first sut) (incf (first sut)))))))
+          (expect (spec-result-passed-p correct) :to-be t))
+        (let* ((wrong (run (lambda (sut) (incf (first sut)))))
+               (detail (spec-violation-detail (spec-result-violation wrong))))
+          (expect (spec-result-passed-p wrong) :to-be nil)
+          (expect (getf detail :what) :to-be :output)
+          (expect (getf detail :step) :to-be 1)
+          (expect (getf detail :expected) :to-be 0)
+          (expect (getf detail :actual) :to-be 1)))))
   (it "reports the operation exception and its content"
     (let* ((result (check-sequential-conformance
                     (conformance-counter) :reset #'conformance-reset
