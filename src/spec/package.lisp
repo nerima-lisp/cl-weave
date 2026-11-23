@@ -58,6 +58,7 @@ Module contracts live in .reinloom/tla-spec/CONTRACTS.md.")
    #:spec-sequence-concat
    #:spec-sequence-length
    #:spec-sequence-ref
+   #:value<
    #:map-value-atoms
 
    ;; ------------------------------------------------------------------
@@ -162,6 +163,8 @@ Module contracts live in .reinloom/tla-spec/CONTRACTS.md.")
    #:spec-result-truncation-reason
    #:spec-result-liveness-requested
    #:spec-result-allow-bounded
+   #:spec-result-checked-properties
+   #:spec-result-limits
    #:spec-result-statistics
    #:spec-result-passed-p
    #:state-graph

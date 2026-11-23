@@ -301,6 +301,20 @@
              (make-spec-result :liveness-requested '(done)))
             :to-be t))
 
+  (it "carries the checked properties and the limits, empty by default"
+    (let ((empty (make-spec-result))
+          (full (make-spec-result :checked-properties '(within-limit :deadlock)
+                                  :limits '(:max-states 10 :max-depth 5))))
+      (expect (spec-result-checked-properties empty) :to-be nil)
+      (expect (spec-result-limits empty) :to-be nil)
+      (expect (spec-result-checked-properties full) :to-equal '(within-limit :deadlock))
+      (expect (spec-result-limits full) :to-equal '(:max-states 10 :max-depth 5))))
+
+  (it "does not let the checked properties or limits change the verdict"
+    (expect (spec-result-passed-p
+             (make-spec-result :checked-properties '(a) :limits '(:budget 1)))
+            :to-be t))
+
   (it "defaults every budget to a finite number"
     (dolist (limit (list *default-max-states* *default-max-depth*
                          *default-max-simulation-steps* *default-linearization-budget*))

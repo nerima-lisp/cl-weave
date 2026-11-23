@@ -88,9 +88,15 @@ for :temporal); DETAIL is a plist whose keys depend on KIND."
   "Outcome of one check. TRUNCATED is true when a limit stopped the search
 before it covered the space; TRUNCATION-REASON is :max-states, :max-depth or
 :budget. LIVENESS-REQUESTED lists the temporal properties that were asked for.
-STATISTICS is a plist of checker-specific counters."
+CHECKED-PROPERTIES lists, in declaration order, the names of the properties the
+check examined: invariants, action properties, temporal properties, and the
+keyword :deadlock when deadlock was checked; NIL when none was. LIMITS is the
+plist of limits the check ran with, for example (:max-states n :max-depth d),
+(:runs r :max-steps s) or (:budget b). STATISTICS is a plist of
+checker-specific counters."
   spec-name mode violation (states-found 0) (depth-reached 0) truncated
-  truncation-reason liveness-requested allow-bounded statistics)
+  truncation-reason liveness-requested allow-bounded checked-properties limits
+  statistics)
 
 (defun spec-result-passed-p (result)
   "True when RESULT is a pass. A violation never passes. A truncated search
