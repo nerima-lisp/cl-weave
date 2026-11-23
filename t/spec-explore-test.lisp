@@ -117,6 +117,8 @@
     (let ((result (explore-spec (counter :limit 1) :max-depth 1 :check-deadlock nil
                                                      :symmetry nil :temporal nil)))
       (expect (spec-result-passed-p result) :to-be t)
+      (expect (spec-result-states-found result) :to-be 2)
+      (expect (spec-result-depth-reached result) :to-be 1)
       (expect (spec-result-truncated result) :to-be nil)))
 
   (it "truncates on a new state after reaching the state limit"
@@ -184,7 +186,7 @@
       (expect (spec-result-checked-properties result) :to-equal '(safe increasing :deadlock))
       (expect (spec-result-limits result) :to-equal '(:max-states 7 :max-depth 3))))
 
-  (it "records only evaluated properties when the initial state violates an invariant"
+  (it "records declared safety properties when the initial state violates an invariant"
     (let* ((spec (specification metadata-violation ()
                    (:variables x) (:init (x 0))
                    (:action inc (:next (x (1+ x))))
@@ -193,7 +195,7 @@
            (result (explore-spec spec :max-states 7 :max-depth 3
                                       :symmetry nil :temporal nil)))
       (expect (spec-result-passed-p result) :to-be nil)
-      (expect (spec-result-checked-properties result) :to-equal '(positive))
+      (expect (spec-result-checked-properties result) :to-equal '(positive increasing))
       (expect (spec-result-limits result) :to-equal '(:max-states 7 :max-depth 3))))
 
   (it "records limits and excludes unexamined temporal properties on truncation"
@@ -258,3 +260,81 @@
            (result (explore-spec spec :symmetry nil :temporal '(good))))
       (expect (spec-result-passed-p result) :to-be t)
       (expect (spec-result-checked-properties result) :to-equal '(good)))))
+
+(describe "spec exhaustive exploration boundary regressions"
+  (it "caps initial states at max-states and reports depth zero"
+    (let ((result (explore-spec (chooser) :max-states 1 :symmetry nil :temporal nil)))
+      (expect (spec-result-truncation-reason result) :to-be :max-states)
+      (expect (spec-result-states-found result) :to-be 1)
+      (expect (spec-result-depth-reached result) :to-be 0)
+      (expect (spec-result-passed-p result) :to-be nil)))
+
+  (it "returns every step of a deadlock trace beyond depth one"
+    (let ((result (explore-spec (counter :limit 2) :symmetry nil :temporal nil)))
+      (expect (spec-violation-kind (spec-result-violation result)) :to-be :deadlock)
+      (expect (exploration-trace-summary result)
+              :to-equal '((nil nil (x 0)) (inc nil (x 1)) (inc nil (x 2))))
+      (expect (spec-result-states-found result) :to-be 3)
+      (expect (spec-result-depth-reached result) :to-be 2)))
+
+  (it "finds a same-depth invariant at discovery before expanding a deadlock"
+    (let* ((spec (specification initial-order () (:variables x)
+                   (:init (x (:in (list 0 1))))
+                   (:invariant zero (= x 0))))
+           (result (explore-spec spec :symmetry nil :temporal nil)))
+      (expect (spec-violation-kind (spec-result-violation result)) :to-be :invariant)
+      (expect (exploration-trace-summary result) :to-equal '((nil nil (x 1))))
+      (expect (spec-result-states-found result) :to-be 2)
+      (expect (spec-result-depth-reached result) :to-be 0)))
+
+  (it "rejects malformed temporal and deadlock options before Init"
+    (let* ((called nil)
+           (spec (make-spec :name 'invalid-options :variables '(x)
+                            :init (lambda () (setf called t) '((x 0))))))
+      (exploration-signals-error spec-configuration-error
+        (explore-spec spec :symmetry nil :temporal :bad))
+      (expect called :to-be nil)
+      (exploration-signals-error spec-configuration-error
+        (explore-spec spec :symmetry nil :temporal nil :check-deadlock :bad))
+      (expect called :to-be nil)))
+
+  (it "includes a dead end at max-depth in the graph for temporal checking"
+    (let* ((spec (make-spec :name 'boundary-graph :variables '(x)
+                            :init (lambda () '((x 0)))
+                            :actions (list (make-spec-action
+                                            :name 'advance
+                                            :guard (lambda (s) (= (state-ref s 'x) 0))
+                                            :update (lambda (s) (declare (ignore s)) '(x 1))))
+                            :temporal-properties (list (make-spec-temporal-property
+                                                        :name 'always-zero :kind :always
+                                                        :predicate (lambda (s) (= (state-ref s 'x) 0))))
+                            :check-deadlock nil))
+           (result (explore-spec spec :max-depth 1 :symmetry nil)))
+      (expect (spec-result-passed-p result) :to-be nil)
+      (expect (spec-violation-kind (spec-result-violation result)) :to-be :temporal)
+      (expect (spec-result-truncated result) :to-be nil)
+      (expect (spec-result-states-found result) :to-be 2)
+      (expect (spec-result-depth-reached result) :to-be 1)))
+
+  (it "lists action properties for a self-loop-only check"
+    (let* ((spec (specification self-loop-metadata () (:variables x) (:init (x 0))
+                   (:action stay (:next (x x)))
+                   (:action-property never nil)))
+           (result (explore-spec spec :symmetry nil :temporal nil :check-deadlock nil)))
+      (expect (spec-result-passed-p result) :to-be t)
+      (expect (spec-result-checked-properties result) :to-equal '(never))
+      (expect (spec-result-states-found result) :to-be 1)
+      (expect (spec-result-depth-reached result) :to-be 0))))
+
+(describe "spec exhaustive exploration invalid temporal options"
+  (it "rejects each non-list temporal option before Init"
+    (let* ((called nil)
+           (spec (make-spec :name 'invalid-temporal :variables '(x)
+                            :init (lambda () (setf called t) '((x 0)))
+                            :temporal-properties (list (make-spec-temporal-property
+                                                        :name 'p1 :kind :always
+                                                        :predicate (constantly t))))))
+      (dolist (option (list 'p1 :p1 t "p1"))
+        (exploration-signals-error spec-configuration-error
+          (explore-spec spec :symmetry nil :temporal option))
+        (expect called :to-be nil)))))

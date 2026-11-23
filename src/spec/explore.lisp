@@ -20,7 +20,13 @@
   (unless (and (integerp max-states) (plusp max-states)
                (integerp max-depth) (plusp max-depth))
     (signal-spec-error 'spec-configuration-error "Search limits must be positive integers."))
+  (unless (member check-deadlock (list :spec t nil))
+    (signal-spec-error (quote spec-configuration-error) "Invalid deadlock option ~S." check-deadlock))
   (unless (eq temporal :all)
+    (unless (or (null temporal)
+                (handler-case (and (list-length temporal) t)
+                  (type-error () nil)))
+      (signal-spec-error (quote spec-configuration-error) "Temporal properties must be a list or :ALL."))
     (dolist (name temporal)
       (unless (find name (spec-temporal-properties spec) :key (function spec-temporal-property-name))
         (signal-spec-error (quote spec-configuration-error)
@@ -45,8 +51,6 @@
            (transitions-count 0)
            (truncation nil)
            (checked-depth -1)
-           (invariants-checked nil)
-           (actions-checked nil)
            (temporal-checked nil)
            (deadlock-checked nil))
       (labels ((key (state) (if canonicalizer (funcall canonicalizer state) state))
@@ -60,11 +64,9 @@
                                    :truncation-reason truncation
                                    :liveness-requested properties :allow-bounded allow-bounded
                                    :checked-properties
-                                   (append (when invariants-checked
-                                             (mapcar (function spec-invariant-name) (spec-invariants spec)))
-                                           (when actions-checked
-                                             (mapcar (function spec-action-property-name)
-                                                     (spec-action-properties spec)))
+                                   (append (mapcar (function spec-invariant-name) (spec-invariants spec))
+                                           (mapcar (function spec-action-property-name)
+                                                   (spec-action-properties spec))
                                            (when temporal-checked
                                              (loop for property in (spec-temporal-properties spec)
                                                    for name = (spec-temporal-property-name property)
@@ -77,7 +79,6 @@
                  (setf (spec-violation-trace violation) (explore-node-trace node))
                  (return-from explore-spec (result violation)))
                (check-state (node initial-p)
-                 (setf invariants-checked t)
                  (let* ((state (explore-node-state node))
                         (violation (first (spec-check-invariants spec state))))
                    (when violation
@@ -119,6 +120,8 @@
                        (when (and blocked deadlock-p)
                          (fail (make-spec-violation :kind :deadlock
                                                     :detail (list :state peer-state)) peer))
+                       (when (and graph (= depth max-depth) blocked)
+                         (setf (state-table-ref (state-graph-edges graph) peer-state) nil))
                        (when (and (= depth max-depth) (not blocked) (null truncation))
                          (setf truncation :max-depth)))))
                  (unless (= depth max-depth)
@@ -128,9 +131,7 @@
                        (dolist (transition transitions)
                          (let* ((next (spec-transition-to transition))
                                 (child (make-explore-node next (1+ depth) node transition))
-                                (property (progn
-                                            (unless (equal state next) (setf actions-checked t))
-                                            (first (spec-check-action-properties spec state next)))))
+                                (property (first (spec-check-action-properties spec state next))))
                            (when property
                              (fail (make-spec-violation
                                     :kind :action-property :property property
