@@ -37,6 +37,9 @@
   (handler-case (progn (macroexpand form) nil)
     (error () t)))
 
+;;; Counts how often a probe check form is evaluated.
+(defvar *registration-probe-count* 0)
+
 (describe "spec registration"
   (it "expands it-spec to it with the check form reported through report-spec-result"
     (expect (macroexpand-1 '(it-spec "counter explores clean" (explore-spec (counter))))
@@ -105,6 +108,67 @@
       (expect (mapcar #'cl-weave::test-event-path
                       (cl-weave::collect-events root :name-filter "wanted"))
               :to-equal '(("wanted check")))))
+
+  (it "reports it-spec-skip with the same status and reason as it-skip"
+    (let ((expected (registration-events
+                     (lambda () (cl-weave:it-skip "skipped case" "not ready"))))
+          (actual (registration-events
+                   (lambda ()
+                     (it-spec-skip "skipped case" "not ready"
+                       (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+      (expect (mapcar #'cl-weave::test-event-status actual)
+              :to-equal (mapcar #'cl-weave::test-event-status expected))
+      (expect (mapcar #'cl-weave::test-event-status actual) :to-equal '(:skip))
+      (expect (mapcar #'cl-weave::test-event-reason actual) :to-equal '("not ready"))
+      (expect (mapcar #'cl-weave::test-event-path actual) :to-equal '(("skipped case")))))
+
+  (it "reports it-spec-todo with the same status and reason as it-todo"
+    (let ((expected (registration-events
+                     (lambda () (cl-weave:it-todo "todo case" "not started"))))
+          (actual (registration-events
+                   (lambda ()
+                     (it-spec-todo "todo case" "not started"
+                       (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+      (expect (mapcar #'cl-weave::test-event-status actual)
+              :to-equal (mapcar #'cl-weave::test-event-status expected))
+      (expect (mapcar #'cl-weave::test-event-reason actual) :to-equal '("not started"))))
+
+  (it "uses the same default reasons as it-skip and it-todo"
+    (let ((skipped (registration-events
+                    (lambda ()
+                      (it-spec-skip "default skip"
+                        (explore-spec (counter) :check-deadlock nil :symmetry nil)))))
+          (todo (registration-events
+                 (lambda ()
+                   (it-spec-todo "default todo"
+                     (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+      (expect (mapcar #'cl-weave::test-event-reason skipped) :to-equal '("skipped"))
+      (expect (mapcar #'cl-weave::test-event-reason todo) :to-equal '("todo"))))
+
+  (it "never evaluates the check form of a skipped or todo test"
+    (let ((*registration-probe-count* 0))
+      (let ((skipped (registration-events
+                      (lambda ()
+                        (it-spec-skip "probe skip"
+                          (progn (incf *registration-probe-count*)
+                                 (explore-spec (counter) :check-deadlock nil :symmetry nil))))))
+            (todo (registration-events
+                   (lambda ()
+                     (it-spec-todo "probe todo"
+                       (progn (incf *registration-probe-count*)
+                              (explore-spec (counter) :check-deadlock nil :symmetry nil)))))))
+        (expect (mapcar #'cl-weave::test-event-status skipped) :to-equal '(:skip))
+        (expect (length todo) :to-be 1)
+        (expect *registration-probe-count* :to-be 0))))
+
+  (it "evaluates the probe check form for a plain it-spec, so the probe is not vacuous"
+    (let ((*registration-probe-count* 0))
+      (registration-events
+       (lambda ()
+         (it-spec "probe pass"
+           (progn (incf *registration-probe-count*)
+                  (explore-spec (counter) :check-deadlock nil :symmetry nil)))))
+      (expect *registration-probe-count* :to-be 1)))
 
   (it "rejects a body with two check forms"
     (expect (registration-error-p
