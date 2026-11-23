@@ -3,8 +3,11 @@
 `cl-weave/spec` brings the working method of TLA+ to Common Lisp. You describe a
 system as a specification: constants, variables, the initial states, and named
 actions that move the system from one state to the next. The checkers then
-explore the states the specification can reach and report the shortest sequence
-of steps that breaks a property you declared.
+explore the states the specification can reach and report a counterexample, a
+sequence of steps that breaks a property you declared. Exhaustive exploration
+reports a shortest counterexample for a safety property. Random exploration and
+conformance checking report a shrunk sequence, which is not guaranteed to be the
+shortest.
 
 Use it where a plain example test cannot cover the interleavings or the state
 space:
@@ -68,7 +71,7 @@ The clauses are:
 | --- | --- |
 | `(:variables v ...)` | The state variables. Required, once. |
 | `(:init (v form) ...)` | The initial state. `(v (:in domain-form))` makes one initial state per element of the list. Required, once. |
-| `(:action name clause...)` | A named action with `:for`, `:guard`, `:next` and `:output` clauses. |
+| `(:action name clause...)` | A named action with at most one each of the `:for`, `:guard`, `:next` and `:output` clauses. |
 | `(:invariant name form)` | A predicate that must hold in every reachable state. |
 | `(:action-property name form)` | A predicate over a step, written with `(next v)`. |
 | `(:temporal name (kind P [Q]))` | A liveness formula. See [Liveness and fairness](#liveness-and-fairness). |
@@ -78,7 +81,9 @@ The clauses are:
 
 Inside guards, updates, outputs and predicates, each state variable and each
 constant is an ordinary lexical variable holding its current value. In an
-action, `:for` clauses quantify over lists (`\E x \in S` in TLA+), and a later
+action, the `:for` clause quantifies over lists (`\E x \in S` in TLA+). An action
+takes one `:for` clause, and that clause holds one `(parameter domain-form)` binding
+for each parameter, so several quantifications go into the same clause. A later
 domain can use an earlier parameter. `:next` lists only the variables that
 change, and every variable not listed is unchanged. An action without `:guard` is
 always enabled, one without `:next` changes nothing, and one without `:output`
@@ -108,8 +113,33 @@ enabled action is a deadlock.
 ;; => 6
 ```
 
-A syntax error in the macros, such as an unknown clause or a variable assigned
-twice, signals `spec-definition-error` when the form is expanded.
+The next specification passes a token between processes with one action. The
+`:for` clause of `pass` binds `source` and `target`, and the domain of `target`
+uses `source`, so a process never passes the token to itself.
+
+```lisp
+(defspec token-passing ((procs '(p1 p2 p3)))
+  (:variables holder)
+  (:init (holder 'p1))
+  (:action pass
+    (:for (source procs) (target (remove source procs)))
+    (:guard (eq holder source))
+    (:next (holder target)))
+  (:deadlock-check nil))
+
+(mapcar (lambda (transition)
+          (list (spec-transition-action transition)
+                (spec-transition-params transition)))
+        (spec-successors (token-passing)
+                         (first (spec-initial-states (token-passing)))))
+;; => ((PASS (P1 P2)) (PASS (P1 P3)))
+(spec-result-states-found (explore-spec (token-passing)))
+;; => 3
+```
+
+A syntax error in the macros, such as an unknown clause, a repeated clause in one
+action or a variable assigned twice, signals `spec-definition-error` when the
+form is expanded.
 
 ### The function API
 
@@ -248,7 +278,9 @@ appears in a successor state is rejected when that state is generated.
 
 `explore-spec` searches the states reachable from the initial states
 breadth-first. Because the search is breadth-first, a safety counterexample has
-the shortest possible length. The next specification has two processes, and
+the shortest possible length. Random exploration and conformance checking shrink
+a failing sequence and give no such guarantee (see [Random
+exploration](#random-exploration)). The next specification has two processes, and
 `checked-lock` switches the lock check in `enter` on and off.
 
 ```lisp
@@ -345,6 +377,12 @@ property, and each candidate it tries is recorded as a `:shrink-step` frame on
 the [execution journal](time-travel-debugging.md). The shrink limit is
 `*property-shrink-max-steps*`, as in [Property
 Testing](property-testing.md#controlling-shrinking).
+
+Shrinking does not guarantee the shortest counterexample. It tries to delete a
+block of consecutive steps, largest blocks first, and keeps the first deletion
+that still fails. It stops when no block can be deleted, so a different failing
+sequence of the same specification could be shorter. The breadth-first search of
+`explore-spec` is the way to get a shortest safety counterexample.
 
 ```lisp
 (let* ((result (simulate-spec (mutex :checked-lock nil)
@@ -827,8 +865,12 @@ states with `(next items)`.
 ```
 
 The checker found the bug, shrunk the failing run to three calls, and reports the
-expected and the actual state at the failing step. `:original-length` counts the
-entries of the unshrunk trace, including its initial state.
+expected and the actual state at the failing step. The unshrunk trace is under
+`:original-trace`, and its length is the original length. It counts the initial
+state, so the 16 entries above are 15 calls and the shrunk trace's four entries
+are three calls. Conformance checking records no `:original-length` or
+`:shrunk-length` key, which only `simulate-spec` adds, so take the length of the
+trace.
 
 `:tree` mode does not draw random sequences. It walks the specification's
 reachable states breadth-first up to `:depth`, and for each transition it finds it
@@ -856,9 +898,18 @@ each is reachable in at most two steps, so a depth of four covers all of them.
 ```
 
 The tree starts at the state that the first `reset` abstracts to, and every later
-`reset` must land in the same state. A `reset` that lands in another initial
-state signals `spec-configuration-error`, because the checker does not skip paths
-silently. Use `:random` mode for an implementation whose initial state varies.
+`reset` must land in the same state. Two different mismatches can occur, and they
+are reported differently:
+
+- A `reset` that lands in a state matching none of the specification's initial
+  states is a `:conformance` violation at step 0, with the initial states as
+  `:expected` and the abstracted state as `:actual`. A step 0 violation is
+  reported as found and is not shrunk.
+- A `reset` that lands in a different state that is a valid initial state of the
+  specification signals `spec-configuration-error`, because the checker does not
+  skip paths silently.
+
+Use `:random` mode for an implementation whose initial state varies.
 
 ```lisp
 (defspec two-starts ()
@@ -877,6 +928,35 @@ silently. Use `:random` mode for an implementation whose initial state varies.
     (spec-configuration-error (condition) (spec-error-message condition))))
 ;; => "Tree reset changed initial state from (X 1) to (X 0)."
 ```
+
+A `reset` that lands outside the initial states, here in the state `(X 5)`, is a
+violation instead of an error.
+
+```lisp
+(let* ((result (check-sequential-conformance
+                (two-starts)
+                :mode :tree :depth 2
+                :reset (lambda () (list 5))
+                :operations (list (cons 'stay #'identity))
+                :abstraction (lambda (sut) (list 'x (first sut)))))
+       (violation (spec-result-violation result))
+       (detail (spec-violation-detail violation)))
+  (list (spec-violation-kind violation)
+        (getf detail :step)
+        (getf detail :expected)
+        (getf detail :actual)))
+;; => (:CONFORMANCE 0 ((X 0) (X 1)) (X 5))
+```
+
+`:tree` mode explores per specification state. For each transition it resets the
+implementation, replays the path to the source state and executes the transition,
+and that includes a transition into a state the tree already holds. A state is
+queued for expansion only when it is first reached, so its successors are tried
+along the first path that reaches it and not along later ones. An implementation
+with internal history that the abstraction does not show can behave differently
+after another path to the same state, and a mismatch that appears only then goes
+unnoticed. `:random` mode samples other paths, and an abstraction that includes
+the history lets either mode see it.
 
 ### Concurrent conformance
 
@@ -1134,17 +1214,58 @@ steps and reports the runs it made.
 
 A failed check returns a `spec-violation` whose `kind` is `:invariant`,
 `:action-property`, `:deadlock`, `:temporal`, `:refinement`, `:conformance` or
-`:linearizability`. Its `trace` is a list of `trace-step` values, each holding an
-action, its parameters and the state after the step. The first step is an initial
-state and has no action. For a `:temporal` violation the trace is a `lasso`, with
-a `lasso-prefix` and a `lasso-cycle`. The last state of the cycle equals the last
-state of the prefix. A cycle that stays in one state is a single step with no
-action. Read the fields with `trace-step-action`, `trace-step-params`,
-`trace-step-state`, `lasso-prefix` and `lasso-cycle`.
+`:linearizability`. The checkers that explore or replay a sequence of steps
+(`explore-spec`, `simulate-spec`, `check-refinement` and
+`check-sequential-conformance`) give a violation a `trace`. `check-linearizability`
+gives it a history instead, and the two are read differently.
+
+**A violation with a trace.** The `trace` is a list of `trace-step` values, each
+holding an action, its parameters and the state after the step. The first step is
+an initial state and has no action. For a `:temporal` violation the trace is a
+`lasso`, with a `lasso-prefix` and a `lasso-cycle`. The last state of the cycle
+equals the last state of the prefix. A cycle that stays in one state is a single
+step with no action. Read the fields with `trace-step-action`,
+`trace-step-params`, `trace-step-state`, `lasso-prefix` and `lasso-cycle`.
 
 For a shrunk random or conformance failure, `trace` is the shrunk sequence. The
 unshrunk trace is under `:original-trace` in the violation's detail list, together
-with `:seed` and `:case-index` for random runs.
+with `:seed` and `:case-index` for random runs. A conformance violation at step 0
+is reported as found, so it has no `:original-trace`.
+
+**A violation from `check-linearizability`.** A `:linearizability` violation has
+no trace, and `spec-violation-trace` returns `nil`. The threads of a concurrent run
+leave a history of operations that overlap in time, not a sequence of steps, so
+the detail list holds the evidence. `:history` holds every recorded operation as a
+`history-operation`, ordered by its `invoked` stamp. Read an operation with
+`history-operation-thread`, `history-operation-action`,
+`history-operation-params`, `history-operation-output`, `history-operation-invoked`
+and `history-operation-returned`. `:longest-prefix` holds the longest list of those
+operations that the search could put in an order the specification allows. The
+operations of `:history` that are missing from the prefix are the ones the search
+could not place after it, so start with the first of them.
+
+Two operations may be ordered either way when their time spans, from `invoked` to
+`returned`, overlap. An operation that returned before another was invoked must
+come first. A violation therefore means that the recorded outputs fit no such
+order. The next check uses an increment that always returns 0, which no order of
+a counter can explain, so the run fails whatever the thread schedule is.
+
+```lisp
+(let* ((result (check-counter (lambda (cell) (declare (ignore cell)) 0)
+                              :threads 2 :operations-per-thread 2 :runs 1 :seed 3))
+       (violation (spec-result-violation result))
+       (detail (spec-violation-detail violation)))
+  (list (spec-violation-kind violation)
+        (spec-violation-trace violation)
+        (length (getf detail :history))
+        (length (getf detail :longest-prefix))))
+;; => (:LINEARIZABILITY NIL 4 0)
+```
+
+An operation that signals an error during a concurrent run is reported as a
+`:conformance` violation, which has no trace either. Its detail list holds
+`:step` (the one-based position of the call in the generated sequence), `:action`,
+`:params` and `:condition`.
 
 `format-spec-trace` renders a trace or a lasso as text, and it limits the length
 and depth of what it prints. `spec-result-payload` returns the property list that
@@ -1165,7 +1286,9 @@ there was one, and `:minimal` holds the trace that is reported:
 
 The `:condition` string of the payload holds the violated property, its kind, every
 step of the trace, and the statistics, so the failure is readable without the
-journal. A truncated run reports the reason and what can be done about it.
+journal. For a `:linearizability` violation, which has no trace, `:minimal` is
+empty and the string lists the history and the longest prefix instead. A
+truncated run reports the reason and what can be done about it.
 
 ```lisp
 (let ((result (explore-spec (countdown :start 50) :max-states 10 :check-deadlock nil)))
@@ -1255,9 +1378,14 @@ wrote to.
 - **Truncation is a failure by default.** `:allow-bounded t` accepts a bounded
   check, and never for liveness.
 - **`:tree` conformance needs a deterministic `reset`.** The tree starts from the
-  abstraction of the first `reset`, and a `reset` that lands in a different state
-  signals `spec-configuration-error`. Use `:random` for an implementation whose
-  initial state varies.
+  abstraction of the first `reset`. A later `reset` that lands in a different
+  valid initial state signals `spec-configuration-error`, and one that lands in a
+  state matching no initial state is a violation at step 0. Use `:random` for an
+  implementation whose initial state varies.
+- **`:tree` conformance explores per state.** It runs a transition into a known
+  state, but it tries the successors of a state only along the first path that
+  reaches it. An implementation with internal history can therefore have a
+  mismatch go unnoticed.
 - **Liveness and symmetry exclude each other**, and random exploration cannot
   check liveness. Both signal `spec-configuration-error` before the search starts.
 
