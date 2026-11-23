@@ -13,9 +13,7 @@
 
 (defun replace-snapshot-entry (key value entries)
   (let ((entry (snapshot-entry key entries)))
-    (if entry (progn
-        (setf (cdr entry) value)
-        entries)
+    (if entry (substitute (cons key value) entry entries :test (function eq))
       (append entries (list (cons key value))))))
 
 (defun snapshot-sequence-key (prefix index)

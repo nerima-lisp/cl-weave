@@ -264,7 +264,20 @@
       (expect (cl-weave:snapshot-entries)
               :to-equal
               (list (cons "session/first" (cl-weave::snapshot-string (list :value 1)))
-                    (cons "session/second" (cl-weave::snapshot-string (list :value 2))))))))
+                    (cons "session/second" (cl-weave::snapshot-string (list :value 2)))))))
+  (it "flushes an updated existing snapshot to disk"
+    (with-test-snapshot-directory
+        (:prefix "snapshot-session-overwrite" :file-name "overwrite.snapshots" :update-snapshots t)
+      (let ((cl-weave::*snapshot-session* nil))
+        (cl-weave::write-snapshot-file (list (cons "session/key" "old")
+                                             (cons "session/other" "preserved")))
+        (cl-weave::call-with-snapshot-session
+         (lambda ()
+           (expect (cl-weave::snapshot-match-or-update-p :new (list "session/key"))
+                   :to-be-truthy)))
+        (expect (cl-weave::read-snapshot-file)
+                :to-equal (list (cons "session/key" (cl-weave::snapshot-string :new))
+                                (cons "session/other" "preserved")))))))
 
 (it "flushes staged updates when execution exits with an error"
   (with-test-snapshot-directory

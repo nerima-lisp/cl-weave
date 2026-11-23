@@ -328,11 +328,7 @@ on exit."
               spec :reset reset :operations (selfv-snap-operations)
               :abstraction #'selfv-snap-abstraction options)))))
 
-;;; Every key is only ever written with one value here. Overwriting an
-;;; existing key with a different value inside a session is never flushed
-;;; (REPLACE-SNAPSHOT-ENTRY mutates the entry list that FLUSH-SNAPSHOT-SESSION
-;;; then compares with itself), so the value-changing domain below is kept for
-;;; the expected-failure test and out of the passing conformance runs.
+
 (defparameter *selfv-snapshot-conformance-ops*
   '((:set "a" "1") (:set "b" "1") (:seq "s" ()) (:seq "s" ("1" "2"))))
 
@@ -715,28 +711,11 @@ on exit."
                              :max-staged 2)
      :mode :tree :depth 7 :max-states 100000 :allow-bounded t))
 
-  ;; Known defect: see the comment at *SELFV-SNAPSHOT-CONFORMANCE-OPS*. The
-  ;; shortest failing path is a direct write of a=1, a session that stages
-  ;; a=2, and its end. Switch to IT-SPEC once the flush is fixed; this test
-  ;; then fails as an unexpected pass.
-  (cl-weave::it-fails "matches the real session when a staged write changes an existing value"
-    (report-spec-result
-     (selfv-check-snapshot-conformance
-      (selfv-snapshot-session :ops-domain *selfv-snapshot-overwrite-ops*)
-      :mode :tree :depth 4 :max-states 100000 :allow-bounded t)
-     :form '(selfv-check-snapshot-conformance overwrite-domain)))
 
-  (it "reports the lost overwrite as a state mismatch at the end of the session"
-    (let* ((result (selfv-check-snapshot-conformance
-                    (selfv-snapshot-session :ops-domain *selfv-snapshot-overwrite-ops*)
-                    :mode :tree :depth 4 :max-states 100000 :allow-bounded t))
-           (violation (spec-result-violation result))
-           (detail (spec-violation-detail violation)))
-      (expect (spec-violation-kind violation) :to-be :conformance)
-      (expect (getf detail :what) :to-be :state)
-      (expect (member (getf detail :action) '(flush-session end-session)) :to-be-truthy)
-      (expect (equal (getf (getf detail :expected) 'disk) (getf (getf detail :actual) 'disk))
-              :to-be nil)))
+  (it-spec "matches the real session when a staged write changes an existing value"
+    (selfv-check-snapshot-conformance
+     (selfv-snapshot-session :ops-domain *selfv-snapshot-overwrite-ops*)
+     :mode :tree :depth 4 :max-states 100000 :allow-bounded t))
 
   (it "detects a real session that drops staged writes when it closes"
     (let* ((result (selfv-check-snapshot-conformance
