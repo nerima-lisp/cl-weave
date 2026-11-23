@@ -94,8 +94,8 @@ variable in the next state, and it is available only in `:output` and
 Two rules from TLA+ apply without being written. The next-state relation is the
 disjunction of the actions, and a stuttering step, which leaves every variable
 unchanged, is always allowed. An action is enabled in a state when its guard holds
-for some choice of parameters. Stuttering does not count, so a state with no
-enabled action is a deadlock.
+for some choice of parameters. Stuttering does not count. [Safety](#safety)
+defines deadlock.
 
 ```lisp
 (spec-initial-states (counter))
@@ -146,27 +146,11 @@ form is expanded.
 The macros expand into calls of `make-spec`, `make-spec-action`,
 `make-spec-invariant`, `make-spec-action-property`, `make-spec-temporal-property`
 and `make-spec-fairness-condition`. Call them directly when the specification is
-computed, for example one action per element of a list. `make-spec` takes `:name`,
-`:constants` (a property list that `spec-constant` reads back), `:variables`,
-`:init`, `:actions`, `:invariants`, `:action-properties`, `:temporal-properties`,
-`:fairness-conditions`, `:symmetry` and `:check-deadlock`. This is the keyword
-behind the `(:deadlock-check nil)` clause. `make-spec-action` takes `:name`,
-`:params` (a list of `(name domain-function)`), `:guard`, `:update` and `:output`.
-The functions you supply take the state first and then the quantified parameters:
-
-| Function | Arguments | Returns |
-| --- | --- | --- |
-| init | none | a list of state property lists |
-| quantifier domain | state, earlier parameters | a list of values |
-| guard | state, parameters | a generalized boolean |
-| update | state, parameters | a property list of the changed variables |
-| output | state, next state, parameters | a value |
-| invariant predicate | state | a generalized boolean |
-| action property relation | state, next state | a generalized boolean |
-| temporal predicates `P` and `Q` | state | a generalized boolean |
-
-`state-ref` reads a variable from a state. The next example builds one action
-per step size.
+computed, for example one action per element of a list. The keywords and the
+signature of each function you supply are in [Specification
+objects](../reference/api.md#specification-objects). They take the state first,
+then the quantified parameters, and `state-ref` reads a variable from a state.
+The next example builds one action per step size.
 
 ```lisp
 (defun make-stepper (step-sizes limit)
@@ -243,17 +227,11 @@ Functions, records and sequences follow the same pattern.
         (spec-sequence-ref items 0)
         (spec-sequence-elements items)))
 ;; => (3 1 (1 2 3))
-
-(= (state-fingerprint (spec-set 1 2 3))
-   (state-fingerprint (spec-set 3 2 1)))
-;; => T
 ```
 
-Related operations include `make-spec-set`, `spec-set-size`,
-`spec-set-intersection`, `spec-subset-p`, `spec-set-filter`, `spec-set-map`,
-`make-spec-function`, `spec-function-domain`, `make-spec-record`,
-`spec-record-fields` and `make-spec-sequence`. Errors in a value operation,
-such as applying a function outside its domain, signal `spec-value-error`.
+The other operations are listed in [Value
+model](../reference/api.md#value-model). An error in a value operation, such as
+applying a function outside its domain, signals `spec-value-error`.
 
 Hash tables, other arrays, structures, closures and CLOS instances are rejected,
 because `equal` compares them by identity and two states holding equal-looking
@@ -277,11 +255,9 @@ appears in a successor state is rejected when that state is generated.
 ## Exhaustive exploration
 
 `explore-spec` searches the states reachable from the initial states
-breadth-first. Because the search is breadth-first, a safety counterexample has
-the shortest possible length. Random exploration and conformance checking shrink
-a failing sequence and give no such guarantee (see [Random
-exploration](#random-exploration)). The next specification has two processes, and
-`checked-lock` switches the lock check in `enter` on and off.
+breadth-first, so a safety counterexample has the shortest possible length. The
+next specification has two processes, and `checked-lock` switches the lock check
+in `enter` on and off.
 
 ```lisp
 (defun set-pc (pc proc value)
@@ -343,8 +319,8 @@ there.
 ;; |   4: ENTER (P2) => (PC ((P1 . :CRITICAL) (P2 . :CRITICAL)) LOCK P2)
 ```
 
-A trace prints one step per line as `index: action params => state`, and the
-initial state has no action. `explore-spec` accepts these keyword arguments:
+A trace prints one step per line as `index: action params => state`.
+`explore-spec` accepts these keyword arguments:
 
 | Keyword | Meaning |
 | --- | --- |
@@ -354,12 +330,10 @@ initial state has no action. `explore-spec` accepts these keyword arguments:
 | `:symmetry` | `t` (the default, use the specification's `:symmetry`) or `nil`. |
 | `:temporal` | `:all` (the default), a list of property names, or `nil`. |
 
-The result is a `spec-result`. Read it with `spec-result-passed-p`,
-`spec-result-violation`, `spec-result-states-found`, `spec-result-depth-reached`,
-`spec-result-truncated`, `spec-result-truncation-reason`,
-`spec-result-checked-properties`, `spec-result-limits` and
-`spec-result-statistics`. A property name that the specification does not
-declare signals `spec-configuration-error` before the search starts.
+The result is a `spec-result`. Its accessors are listed in [Results, traces and
+limits](../reference/api.md#results-traces-and-limits). A property name that the
+specification does not declare signals `spec-configuration-error` before the
+search starts.
 
 ## Random exploration
 
@@ -373,10 +347,10 @@ The seed and the number of runs follow the property-testing settings, which are
 `CL_WEAVE_PROPERTY_SEED` and `CL_WEAVE_PROPERTY_TESTS`. The seed is overridden by `:seed`, and `:runs` overrides the run count. The same seed reproduces the same
 counterexample. A failing sequence is shrunk: the search removes steps while the
 shorter sequence still fails with the same kind of violation on the same
-property, and each candidate it tries is recorded as a `:shrink-step` frame on
-the [execution journal](time-travel-debugging.md). The shrink limit is
-`*property-shrink-max-steps*`, as in [Property
-Testing](property-testing.md#controlling-shrinking).
+property. The shrink limit is `*property-shrink-max-steps*`, as in [Property
+Testing](property-testing.md#controlling-shrinking). Each candidate is recorded as a
+`:shrink-step` frame on the [execution journal](time-travel-debugging.md), as
+[Watching a Shrink Run](property-testing.md#watching-a-shrink-run) describes.
 
 Shrinking does not guarantee the shortest counterexample. It tries to delete a
 block of consecutive steps, largest blocks first, and keeps the first deletion
@@ -389,35 +363,20 @@ sequence of the same specification could be shorter. The breadth-first search of
                               :runs 50 :max-steps 30 :seed 7))
        (violation (spec-result-violation result))
        (detail (spec-violation-detail violation)))
-  (format-spec-trace (spec-violation-trace violation) *standard-output*)
   (list :passed (spec-result-passed-p result)
         :property (spec-violation-property violation)
         :seed (getf detail :seed)
         :case-index (getf detail :case-index)
         :original-length (getf detail :original-length)
         :shrunk-length (getf detail :shrunk-length)))
-;; |   0: NIL NIL => (PC ((P1 . :IDLE) (P2 . :IDLE)) LOCK :FREE)
-;; |   1: TRY (P2) => (PC ((P1 . :IDLE) (P2 . :WAITING)) LOCK :FREE)
-;; |   2: TRY (P1) => (PC ((P1 . :WAITING) (P2 . :WAITING)) LOCK :FREE)
-;; |   3: ENTER (P1) => (PC ((P1 . :CRITICAL) (P2 . :WAITING)) LOCK P1)
-;; |   4: ENTER (P2) => (PC ((P1 . :CRITICAL) (P2 . :CRITICAL)) LOCK P2)
 ;; => (:PASSED NIL :PROPERTY MUTUAL-EXCLUSION :SEED 7 :CASE-INDEX 0 :ORIGINAL-LENGTH 19 :SHRUNK-LENGTH 4)
 ```
 
 The violation records the seed, the zero-based run in which it appeared, and the
 number of calls before and after shrinking, so the shrunk trace has four steps
-after its initial state. The same seed gives the same text.
+after its initial state. A run without a violation reports its statistics.
 
 ```lisp
-(flet ((trace-text (seed)
-         (format-spec-trace
-          (spec-violation-trace
-           (spec-result-violation
-            (simulate-spec (mutex :checked-lock nil)
-                           :runs 50 :max-steps 30 :seed seed))))))
-  (string= (trace-text 7) (trace-text 7)))
-;; => T
-
 (let ((result (simulate-spec (mutex) :runs 20 :max-steps 30 :seed 7)))
   (list (spec-result-passed-p result) (spec-result-statistics result)))
 ;; => (T (:RUNS 20 :STEPS 600 :SEED 7))
@@ -445,22 +404,6 @@ trace never shows that something happens eventually. Passing `:temporal` signals
   (spec-configuration-error (condition) (spec-error-message condition)))
 ;; => "Random search cannot check temporal properties."
 ```
-
-With the journal enabled, each shrink candidate appears as a `:shrink-step`
-frame. Each line shows a candidate list of calls, and `rejected` means that the
-candidate no longer reproduces the failure. These are the first three candidates
-of the run above:
-
-```lisp
-(let ((frames (cl-weave:with-execution-journal
-                (simulate-spec (mutex :checked-lock nil)
-                               :runs 50 :max-steps 30 :seed 7))))
-  (cl-weave:explain-journal (subseq frames 0 3) *standard-output*))
-;; | #0 shrink-step arg 0 -> NIL rejected
-;; | #1 shrink-step arg 0 -> ((ENTER P2)) rejected
-;; | #2 shrink-step arg 0 -> ((TRY P2)) rejected
-```
-
 
 ## Safety
 
@@ -562,11 +505,10 @@ action counts as taken when its step changes at least one variable.
   (:deadlock-check nil))
 ```
 
-Both specifications end in a state with no enabled action, so they turn the
-deadlock check off. The ticker reaches its limit under weak fairness. The lazy
-ticker declares no fairness, so the search returns a lasso: a prefix from an initial state and a
-cycle that repeats forever. Here the cycle is a stuttering step, which the
-checker prints as a step with no action.
+The ticker reaches its limit under weak fairness. The lazy ticker declares no
+fairness, so the search returns a lasso: a prefix from an initial state and a
+cycle that repeats forever. [Reading a counterexample](#reading-a-counterexample)
+explains how to read one.
 
 ```lisp
 (let ((result (explore-spec (ticker))))
@@ -587,10 +529,8 @@ checker prints as a step with no action.
 Liveness is decided only on the complete state graph. `explore-spec` builds the
 graph while it searches. If the search is truncated, liveness is not decided and
 the run fails, even with `:allow-bounded t` (see [Truncation and
-limits](#truncation-and-limits)). `check-temporal-properties` is the checker
-underneath. It takes a specification and a complete `state-graph` and returns a
-list of violations. Symmetry and liveness cannot be used together, and the combination signals
-`spec-configuration-error`.
+limits](#truncation-and-limits)). Symmetry and liveness cannot be used together,
+and the combination signals `spec-configuration-error`.
 
 ## Symmetry
 
@@ -639,11 +579,14 @@ size.
 
 The last result, `:WITH-SYMMETRY T`, is a wrong answer, shown on purpose. The
 `never-alone` invariant names one process through the constant `alone`, so it is
-not invariant under permutation. The reduced search discards the state
-`{p4}` as equivalent to `{p1}` before it checks it. The trace and the checks
-use the real states, and the canonical form only
-decides whether a state was already visited. Symmetric constants must be a set
-or a list of atoms, and the list must not contain `nil`.
+not invariant under permutation, and symmetry is sound only for properties that
+are. The reduced search discards the state `{p4}` as equivalent to `{p1}`
+before it checks it. The trace and the checks use the real states, and the
+canonical form only decides whether a state was already visited. A numeric
+constant that also appears as an ordinary number in another variable is not
+invariant either, because the permutation rewrites those numbers too. Such a
+specification can pass with symmetry on and fail with it off. Symmetric
+constants must be a set or a list of atoms, and the list must not contain `nil`.
 
 Keep the state that mentions symmetric constants in sets, functions, records or
 sequences, which are rebuilt in canonical form after a permutation. A plain list
@@ -672,8 +615,10 @@ function value reduced it.
 ;; => ("Symmetry and temporal properties cannot be checked together." T)
 ```
 
-Symmetry is sound only for properties that are invariant under permutation of
-the symmetric constants. See [Limits and caveats](#limits-and-caveats).
+Canonicalizing a state tries every permutation of the symmetric constants, so the
+cost grows factorially with the number of symmetric elements. On a small state
+space the cost can exceed the saving. Measure with `:symmetry nil` before relying
+on it.
 
 ## Refinement
 
@@ -755,12 +700,7 @@ high-level one assumes fails the check.
 
 (let* ((result (check-refinement (unfair-steps) (halves) #'halve))
        (violation (spec-result-violation result)))
-  (format-spec-trace (spec-violation-trace violation) *standard-output*)
   (list (spec-violation-kind violation) (spec-violation-property violation)))
-;; | Prefix:
-;; |   0: NIL NIL => (X 0)
-;; | Cycle:
-;; |   0: NIL NIL => (X 0)
 ;; => (:TEMPORAL REACHES-TOP)
 ```
 
@@ -864,8 +804,8 @@ states with `(next items)`.
 ;; => (:PASSED NIL :STEP 3 :ACTION DEQ :WHAT :STATE :EXPECTED (ITEMS (A)) :ACTUAL (ITEMS (B)) :ORIGINAL-ENTRIES 16 :SHRUNK-ENTRIES 4)
 ```
 
-The checker found the bug, shrunk the failing run to three calls, and reports the
-expected and the actual state at the failing step. The unshrunk trace is under
+The checker shrank the failing run to three calls and reports the expected and
+the actual state at the failing step. The unshrunk trace is under
 `:original-trace`, and its length is the original length. It counts the initial
 state, so the 16 entries above are 15 calls and the shrunk trace's four entries
 are three calls. Conformance checking records no `:original-length` or
@@ -875,8 +815,8 @@ trace.
 `:tree` mode does not draw random sequences. It walks the specification's
 reachable states breadth-first up to `:depth`, and for each transition it finds it
 calls `reset` and replays the path that leads there. A tree that stops at the
-depth limit while some state still has an enabled action is truncated, so
-it fails unless `:allow-bounded t`. The queue has seven states, and
+depth limit while some state still has an enabled action is truncated (see
+[Truncation and limits](#truncation-and-limits)). The queue has seven states, and
 each is reachable in at most two steps, so a depth of four covers all of them.
 
 ```lisp
@@ -885,9 +825,6 @@ each is reachable in at most two steps, so a depth of four covers all of them.
         (spec-result-truncated result)
         (spec-result-truncation-reason result)))
 ;; => (NIL T :MAX-DEPTH)
-
-(spec-result-passed-p (check-queue nil :mode :tree :depth 1 :allow-bounded t))
-;; => T
 
 (let ((result (check-queue nil :mode :tree :depth 4)))
   (list (spec-result-passed-p result) (spec-result-truncated result)))
@@ -1027,10 +964,6 @@ come from a counter.
 ;; => T
 ```
 
-When the budget runs out, `check-linearizability` returns a truncated result with
-the reason `:budget`. It fails by default like any truncation, and
-`:allow-bounded t` accepts it.
-
 A counter whose increment holds a lock is linearizable. One that reads, yields,
 and writes loses updates, and the history records an output pair that no
 sequential order explains.
@@ -1069,11 +1002,13 @@ sequential order explains.
 ;; => (NIL :LINEARIZABILITY 20)
 ```
 
-The failing run depends on the thread schedule. With this much contention a
-failure is expected but not guaranteed on every run, and the history differs
-between runs. The violation detail holds the recorded history under `:history` and the
-longest linearizable prefix under `:longest-prefix`. A budget that is too small
-truncates the check.
+With this much contention a failure is expected but not guaranteed on every run,
+and the history differs between runs. [Reading a
+counterexample](#reading-a-counterexample) explains the detail list.
+
+When the search budget runs out, `check-linearizability` returns a truncated
+result with the reason `:budget`, which fails by default (see [Truncation and
+limits](#truncation-and-limits)).
 
 ```lisp
 (let ((result (check-counter #'locked-incr :threads 2 :operations-per-thread 3
@@ -1082,23 +1017,6 @@ truncates the check.
         (spec-result-truncation-reason result)
         (spec-result-passed-p result)))
 ;; => (T :BUDGET NIL)
-
-(spec-result-passed-p (check-counter #'locked-incr :threads 2 :operations-per-thread 3
-                                                   :runs 2 :seed 3 :budget 1
-                                                   :allow-bounded t))
-;; => T
-```
-
-Emptying `cl-weave::*platform-capabilities*` for one call simulates a runtime
-without threads. The check signals the capability error before it starts a
-thread.
-
-```lisp
-(handler-case
-    (let ((cl-weave::*platform-capabilities* nil))
-      (check-counter #'locked-incr))
-  (error (condition) (type-of condition)))
-;; => CL-WEAVE::PLATFORM-CAPABILITY-UNAVAILABLE
 ```
 
 ## Registering specification tests
@@ -1132,7 +1050,7 @@ signals `assertion-failure`, so a failure reports through the same path as `expe
 ```
 
 The `spec` reporter (`:reporter :spec`, see [Reporters and
-CI](reporters-and-ci.md)) prints the following. Timings are omitted here.
+CI](reporters-and-ci.md)) prints the following. Timings and the summary line are omitted here.
 
 ```text
 [PASS] queue model > never deadlocks
@@ -1141,16 +1059,13 @@ CI](reporters-and-ci.md)) prints the following. Timings are omitted here.
     reason: waiting for the ring buffer
 [TODO] queue model > write the liveness check
     reason: todo
-
-2 passed, 1 skipped, 1 todo, 0 failed, 0 errored, 4 total
 ```
 
 ## Truncation and limits
 
-Every search has finite default limits: `*default-max-states*`,
-`*default-max-depth*`, `*default-max-simulation-steps*` and
-`*default-linearization-budget*`. Pass keyword arguments to override them per
-check, or rebind the variables.
+Every search has finite default limits, which [Results, traces and
+limits](../reference/api.md#results-traces-and-limits) lists. Pass keyword
+arguments to override them per check, or rebind the variables.
 
 A check that stops because of a limit has not covered the space, so by default it
 fails. The failure message names the number of states found and the depth
@@ -1191,10 +1106,6 @@ and therefore `it-spec`, calls it, and so should any code that reads a result:
   (list (spec-result-truncated result) (spec-result-passed-p result)))
 ;; => (T T)
 
-(let ((result (explore-spec (countdown :start 50) :max-depth 5 :check-deadlock nil)))
-  (list (spec-result-truncation-reason result) (spec-result-passed-p result)))
-;; => (:MAX-DEPTH NIL)
-
 (let ((result (explore-spec (ticker :limit 50) :max-states 5 :allow-bounded t)))
   (list (spec-result-truncated result) (spec-result-passed-p result)))
 ;; => (T NIL)
@@ -1212,20 +1123,20 @@ steps and reports the runs it made.
 
 ## Reading a counterexample
 
-A failed check returns a `spec-violation` whose `kind` is `:invariant`,
-`:action-property`, `:deadlock`, `:temporal`, `:refinement`, `:conformance` or
-`:linearizability`. The checkers that explore or replay a sequence of steps
-(`explore-spec`, `simulate-spec`, `check-refinement` and
-`check-sequential-conformance`) give a violation a `trace`. `check-linearizability`
-gives it a history instead, and the two are read differently.
+A failed check returns a `spec-violation`. Its `kind`, the other fields and their
+accessors are listed in [Results, traces and
+limits](../reference/api.md#results-traces-and-limits). The checkers that explore
+or replay a sequence of steps (`explore-spec`, `simulate-spec`, `check-refinement`
+and `check-sequential-conformance`) give a violation a `trace`.
+`check-linearizability` gives it a history instead, and the two are read
+differently.
 
 **A violation with a trace.** The `trace` is a list of `trace-step` values, each
 holding an action, its parameters and the state after the step. The first step is
 an initial state and has no action. For a `:temporal` violation the trace is a
-`lasso`, with a `lasso-prefix` and a `lasso-cycle`. The last state of the cycle
-equals the last state of the prefix. A cycle that stays in one state is a single
-step with no action. Read the fields with `trace-step-action`,
-`trace-step-params`, `trace-step-state`, `lasso-prefix` and `lasso-cycle`.
+`lasso`, which has a prefix and a cycle. The last state of the cycle equals the
+last state of the prefix. A cycle that stays in one state is a single step with
+no action.
 
 For a shrunk random or conformance failure, `trace` is the shrunk sequence. The
 unshrunk trace is under `:original-trace` in the violation's detail list, together
@@ -1236,13 +1147,11 @@ is reported as found, so it has no `:original-trace`.
 no trace, and `spec-violation-trace` returns `nil`. The threads of a concurrent run
 leave a history of operations that overlap in time, not a sequence of steps, so
 the detail list holds the evidence. `:history` holds every recorded operation as a
-`history-operation`, ordered by its `invoked` stamp. Read an operation with
-`history-operation-thread`, `history-operation-action`,
-`history-operation-params`, `history-operation-output`, `history-operation-invoked`
-and `history-operation-returned`. `:longest-prefix` holds the longest list of those
-operations that the search could put in an order the specification allows. The
-operations of `:history` that are missing from the prefix are the ones the search
-could not place after it, so start with the first of them.
+`history-operation`, ordered by its `invoked` stamp. `:longest-prefix` holds the
+longest list of those operations that the search could put in an order the
+specification allows. The operations of `:history` that are missing from the
+prefix are the ones the search could not place after it, so start with the first
+of them.
 
 Two operations may be ordered either way when their time spans, from `invoked` to
 `returned`, overlap. An operation that returned before another was invoked must
@@ -1267,79 +1176,45 @@ An operation that signals an error during a concurrent run is reported as a
 `:step` (the one-based position of the call in the generated sequence), `:action`,
 `:params` and `:condition`.
 
-`format-spec-trace` renders a trace or a lasso as text, and it limits the length
-and depth of what it prints. `spec-result-payload` returns the property list that
-a failure carries, and `report-spec-result` signals `assertion-failure` with that
-payload when the result does not pass. `:values` holds the unshrunk trace when
-there was one, and `:minimal` holds the trace that is reported:
-
-```lisp
-(loop for (key) on (spec-result-payload *broken*) by #'cddr
-      collect key)
-;; => (:SEED :CASE-INDEX :VALUES :MINIMAL :CONDITION :SPEC :MODE :KIND :PROPERTY :STATS)
-
-(let ((payload (spec-result-payload *broken*)))
-  (list (getf payload :spec) (getf payload :kind) (getf payload :property)
-        (getf payload :stats)))
-;; => (MUTEX :INVARIANT MUTUAL-EXCLUSION (:TRANSITIONS 14 :INITIAL-STATES 1))
-```
+A failed test carries a payload, a property list whose keys, together with
+`format-spec-trace` and `report-spec-result`, [Reporting and
+registration](../reference/api.md#reporting-and-registration) describes. In the
+payload, `:values` holds the unshrunk trace when there was one, and `:minimal`
+holds the trace that is reported.
 
 The `:condition` string of the payload holds the violated property, its kind, every
 step of the trace, and the statistics, so the failure is readable without the
 journal. For a `:linearizability` violation, which has no trace, `:minimal` is
 empty and the string lists the history and the longest prefix instead. A
-truncated run reports the reason and what can be done about it.
+truncated run reports the reason and what can be done about it:
 
 ```lisp
 (let ((result (explore-spec (countdown :start 50) :max-states 10 :check-deadlock nil)))
   (write-string (getf (spec-result-payload result) :condition)))
 ;; | States found: 10; depth reached: 9.
 ;; | Search truncated: :MAX-STATES. Use :allow-bounded t to permit bounded checking (except temporal properties).
-
-(let ((result (explore-spec (ticker :limit 50) :max-states 5 :allow-bounded t)))
-  (write-string (getf (spec-result-payload result) :condition)))
-;; | States found: 5; depth reached: 4.
-;; | Search truncated: :MAX-STATES. Temporal properties cannot pass a truncated search, even with :allow-bounded t.
 ```
+
+When temporal properties were requested, the second line says instead that they
+cannot pass a truncated search, even with `:allow-bounded t`.
 
 In a test run, the spec reporter shows the payload. With the journal enabled
 (bind `cl-weave:*journal-enabled*` or pass `--journal`, see [Time-Travel
-Debugging](time-travel-debugging.md)), it also shows a timeline of `:spec-step` frames, one per trace step, ending in a
-`:spec-stats` frame. A concurrent failure adds a `:spec-history` frame for each
-recorded operation. The reporter schema is unchanged. This is the report for
+Debugging](time-travel-debugging.md)), it also shows a timeline of `:spec-step`
+frames, one per trace step, ending in a `:spec-stats` frame. A concurrent failure
+adds a `:spec-history` frame for each recorded operation. The reporter schema is
+unchanged. This is the report for
 `(it-spec "without the lock check (broken)" (explore-spec (mutex :checked-lock nil) :max-states 500 :max-depth 20))`
-in a suite named `mutex`:
+in a suite named `mutex`. It is abbreviated: `actual:` carries the payload, and
+the `condition:`, `form:` and `negated:` lines are left out.
 
 ```text
 [FAIL] mutex > without the lock check (broken)
-    condition: Test assertion failed: (EXPLORE-SPEC (MUTEX :CHECKED-LOCK NIL)
-                                                    :MAX-STATES 500 :MAX-DEPTH
-                                                    20)
-    form: (EXPLORE-SPEC (MUTEX :CHECKED-LOCK NIL) :MAX-STATES 500 :MAX-DEPTH 20)
     matcher: :SPEC
-    actual: (:SEED NIL :CASE-INDEX NIL :VALUES NIL :MINIMAL
-             ((:INDEX 0 :ACTION NIL :PARAMS NIL :STATE
-               (PC ((P1 . :IDLE) (P2 . :IDLE)) LOCK :FREE))
-              (:INDEX 1 :ACTION TRY :PARAMS (P1) :STATE
-               (PC ((P1 . :WAITING) (P2 . :IDLE)) LOCK :FREE))
-              (:INDEX 2 :ACTION TRY :PARAMS (P2) :STATE
-               (PC ((P1 . :WAITING) (P2 . :WAITING)) LOCK :FREE))
-              (:INDEX 3 :ACTION ENTER :PARAMS (P1) :STATE
-               (PC ((P1 . :CRITICAL) (P2 . :WAITING)) LOCK P1))
-              (:INDEX 4 :ACTION ENTER :PARAMS (P2) :STATE
-               (PC ((P1 . :CRITICAL) (P2 . :CRITICAL)) LOCK P2)))
-             :CONDITION "Violation :INVARIANT property MUTUAL-EXCLUSION
-  0: NIL NIL => (PC ((P1 . :IDLE) (P2 . :IDLE)) LOCK :FREE)
-  1: TRY (P1) => (PC ((P1 . :WAITING) (P2 . :IDLE)) LOCK :FREE)
-  2: TRY (P2) => (PC ((P1 . :WAITING) (P2 . :WAITING)) LOCK :FREE)
-  3: ENTER (P1) => (PC ((P1 . :CRITICAL) (P2 . :WAITING)) LOCK P1)
-  4: ENTER (P2) => (PC ((P1 . :CRITICAL) (P2 . :CRITICAL)) LOCK P2)
-States found: 9; depth reached: 4.
-"
+    actual: (:SEED NIL :CASE-INDEX NIL :VALUES NIL :MINIMAL (...) :CONDITION "..."
              :SPEC MUTEX :MODE :EXHAUSTIVE :KIND :INVARIANT :PROPERTY
              MUTUAL-EXCLUSION :STATS (:TRANSITIONS 14 :INITIAL-STATES 1))
     expected: (MUTUAL-EXCLUSION :DEADLOCK)
-    negated: NIL
     timeline (6 frames):
       #0 spec-step :INIT => (PC ((P1 . :IDLE) (P2 . :IDLE)) LOCK :FREE) ok
       #1 spec-step (TRY P1) => (PC ((P1 . :WAITING) (P2 . :IDLE)) LOCK :FREE) ok
@@ -1355,39 +1230,22 @@ wrote to.
 
 ## Limits and caveats
 
-- **Refinement does not check the high-level fairness conditions.** It checks the
-  high-level temporal formulas under the low-level fairness, mapped through the
-  refinement mapping. A high-level `WF` or `SF` declaration is not an obligation
-  on the low-level specification.
-- **Symmetry is sound only for permutation-invariant predicates.** Symmetric
-  constants must be sets or lists of atoms, and `nil` signals
-  `spec-definition-error`. A predicate that names a specific element, such as
-  "process 1 never enters", is not invariant. Neither is a numeric constant that
-  also appears as an ordinary number in another variable, because the permutation
-  rewrites those numbers too. Such a specification can pass with symmetry on and
-  fail with it off.
-- **Symmetry can slow a small search.** Canonicalizing a state tries every
-  permutation of the symmetric constants, so the cost grows factorially with the
-  number of symmetric elements. On a small state space the cost can exceed the
-  saving. Measure with `:symmetry nil` before relying on it.
-- **Concurrent conformance needs total actions.** Every action must be defined,
-  with a result, in every state any interleaving can reach.
-- **Concurrent conformance needs the `:concurrency` capability.** Without it,
-  `platform-capability-unavailable` is signaled. The seed fixes the generated
-  operations but not the thread schedule.
-- **Truncation is a failure by default.** `:allow-bounded t` accepts a bounded
-  check, and never for liveness.
-- **`:tree` conformance needs a deterministic `reset`.** The tree starts from the
-  abstraction of the first `reset`. A later `reset` that lands in a different
-  valid initial state signals `spec-configuration-error`, and one that lands in a
-  state matching no initial state is a violation at step 0. Use `:random` for an
-  implementation whose initial state varies.
-- **`:tree` conformance explores per state.** It runs a transition into a known
-  state, but it tries the successors of a state only along the first path that
-  reaches it. An implementation with internal history can therefore have a
-  mismatch go unnoticed.
-- **Liveness and symmetry exclude each other**, and random exploration cannot
-  check liveness. Both signal `spec-configuration-error` before the search starts.
+Each constraint is stated where the feature is described:
+
+- Refinement does not check the high-level fairness conditions: [Refinement](#refinement).
+- Symmetry is sound only for permutation-invariant predicates, and it can slow a
+  small search: [Symmetry](#symmetry).
+- Concurrent conformance needs total actions and the `:concurrency` capability, and
+  the seed does not fix the thread schedule: [Concurrent
+  conformance](#concurrent-conformance).
+- Truncation is a failure by default, and never passes for liveness: [Truncation
+  and limits](#truncation-and-limits).
+- `:tree` conformance needs a deterministic `reset` and explores per state:
+  [Sequential conformance](#sequential-conformance).
+- Liveness and symmetry exclude each other: [Liveness and
+  fairness](#liveness-and-fairness).
+- Random exploration cannot check liveness: [Random
+  exploration](#random-exploration).
 
 See also [Property Testing](property-testing.md), [Test
 Execution](test-execution.md), [Time-Travel Debugging](time-travel-debugging.md),
