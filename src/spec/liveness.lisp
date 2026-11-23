@@ -119,6 +119,12 @@
   (unless (state-graph-complete-p graph)
     (signal-spec-error 'spec-configuration-error
                        "Temporal properties require a complete state graph."))
+  (unless (eq properties :all)
+    (dolist (name properties)
+      (unless (find name (spec-temporal-properties spec)
+                    :key (function spec-temporal-property-name))
+        (signal-spec-error (quote spec-configuration-error)
+                           "Unknown temporal property ~S." name))))
   (loop for property in (spec-temporal-properties spec)
         for trace = (when (or (eq properties :all)
                               (member (spec-temporal-property-name property) properties))

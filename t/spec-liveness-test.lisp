@@ -198,3 +198,60 @@
                   (:temporal stays-last (:eventually-always (= x 2))))))
       (expect (mapcar #'spec-violation-property (checked-liveness-violations spec))
               :to-equal '(last-to-middle often-middle)))))
+
+(describe "spec liveness and fairness selection and boundaries"
+  (it "rejects unknown selected properties, including when mixed with known names"
+    (let* ((spec (liveness-toggle-spec nil))
+           (graph (liveness-graph spec)))
+      (dolist (names '((missing) (reach missing)))
+        (expect (handler-case
+                    (progn (check-temporal-properties spec graph :properties names) :no-error)
+                  (spec-configuration-error () :signalled))
+                :to-be :signalled))
+      (expect (mapcar #'spec-violation-property
+                      (check-temporal-properties spec graph :properties '(reach)))
+              :to-equal '(reach))
+      (expect (check-temporal-properties spec graph :properties nil) :to-be nil)))
+
+  (it "agrees with a passing invariant on every reachable state"
+    (let* ((spec (specification bounded-pass () (:variables x) (:init (x 0))
+                   (:action inc (:guard (< x 2)) (:next (x (1+ x))))
+                   (:invariant bounded (<= x 2))
+                   (:temporal always-bounded (:always (<= x 2)))))
+           (graph (liveness-graph spec))
+           (failed nil))
+      (map-state-table (lambda (state edges) (declare (ignore edges))
+                         (when (spec-check-invariants spec state) (setf failed t)))
+                       (state-graph-edges graph))
+      (expect failed :to-be nil)
+      (expect (checked-liveness-violations spec) :to-be nil)))
+
+  (it "treats quantified instances as one weakly fair action"
+    (let* ((spec (specification quantified-union () (:variables x) (:init (x 0))
+                   (:action choose (:for (value '(1 2)))
+                     (:guard (< x 2)) (:next (x value)))
+                   (:action back (:guard (= x 1)) (:next (x 0)))
+                   (:fairness (:weak choose back))
+                   (:temporal reaches-two (:eventually (= x 2)))))
+           (violations (checked-liveness-violations spec)))
+      (expect (mapcar #'spec-violation-property violations) :to-equal '(reaches-two))
+      (let ((cycle (lasso-cycle (spec-violation-trace (first violations)))))
+        (expect (not (null (find-if (lambda (step)
+                                      (and (eq (trace-step-action step) 'choose)
+                                           (equal (trace-step-params step) '(1))))
+                                    cycle))) :to-be t)
+        (expect (not (null (find 'back cycle :key #'trace-step-action))) :to-be t))))
+
+  (it "finds a strongly fair subcycle that avoids an enabled state of its SCC"
+    (let* ((spec (specification sf-subcycle () (:variables x) (:init (x 0))
+                   (:action flip (:guard (< x 2)) (:next (x (- 1 x))))
+                   (:action branch (:guard (= x 0)) (:next (x 2)))
+                   (:action back (:guard (= x 2)) (:next (x 0)))
+                   (:action finish (:guard (= x 2)) (:next (x 3)))
+                   (:fairness (:weak flip) (:strong finish))
+                   (:temporal done (:eventually (= x 3)))))
+           (violations (checked-liveness-violations spec)))
+      (expect (mapcar #'spec-violation-property violations) :to-equal '(done))
+      (expect (every (lambda (step) (< (state-ref (trace-step-state step) 'x) 2))
+                     (lasso-cycle (spec-violation-trace (first violations))))
+              :to-be t))))
