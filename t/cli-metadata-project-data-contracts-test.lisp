@@ -1,5 +1,13 @@
 (in-package #:cl-weave/test)
 
+(defun capability-api-package (capability-name)
+  "Return the package whose exports CAPABILITY-NAME's public-apis must name.
+Capabilities of the separate cl-weave/spec system are not exported from
+cl-weave."
+  (if (string= capability-name "specification-checking")
+      (find-package '#:cl-weave/spec)
+      (find-package '#:cl-weave)))
+
 (describe "cli metadata contracts"
   (it "keeps README adoption and CI contracts synchronized with metadata"
     (let* ((adoption-document (read-text-file
@@ -147,7 +155,8 @@
           (expect-unique-strings (getf entry :public-apis))
           (dolist (api-name (getf entry :public-apis))
             (multiple-value-bind (symbol status)
-                (find-symbol (string-upcase api-name) '#:cl-weave)
+                (find-symbol (string-upcase api-name)
+                           (capability-api-package (getf entry :name)))
               (expect symbol :not :to-be nil)
               (expect status :to-be :external)))
           (expect (getf entry :quality-gates) :to-satisfy #'consp)
@@ -342,6 +351,28 @@
         (dolist (reporter (getf metadata :list-reporters))
           (expect (member reporter (getf metadata :reporters) :test #'string=)
                   :not :to-be nil)))))
+
+  (it "keeps cl-weave/spec capability public APIs within the package exports"
+    ;; Inclusion, not equality: the capability names the entry points, while
+    ;; the package also exports accessors and helpers.
+    (let* ((metadata (cl-weave/metadata:framework-metadata))
+           (entry (find-metadata-entry
+                   :name "specification-checking"
+                   (getf metadata :capability-matrix)))
+           (exports '()))
+      (do-external-symbols (symbol (find-package '#:cl-weave/spec))
+        (push (symbol-name symbol) exports))
+      (expect entry :not :to-be nil)
+      (expect (member "specification-checking" (getf metadata :capabilities)
+                      :test #'string=)
+              :not :to-be nil)
+      (dolist (api-name (getf entry :public-apis))
+        (expect exports :to-contain (string-upcase api-name)))
+      ;; The fixed package-exports list stays at the packages that are always
+      ;; loaded, so the metadata output does not depend on what is loaded.
+      (expect (find-metadata-entry :name "cl-weave/spec"
+                                   (getf metadata :package-exports))
+              :to-be nil)))
 
   (it "advertises framework metadata in machine-readable capability APIs"
     (let ((capability-matrix

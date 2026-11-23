@@ -52,7 +52,7 @@ every install path and more CLI examples.
 ```sh
 nix run github:nerima-lisp/cl-weave -- --help    # run without installing
 nix profile install github:nerima-lisp/cl-weave  # install via Nix
-nix develop -c nix profile install .           # from a local checkout
+nix profile install .                            # from a local checkout
 ```
 
 As a flake input, pin a release tag rather than following the default branch:
@@ -60,7 +60,7 @@ As a flake input, pin a release tag rather than following the default branch:
 ```nix
 # flake.nix
 inputs.cl-weave = {
-  url = "github:nerima-lisp/cl-weave/v1.0.1";
+  url = "github:nerima-lisp/cl-weave/v1.6.0";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
@@ -69,8 +69,10 @@ inputs.cl-weave = {
 
 - [Getting Started](https://nerima-lisp.github.io/cl-weave/getting-started/)
 - [DSL Guide](https://nerima-lisp.github.io/cl-weave/guide/dsl-guide/)
+- [Specification Checking](https://nerima-lisp.github.io/cl-weave/guide/specification-checking/):
+  TLA+-style checks in the separate `cl-weave/spec` system.
 - [API Reference](https://nerima-lisp.github.io/cl-weave/reference/api/):
-  programmatic coverage and attempt callback contracts.
+  programmatic coverage, attempt callback, and `cl-weave/spec` contracts.
 
 ## Development
 

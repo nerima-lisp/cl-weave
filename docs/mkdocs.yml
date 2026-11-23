@@ -147,6 +147,7 @@ nav:
       - Benchmarking: guide/benchmarking.md
       - Test Execution: guide/test-execution.md
       - Logic Programming: guide/logic-programming.md
+      - Specification Checking: guide/specification-checking.md
       - Time-Travel Debugging: guide/time-travel-debugging.md
       - Reporters and CI: guide/reporters-and-ci.md
   - Reference:
