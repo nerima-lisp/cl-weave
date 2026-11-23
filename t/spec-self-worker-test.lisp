@@ -646,3 +646,228 @@ and JOIN-THREAD, which receive the original function first."
     (expect (lambda ()
               (cl-weave::run-concurrent-test-cases (cl-weave::make-suite :name "pool") nil))
             :to-throw 'cl-weave::platform-capability-unavailable)))
+
+;;; ------------------------------------------------------------------------
+;;; Linearizability of the pool as seen from outside (FR-011).
+;;;
+;;; The claim, the cancel bit and the result store are local to
+;;; RUN-CONCURRENT-TEST-CASES/THREADED, so no operation at that grain can be
+;;; called from outside, and the model above stays the only check of them. The
+;;; coarsest callable operation is one whole pool run. Its observable output is
+;;; the pair (how often each job body ran, the event paths in index order),
+;;; which is exactly "each job once" and "result at its index". The sequential
+;;; specification below is total: a pool run always succeeds, and READ-RUNS
+;;; counts the runs that returned. Concurrent runs must not disturb each other.
+
+(defun wp-expected-summary (job-count)
+  (list :counts (make-list job-count :initial-element 1)
+        :statuses (make-list job-count :initial-element :pass)
+        :paths (loop for index below job-count
+                     collect (list "pool" (format nil "job-~D" index)))))
+
+(defspec pool-runs ()
+  (:variables runs)
+  (:init (runs 0))
+  (:action run-pool
+    (:for (job-count (list 2 3)))
+    (:next (runs (1+ runs)))
+    (:output (wp-expected-summary job-count)))
+  (:action read-runs
+    (:next (runs runs))
+    (:output runs)))
+
+;;; Only pool runs, so that a one-operation run cannot draw a read.
+(defspec pool-run-only ()
+  (:variables runs)
+  (:init (runs 0))
+  (:action run-pool
+    (:for (job-count (list 2 3)))
+    (:next (runs (1+ runs)))
+    (:output (wp-expected-summary job-count))))
+
+(defun wp-run-op (id invoked returned job-count output)
+  (make-history-operation :id id :thread id :action 'run-pool :params (list job-count)
+                          :output output :invoked invoked :returned returned))
+
+(defun wp-read-op (id invoked returned output)
+  (make-history-operation :id id :thread id :action 'read-runs :params nil
+                          :output output :invoked invoked :returned returned))
+
+(describe "worker pool linearizability on hand-built histories"
+  (it "accepts overlapping pool runs with the right summaries and a read that counts both"
+    (let* ((first (wp-run-op 0 0 3 2 (wp-expected-summary 2)))
+           (second (wp-run-op 1 1 4 3 (wp-expected-summary 3)))
+           (read (wp-read-op 2 5 6 2)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (pool-runs) (list read second first))
+        (expect linearizable :to-be t)
+        (expect prefix :to-equal (list first second read))
+        (expect exceeded :to-be nil))))
+
+  (it "rejects a read that misses a pool run which returned before it started"
+    (let* ((run (wp-run-op 0 0 1 2 (wp-expected-summary 2)))
+           (read (wp-read-op 1 2 3 0)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (pool-runs) (list run read))
+        (expect linearizable :to-be nil)
+        (expect prefix :to-equal (list run))
+        (expect exceeded :to-be nil))))
+
+  (it "rejects a read that counts a run which never happened"
+    (let* ((first (wp-run-op 0 0 3 2 (wp-expected-summary 2)))
+           (second (wp-run-op 1 1 4 3 (wp-expected-summary 3)))
+           (read (wp-read-op 2 5 6 3)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (pool-runs) (list first second read))
+        (expect linearizable :to-be nil)
+        (expect prefix :to-equal (list first second))
+        (expect exceeded :to-be nil))))
+
+  (it "rejects a pool run in which one job ran twice and another never"
+    (let* ((summary (list :counts '(2 0) :statuses '(:pass :pass)
+                          :paths (getf (wp-expected-summary 2) :paths)))
+           (run (wp-run-op 0 0 1 2 summary)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (pool-run-only) (list run))
+        (expect linearizable :to-be nil)
+        (expect prefix :to-equal nil)
+        (expect exceeded :to-be nil))))
+
+  (it "rejects a pool run whose results are in the wrong index order"
+    (let* ((expected (wp-expected-summary 3))
+           (summary (list :counts (getf expected :counts)
+                          :statuses (getf expected :statuses)
+                          :paths (reverse (getf expected :paths))))
+           (run (wp-run-op 0 0 1 3 summary)))
+      (multiple-value-bind (linearizable prefix exceeded)
+          (linearizable-history-p (pool-run-only) (list run))
+        (expect linearizable :to-be nil)
+        (expect prefix :to-equal nil)
+        (expect exceeded :to-be nil)))))
+
+#+sb-thread
+(progn
+  (defun wp-real-pool-summary (job-count)
+    "One run of the real pool with two workers, summarised like the model."
+    (let ((counters (wp-make-counters job-count)))
+      (multiple-value-bind (suite tests)
+          (wp-make-jobs job-count (lambda (index) (wp-count-run counters index)))
+        (let ((events (let ((cl-weave::*max-workers* 2))
+                        (cl-weave::run-concurrent-test-cases suite tests))))
+          (list :counts (coerce counters 'list)
+                :statuses (mapcar #'cl-weave::test-event-status events)
+                :paths (mapcar #'cl-weave::test-event-path events))))))
+
+  (defun wp-mini-pool-summary (job-count &key (claim :cas) (store :in-place))
+    "A two-worker copy of the claim protocol with one deliberate defect each.
+CLAIM :RACY makes both workers read the word before either writes it, forced
+with a semaphore so it happens under every schedule; STORE :SHIFTED writes each
+result one slot too far."
+    (let* ((counters (wp-make-counters job-count))
+           (results (make-array job-count :initial-element nil))
+           (word (make-array 1 :element-type 'sb-ext:word :initial-element 0))
+           (both-read (sb-thread:make-semaphore :count 0))
+           (gate (sb-thread:make-semaphore :count 0))
+           (threads
+             (loop repeat 2
+                   collect
+                   (sb-thread:make-thread
+                    (lambda ()
+                      (sb-thread:wait-on-semaphore gate)
+                      (let ((first-claim t))
+                        (loop
+                          (let ((seen (aref word 0)))
+                            (when (>= seen job-count)
+                              (return))
+                            (let ((index
+                                    (cond ((and first-claim (eq claim :racy))
+                                           (setf first-claim nil)
+                                           (sb-thread:signal-semaphore both-read)
+                                           (sb-thread:wait-on-semaphore both-read :n 2)
+                                           (sb-thread:signal-semaphore both-read 2)
+                                           (setf (aref word 0) (1+ seen))
+                                           seen)
+                                          ((= seen (sb-ext:compare-and-swap
+                                                    (aref word 0) seen (1+ seen)))
+                                           seen))))
+                              (when index
+                                (wp-count-run counters index)
+                                (setf (aref results
+                                            (if (eq store :shifted)
+                                                (mod (1+ index) job-count)
+                                                index))
+                                      (list "pool" (format nil "job-~D" index)))))))))))))
+      (sb-thread:signal-semaphore gate 2)
+      (mapc #'sb-thread:join-thread threads)
+      (list :counts (coerce counters 'list)
+            :statuses (make-list job-count :initial-element :pass)
+            :paths (coerce results 'list))))
+
+  (defun wp-pool-operations (summary-function)
+    (let ((summary-function summary-function))
+      (list (cons 'run-pool
+                  (lambda (sut job-count)
+                    (let ((summary (funcall summary-function job-count)))
+                      (sb-ext:atomic-incf
+                          (aref (the (simple-array sb-ext:word (*)) sut) 0))
+                      summary)))
+            (cons 'read-runs
+                  (lambda (sut)
+                    (aref (the (simple-array sb-ext:word (*)) sut) 0))))))
+
+  (defun wp-pool-sut ()
+    (make-array 1 :element-type 'sb-ext:word :initial-element 0))
+
+  (defun wp-check-pool (spec summary-function &key (threads 1) (operations 1) (runs 1))
+    (check-linearizability spec :reset #'wp-pool-sut
+                                :operations (wp-pool-operations summary-function)
+                                :threads threads :operations-per-thread operations
+                                :runs runs :seed 42))
+
+  (describe "worker pool linearizability on real threads"
+    (it "accepts the real pool under concurrent runs: every job once, results at their index"
+      (expect (cl-weave::platform-capability-available-p :concurrency) :to-be t)
+      (let ((result (wp-check-pool (pool-runs) #'wp-real-pool-summary
+                                   :threads 2 :operations 2 :runs 2)))
+        (expect (spec-result-mode result) :to-be :linearizability)
+        (expect (spec-result-passed-p result) :to-be t)
+        (expect (spec-result-truncated result) :to-be nil)
+        ;; Both runs executed their four operations and the search visited states.
+        (expect (getf (spec-result-statistics result) :runs) :to-be 2)
+        (expect (spec-result-states-found result) :to-be-greater-than 0)))
+
+    (it "accepts a copy of the claim protocol without defects, so the checks below fail for the defect alone"
+      (let ((result (wp-check-pool (pool-run-only) #'wp-mini-pool-summary
+                                   :threads 2 :operations 2 :runs 2)))
+        (expect (spec-result-passed-p result) :to-be t)))
+
+    (it "fails a claim whose two workers read the word before either writes it: a job runs twice"
+      (let* ((result (wp-check-pool (pool-run-only)
+                                    (lambda (job-count)
+                                      (wp-mini-pool-summary job-count :claim :racy))))
+             (violation (spec-result-violation result))
+             (detail (spec-violation-detail violation))
+             (operation (first (getf detail :history))))
+        (expect (spec-result-passed-p result) :to-be nil)
+        (expect (spec-violation-kind violation) :to-be :linearizability)
+        (expect (length (getf detail :history)) :to-be 1)
+        (expect (getf detail :longest-prefix) :to-equal nil)
+        (expect (first (getf (history-operation-output operation) :counts)) :to-be 2)))
+
+    (it "fails a pool that stores each result one slot too far"
+      (let* ((result (wp-check-pool (pool-run-only)
+                                    (lambda (job-count)
+                                      (wp-mini-pool-summary job-count :store :shifted))))
+             (violation (spec-result-violation result))
+             (detail (spec-violation-detail violation))
+             (operation (first (getf detail :history)))
+             (output (history-operation-output operation))
+             (job-count (length (getf output :counts))))
+        (expect (spec-result-passed-p result) :to-be nil)
+        (expect (spec-violation-kind violation) :to-be :linearizability)
+        (expect (getf detail :longest-prefix) :to-equal nil)
+        ;; Each job ran once; only the placement differs from the specification.
+        (expect (getf output :counts) :to-equal (getf (wp-expected-summary job-count) :counts))
+        (expect (getf output :paths)
+                :to-equal (let ((paths (getf (wp-expected-summary job-count) :paths)))
+                            (append (last paths) (butlast paths))))))))
