@@ -205,7 +205,7 @@ COMPLETE-P is true only when no limit cut the search."
                        "Fairness condition ~S must be :weak or :strong on a declared action."
                        condition))
   (dolist (constant symmetry)
-    (ensure-definition (member constant constants)
+    (ensure-definition (loop for key in constants by (function cddr) thereis (eql constant key))
                        "Symmetry names ~S, which is not a constant of ~A." constant name)))
 
 (defun make-spec (&key name constants variables init actions invariants

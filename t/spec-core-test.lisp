@@ -398,3 +398,16 @@
                                                      (declare (ignore state))
                                                      (cons (quote x) 7)))))))
       (signals-error-of-type spec-definition-error (spec-successors spec (quote (x 0)))))))
+
+(describe "spec symmetry constant names"
+  (it "rejects a constant value used as a symmetry name"
+    (signals-error-of-type spec-definition-error
+      (make-spec :name (quote bad-symmetry) :constants (quote (a b))
+                 :variables (quote (x)) :init (lambda () (list (list (quote x) 0)))
+                 :symmetry (quote (b)))))
+  (it "accepts a declared constant key as a symmetry name"
+    (expect (spec-symmetry
+             (make-spec :name (quote good-symmetry) :constants (quote (a b))
+                        :variables (quote (x)) :init (lambda () (list (list (quote x) 0)))
+                        :symmetry (quote (a))))
+            :to-equal (quote (a)))))
