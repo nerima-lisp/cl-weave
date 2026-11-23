@@ -4,8 +4,7 @@
   (make-spec :name 'symmetry-test :constants constants :variables '(x y)
              :init (lambda () '((x 0 y 0))) :symmetry symmetry))
 
-(describe "spec symmetry"
-  (it "returns no canonicalizer without symmetric constants"
+(describe "spec symmetry" (it "returns no canonicalizer without symmetric constants"
     (expect (spec-state-canonicalizer (symmetry-test-spec nil nil)) :to-be nil))
 
   (it "normalizes two elements idempotently and distinguishes orbits"
@@ -73,5 +72,36 @@
       (expect (handler-case
                   (progn (spec-state-canonicalizer
                           (symmetry-test-spec (list 'procs value) '(procs))) :no-error)
+                (spec-definition-error () :signalled))
+              :to-be :signalled)))
+  (it "orders state variables by declaration"
+    (let* ((spec (symmetry-test-spec (list (quote procs) (list :a :b)) (quote (procs))))
+           (canonicalize (spec-state-canonicalizer spec)))
+      (expect (funcall canonicalize (list (quote y) :b (quote x) :a))
+              :to-equal (list (quote x) :a (quote y) :b))))
+  (it "ignores repeated list elements"
+    (let ((canonicalize (spec-state-canonicalizer
+                         (symmetry-test-spec (list (quote procs) (list :a :a :b)) (quote (procs))))))
+      (expect (funcall canonicalize (list (quote x) :b (quote y) :a))
+              :to-equal (list (quote x) :a (quote y) :b))))
+  (it "matches distinct equal strings"
+    (let* ((a (copy-seq "a")) (b (copy-seq "b"))
+           (canonicalize (spec-state-canonicalizer
+                          (symmetry-test-spec (list (quote procs) (list a b)) (quote (procs))))))
+      (expect (funcall canonicalize (list (quote x) (copy-seq "b") (quote y) (copy-seq "a")))
+              :to-equal (list (quote x) "a" (quote y) "b"))))
+  (it "normalizes every permutation of three elements"
+    (let ((canonicalize (spec-state-canonicalizer
+                         (symmetry-test-spec (list (quote procs) (list :a :b :c)) (quote (procs))))))
+      (dolist (pair (list (list :a :b) (list :b :a) (list :a :c)
+                          (list :c :a) (list :b :c) (list :c :b)))
+        (expect (funcall canonicalize (list (quote x) (first pair) (quote y) (second pair)))
+                :to-equal (list (quote x) :a (quote y) :b)))))
+  (it "rejects non-atomic symmetric elements"
+    (dolist (domain (list (list :a (list 1 2)) (spec-set :a (list 1 2))))
+      (expect (handler-case
+                  (progn (spec-state-canonicalizer
+                          (symmetry-test-spec (list (quote procs) domain) (quote (procs))))
+                         :no-error)
                 (spec-definition-error () :signalled))
               :to-be :signalled))))
