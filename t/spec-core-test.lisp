@@ -382,3 +382,19 @@
       (expect (handler-case (progn (macroexpand-1 form) :no-error)
                 (spec-definition-error () :signalled))
               :to-be :signalled))))
+
+(describe "spec malformed state and update lists"
+  (it "rejects a dotted initial state with a definition error"
+    (let ((spec (make-spec :name (quote bad-init) :variables (quote (x))
+                           :init (lambda () (list (cons (quote x) 7))))))
+      (signals-error-of-type spec-definition-error (spec-initial-states spec))))
+  (it "rejects a dotted action update with a definition error"
+    (let ((spec (make-spec :name (quote bad-update) :variables (quote (x))
+                           :init (lambda () (list (list (quote x) 0)))
+                           :actions (list (make-spec-action
+                                           :name (quote step)
+                                           :guard (constantly t)
+                                           :update (lambda (state)
+                                                     (declare (ignore state))
+                                                     (cons (quote x) 7)))))))
+      (signals-error-of-type spec-definition-error (spec-successors spec (quote (x 0)))))))

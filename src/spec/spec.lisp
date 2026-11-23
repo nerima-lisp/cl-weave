@@ -243,7 +243,11 @@ whose values are symmetric sets."
 declaration order. Signal SPEC-DEFINITION-ERROR for a missing, repeated or
 undeclared variable and SPEC-STATE-ERROR for a value EQUAL cannot compare."
   (let ((variables (spec-variables spec)))
-    (ensure-definition (and (listp plist) (evenp (length plist)))
+    (ensure-definition (handler-case
+                           (and (listp plist)
+                                (let ((size (list-length plist)))
+                                  (and size (evenp size))))
+                         (type-error () nil))
                        "A state of ~A must be a plist, got ~S." (spec-name spec) plist)
     (let ((keys (loop for key in plist by #'cddr collect key)))
       (ensure-definition (and (unique-p keys)
@@ -307,7 +311,11 @@ quantifiers may depend on earlier ones. Domains are visited in list order."
     (walk (spec-action-params action) '())))
 
 (defun apply-update (spec action state update)
-  (ensure-definition (and (listp update) (evenp (length update)))
+  (ensure-definition (handler-case
+                         (and (listp update)
+                              (let ((size (list-length update)))
+                                (and size (evenp size))))
+                       (type-error () nil))
                      "Update of action ~S must return a plist, got ~S."
                      (spec-action-name action) update)
   (let ((assigned (loop for key in update by #'cddr collect key)))
