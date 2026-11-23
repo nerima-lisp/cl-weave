@@ -60,7 +60,7 @@ As a flake input, pin a release tag rather than following the default branch:
 ```nix
 # flake.nix
 inputs.cl-weave = {
-  url = "github:nerima-lisp/cl-weave/v1.0.1";
+  url = "github:nerima-lisp/cl-weave/v1.6.0";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
@@ -72,7 +72,7 @@ inputs.cl-weave = {
 - [Specification Checking](https://nerima-lisp.github.io/cl-weave/guide/specification-checking/):
   TLA+-style checks in the separate `cl-weave/spec` system.
 - [API Reference](https://nerima-lisp.github.io/cl-weave/reference/api/):
-  programmatic coverage and attempt callback contracts.
+  programmatic coverage, attempt callback, and `cl-weave/spec` contracts.
 
 ## Development
 
